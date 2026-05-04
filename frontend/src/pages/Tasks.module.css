@@ -1,0 +1,48 @@
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 1.5rem;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.header h1 { font-size: 1.8rem; }
+.sub { color: var(--text-muted); font-size: 0.9rem; }
+
+.sessionEarned {
+  font-size: 0.9rem;
+  color: var(--text-muted);
+  padding: 0.6rem 1rem;
+}
+
+.sessionEarned strong { color: var(--green); }
+
+.tabs {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-bottom: 1.5rem;
+}
+
+.tab {
+  background: var(--dark-card);
+  color: var(--text-muted);
+  border: 1px solid var(--dark-border);
+  padding: 0.4rem 1rem;
+  border-radius: 999px;
+  font-size: 0.85rem;
+  font-weight: 500;
+}
+
+.activeTab {
+  background: var(--gold);
+  color: #000;
+  border: 1px solid var(--gold);
+  padding: 0.4rem 1rem;
+  border-radius: 999px;
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+.loading { color: var(--text-muted); text-align: center; padding: 3rem; }

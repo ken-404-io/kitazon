@@ -1,0 +1,26 @@
+.layout {
+  display: grid;
+  grid-template-columns: 480px 1fr;
+  gap: 2rem;
+  align-items: start;
+}
+
+.history h3 { margin-bottom: 0.75rem; }
+.empty { color: var(--text-muted); }
+
+.row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+
+.channel { font-size: 0.88rem; font-weight: 600; }
+.time { font-size: 0.75rem; color: var(--text-muted); }
+
+.right { text-align: right; display: flex; flex-direction: column; gap: 0.25rem; align-items: flex-end; }
+.amount { font-weight: 800; color: var(--gold); }
+
+@media (max-width: 900px) {
+  .layout { grid-template-columns: 1fr; }
+}
