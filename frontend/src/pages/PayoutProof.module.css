@@ -1,0 +1,7 @@
+.header {
+  text-align: center;
+  margin-bottom: 2rem;
+}
+
+.header h1 { font-size: 2rem; margin-bottom: 0.5rem; }
+.sub { color: var(--text-muted); }
