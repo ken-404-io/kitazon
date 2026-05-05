@@ -1,10 +1,10 @@
-import { Response, NextFunction } from 'express';
+import { Request, Response, NextFunction } from 'express';
 import db from '../../config/database';
-import { AuthRequest, WithdrawalChannel } from '../types';
+import { WithdrawalChannel } from '../types';
 
 const VALID_CHANNELS: WithdrawalChannel[] = ['gcash', 'maya', 'gotyme', 'bpi', 'bdo', 'unionbank', 'coins', 'usdt'];
 
-export async function create(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+export async function create(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     const { amount, channel, account_number } = req.body as {
       amount: string | number; channel: string; account_number: string;
@@ -24,7 +24,7 @@ export async function create(req: AuthRequest, res: Response, next: NextFunction
       return;
     }
 
-    const user = await db('users').where({ id: req.user.id }).first();
+    const user = await db('users').where({ id: req.user!.id }).first();
     if (user.balance < parsed) {
       res.status(400).json({ message: 'Insufficient balance.' });
       return;
@@ -33,7 +33,7 @@ export async function create(req: AuthRequest, res: Response, next: NextFunction
     const now = new Date();
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
     const [monthTotal] = await db('withdrawals')
-      .where({ user_id: req.user.id, status: 'completed' })
+      .where({ user_id: req.user!.id, status: 'completed' })
       .where('created_at', '>=', monthStart)
       .sum('amount as total');
 
@@ -47,17 +47,17 @@ export async function create(req: AuthRequest, res: Response, next: NextFunction
     }
 
     await db.transaction(async (trx) => {
-      await trx('users').where({ id: req.user.id }).decrement('balance', parsed);
-      await trx('withdrawals').insert({ user_id: req.user.id, amount: parsed, fee, net_amount: netAmount, channel, account_number, status: 'pending' });
+      await trx('users').where({ id: req.user!.id }).decrement('balance', parsed);
+      await trx('withdrawals').insert({ user_id: req.user!.id, amount: parsed, fee, net_amount: netAmount, channel, account_number, status: 'pending' });
     });
 
     res.status(201).json({ message: 'Withdrawal submitted successfully.', fee, net_amount: netAmount });
   } catch (err) { next(err); }
 }
 
-export async function list(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+export async function list(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const withdrawals = await db('withdrawals').where({ user_id: req.user.id }).orderBy('created_at', 'desc');
+    const withdrawals = await db('withdrawals').where({ user_id: req.user!.id }).orderBy('created_at', 'desc');
     res.json(withdrawals);
   } catch (err) { next(err); }
 }

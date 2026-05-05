@@ -1,10 +1,10 @@
-import { Response, NextFunction } from 'express';
+import { Request, Response, NextFunction } from 'express';
 import db from '../../config/database';
-import { AuthRequest, DbTask, DbEarning } from '../types';
+import { DbTask, DbEarning } from '../types';
 
 const SPIN_PRIZES = [5, 5, 10, 10, 15, 20, 25, 50, 75, 100];
 
-export async function list(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+export async function list(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     const query = db<DbTask>('tasks').where({ is_active: true }).orderBy('payout', 'desc');
     if (req.query.category) query.where({ category: req.query.category as string });
@@ -12,7 +12,7 @@ export async function list(req: AuthRequest, res: Response, next: NextFunction):
   } catch (err) { next(err); }
 }
 
-export async function complete(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+export async function complete(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     const { id } = req.params;
     const task = await db<DbTask>('tasks').where({ id, is_active: true }).first();
@@ -21,17 +21,17 @@ export async function complete(req: AuthRequest, res: Response, next: NextFuncti
       return;
     }
 
-    const alreadyDone = await db<DbEarning>('earnings').where({ user_id: req.user.id, task_id: id }).first();
+    const alreadyDone = await db<DbEarning>('earnings').where({ user_id: req.user!.id, task_id: id }).first();
     if (alreadyDone) {
       res.status(409).json({ message: 'You already completed this task.' });
       return;
     }
 
     await db.transaction(async (trx) => {
-      await trx('earnings').insert({ user_id: req.user.id, task_id: id, amount: task.payout, type: 'task', description: task.title });
-      await trx('users').where({ id: req.user.id }).increment('balance', task.payout);
+      await trx('earnings').insert({ user_id: req.user!.id, task_id: id, amount: task.payout, type: 'task', description: task.title });
+      await trx('users').where({ id: req.user!.id }).increment('balance', task.payout);
 
-      const referral = await trx('referrals').where({ referred_id: req.user.id }).first();
+      const referral = await trx('referrals').where({ referred_id: req.user!.id }).first();
       if (referral) {
         const commission = parseFloat((task.payout * 0.20).toFixed(2));
         await trx('referrals').where({ id: referral.id }).increment('commission_earned', commission);
@@ -44,13 +44,13 @@ export async function complete(req: AuthRequest, res: Response, next: NextFuncti
   } catch (err) { next(err); }
 }
 
-export async function spin(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+export async function spin(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
     const spunToday = await db<DbEarning>('earnings')
-      .where({ user_id: req.user.id, type: 'spin' })
+      .where({ user_id: req.user!.id, type: 'spin' })
       .where('created_at', '>=', today)
       .first();
 
@@ -62,18 +62,18 @@ export async function spin(req: AuthRequest, res: Response, next: NextFunction):
     const amount = SPIN_PRIZES[Math.floor(Math.random() * SPIN_PRIZES.length)];
 
     await db.transaction(async (trx) => {
-      await trx('earnings').insert({ user_id: req.user.id, task_id: null, amount, type: 'spin', description: 'Daily spin wheel' });
-      await trx('users').where({ id: req.user.id }).increment('balance', amount);
+      await trx('earnings').insert({ user_id: req.user!.id, task_id: null, amount, type: 'spin', description: 'Daily spin wheel' });
+      await trx('users').where({ id: req.user!.id }).increment('balance', amount);
     });
 
     res.json({ amount });
   } catch (err) { next(err); }
 }
 
-export async function recentEarnings(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+export async function recentEarnings(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     const earnings = await db('earnings')
-      .where({ 'earnings.user_id': req.user.id })
+      .where({ 'earnings.user_id': req.user!.id })
       .leftJoin('tasks', 'earnings.task_id', 'tasks.id')
       .select(
         'earnings.id',

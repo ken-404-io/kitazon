@@ -2,7 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import db from '../../config/database';
-import { AuthRequest, DbUser } from '../types';
+import { DbUser } from '../types';
 
 const sign = (user: DbUser): string =>
   jwt.sign({ id: user.id, email: user.email }, process.env.JWT_SECRET as string, { expiresIn: '30d' });
@@ -84,9 +84,9 @@ export async function login(req: Request, res: Response, next: NextFunction): Pr
   } catch (err) { next(err); }
 }
 
-export async function me(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+export async function me(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const user = await db<DbUser>('users').where({ id: req.user.id }).first();
+    const user = await db<DbUser>('users').where({ id: req.user!.id }).first();
     if (!user) {
       res.status(404).json({ message: 'User not found.' });
       return;
@@ -95,17 +95,17 @@ export async function me(req: AuthRequest, res: Response, next: NextFunction): P
   } catch (err) { next(err); }
 }
 
-export async function stats(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+export async function stats(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const user = await db<DbUser>('users').where({ id: req.user.id }).first();
+    const user = await db<DbUser>('users').where({ id: req.user!.id }).first();
     const now = new Date();
     const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     const weekStart = new Date(todayStart);
     weekStart.setDate(weekStart.getDate() - 7);
 
-    const [today] = await db('earnings').where({ user_id: req.user.id }).where('created_at', '>=', todayStart).sum('amount as total');
-    const [week] = await db('earnings').where({ user_id: req.user.id }).where('created_at', '>=', weekStart).sum('amount as total');
-    const [total] = await db('earnings').where({ user_id: req.user.id }).sum('amount as total');
+    const [today] = await db('earnings').where({ user_id: req.user!.id }).where('created_at', '>=', todayStart).sum('amount as total');
+    const [week] = await db('earnings').where({ user_id: req.user!.id }).where('created_at', '>=', weekStart).sum('amount as total');
+    const [total] = await db('earnings').where({ user_id: req.user!.id }).sum('amount as total');
 
     res.json({
       balance: user?.balance ?? 0,
