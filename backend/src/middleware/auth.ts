@@ -1,8 +1,8 @@
-import { Response, NextFunction } from 'express';
+import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
-import { AuthRequest, AuthPayload } from '../types';
+import { AuthPayload } from '../types';
 
-export default function authMiddleware(req: AuthRequest, res: Response, next: NextFunction): void {
+export default function authMiddleware(req: Request, res: Response, next: NextFunction): void {
   const token = req.headers.authorization?.split(' ')[1];
   if (!token) {
     res.status(401).json({ message: 'Unauthorized' });
