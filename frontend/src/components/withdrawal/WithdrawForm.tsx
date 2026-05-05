@@ -23,12 +23,12 @@ interface FormState {
 }
 
 interface Props {
-  balance?: number;
+  balance?: number | string;
   onSuccess?: (amount: number) => void;
 }
 
-export default function WithdrawForm({ balance = 0 as number | string, onSuccess }: Props) {
-  const numBalance = Number(balance);
+export default function WithdrawForm({ balance, onSuccess }: Props) {
+  const numBalance = Number(balance ?? 0);
   const [form, setForm] = useState<FormState>({ amount: '', channel: 'gcash', account_number: '' });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
