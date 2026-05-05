@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { sanitizeEmail, isValidEmail } from '../utils/sanitize';
 import styles from './Auth.module.css';
 
 export default function Login() {
@@ -15,9 +16,14 @@ export default function Login() {
   const submit = async (e: React.FormEvent): Promise<void> => {
     e.preventDefault();
     setError('');
+
+    const email = sanitizeEmail(form.email);
+    if (!isValidEmail(email)) return setError('Invalid email address.');
+    if (!form.password) return setError('Password is required.');
+
     setLoading(true);
     try {
-      await login(form.email, form.password);
+      await login(email, form.password);
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { message?: string } } }).response?.data?.message;
       setError(msg ?? 'Invalid email or password.');
@@ -31,14 +37,14 @@ export default function Login() {
       <div className={styles.card}>
         <h2>Welcome back 👋</h2>
         <p className={styles.sub}>Login to your Kitazon account</p>
-        <form onSubmit={submit}>
+        <form onSubmit={submit} autoComplete="on">
           <div className="form-group">
             <label>Email</label>
-            <input type="email" value={form.email} onChange={set('email')} required autoFocus />
+            <input type="email" value={form.email} onChange={set('email')} required autoFocus autoComplete="email" maxLength={254} />
           </div>
           <div className="form-group">
             <label>Password</label>
-            <input type="password" value={form.password} onChange={set('password')} required />
+            <input type="password" value={form.password} onChange={set('password')} required autoComplete="current-password" maxLength={128} />
           </div>
           {error && <p className="error-msg">{error}</p>}
           <button className="btn-primary" style={{ width: '100%' }} type="submit" disabled={loading}>
