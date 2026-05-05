@@ -29,7 +29,7 @@ export default function Dashboard() {
           <p className={styles.sub}>Here's your earnings overview</p>
         </div>
         <Link to="/withdraw">
-          <button className="btn-primary">Withdraw ₱{(stats?.balance ?? 0).toFixed(2)}</button>
+          <button className="btn-primary">Withdraw ₱{Number(stats?.balance ?? 0).toFixed(2)}</button>
         </Link>
       </div>
 

@@ -27,7 +27,8 @@ interface Props {
   onSuccess?: (amount: number) => void;
 }
 
-export default function WithdrawForm({ balance = 0, onSuccess }: Props) {
+export default function WithdrawForm({ balance = 0 as number | string, onSuccess }: Props) {
+  const numBalance = Number(balance);
   const [form, setForm] = useState<FormState>({ amount: '', channel: 'gcash', account_number: '' });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -41,7 +42,7 @@ export default function WithdrawForm({ balance = 0, onSuccess }: Props) {
     setError('');
     setSuccess('');
     if (parseFloat(form.amount) < 50) return setError('Minimum withdrawal is ₱50.');
-    if (parseFloat(form.amount) > balance) return setError('Insufficient balance.');
+    if (parseFloat(form.amount) > numBalance) return setError('Insufficient balance.');
     setLoading(true);
     try {
       await api.post('/withdrawals', form);
@@ -60,7 +61,7 @@ export default function WithdrawForm({ balance = 0, onSuccess }: Props) {
   return (
     <form className={`card ${styles.form}`} onSubmit={submit}>
       <h3>Request Withdrawal</h3>
-      <p className={styles.balance}>Available: <strong>₱{balance.toFixed(2)}</strong></p>
+      <p className={styles.balance}>Available: <strong>₱{numBalance.toFixed(2)}</strong></p>
 
       <div className="form-group">
         <label>Amount (min ₱50)</label>

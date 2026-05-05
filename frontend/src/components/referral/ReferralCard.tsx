@@ -48,7 +48,7 @@ export default function ReferralCard({ referralCode = '', referralCount = 0, lif
           <p className={styles.statLabel}>Referrals</p>
         </div>
         <div className={styles.stat}>
-          <p className={styles.statNum}>₱{lifetimeEarnings.toFixed(0)}</p>
+          <p className={styles.statNum}>₱{Number(lifetimeEarnings).toFixed(0)}</p>
           <p className={styles.statLabel}>Earned</p>
         </div>
         <div className={styles.stat}>
