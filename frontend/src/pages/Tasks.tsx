@@ -63,7 +63,7 @@ export default function Tasks() {
       ) : (
         <div className="grid-3">
           {tasks.map((t) => (
-            <TaskCard key={t.id} task={t} onComplete={(amount) => setTotalEarned((p) => p + amount)} />
+            <TaskCard key={t.id} task={t} onComplete={(amount) => setTotalEarned((p) => p + Number(amount))} />
           ))}
         </div>
       )}
