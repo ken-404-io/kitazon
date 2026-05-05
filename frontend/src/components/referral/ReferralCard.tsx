@@ -16,11 +16,13 @@ const TIERS: Tier[] = [
 
 interface Props {
   referralCode?: string;
-  referralCount?: number;
-  lifetimeEarnings?: number;
+  referralCount?: number | string;
+  lifetimeEarnings?: number | string;
 }
 
 export default function ReferralCard({ referralCode = '', referralCount = 0, lifetimeEarnings = 0 }: Props) {
+  const numCount = Number(referralCount);
+  const numEarnings = Number(lifetimeEarnings);
   const [copied, setCopied] = useState(false);
   const link = `${window.location.origin}/register?ref=${referralCode}`;
 
@@ -30,7 +32,7 @@ export default function ReferralCard({ referralCode = '', referralCount = 0, lif
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const tier = TIERS.slice().reverse().find((t) => referralCount >= t.min);
+  const tier = TIERS.slice().reverse().find((t) => numCount >= t.min);
 
   return (
     <div className={`card ${styles.wrap}`}>
@@ -44,11 +46,11 @@ export default function ReferralCard({ referralCode = '', referralCount = 0, lif
 
       <div className={styles.stats}>
         <div className={styles.stat}>
-          <p className={styles.statNum}>{referralCount}</p>
+          <p className={styles.statNum}>{numCount}</p>
           <p className={styles.statLabel}>Referrals</p>
         </div>
         <div className={styles.stat}>
-          <p className={styles.statNum}>₱{Number(lifetimeEarnings).toFixed(0)}</p>
+          <p className={styles.statNum}>₱{numEarnings.toFixed(0)}</p>
           <p className={styles.statLabel}>Earned</p>
         </div>
         <div className={styles.stat}>
@@ -63,7 +65,7 @@ export default function ReferralCard({ referralCode = '', referralCount = 0, lif
         {TIERS.map((t) => (
           <div
             key={t.name}
-            className={`${styles.tier} ${referralCount >= t.min ? styles.active : ''}`}
+            className={`${styles.tier} ${numCount >= t.min ? styles.active : ''}`}
             style={{ '--tc': t.color } as React.CSSProperties}
           >
             <strong style={{ color: t.color }}>{t.name}</strong>
