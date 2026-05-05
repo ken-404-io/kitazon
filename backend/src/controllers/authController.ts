@@ -1,11 +1,19 @@
 import { Request, Response, NextFunction } from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
+import crypto from 'crypto';
 import db from '../../config/database';
-import { DbUser } from '../types';
+import { DbUser, AuthPayload } from '../types';
+
+// Short-lived access token; use refresh tokens in production for longer sessions
+const TOKEN_TTL = '2h';
 
 const sign = (user: DbUser): string =>
-  jwt.sign({ id: user.id, email: user.email }, process.env.JWT_SECRET as string, { expiresIn: '30d' });
+  jwt.sign(
+    { id: user.id, email: user.email, jti: crypto.randomUUID() },
+    process.env.JWT_SECRET as string,
+    { expiresIn: TOKEN_TTL }
+  );
 
 const safeUser = (u: DbUser) => ({
   id: u.id,
@@ -14,6 +22,16 @@ const safeUser = (u: DbUser) => ({
   balance: u.balance,
   referral_code: u.referral_code,
 });
+
+// ─── Token blacklist (in-memory; use Redis in production) ────────────────────
+export const tokenBlacklist = new Set<string>();
+
+// Prune expired JTIs every hour so memory doesn't grow unbounded
+setInterval(() => {
+  // We can't inspect expiry without decoding, so clear the full set hourly.
+  // Tokens expire in 2h, so any JTI older than that is already invalid.
+  tokenBlacklist.clear();
+}, 60 * 60 * 1000);
 
 // ─── Account lockout (in-memory; use Redis in production) ───────────────────
 interface LockoutEntry { attempts: number; lockedUntil: Date | null; }
@@ -52,7 +70,7 @@ function validatePassword(password: string): string | null {
 
 // ─── Email format ────────────────────────────────────────────────────────────
 function isValidEmail(email: string): boolean {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+  return /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)+$/.test(email);
 }
 
 // ─── Controllers ─────────────────────────────────────────────────────────────
@@ -87,20 +105,29 @@ export async function register(req: Request, res: Response, next: NextFunction):
     }
 
     const hash = await bcrypt.hash(password, 12);
-    const code = Math.random().toString(36).slice(2, 10).toUpperCase();
+
+    // Generate referral code with collision retry
+    let code: string;
+    let attempts = 0;
+    do {
+      code = crypto.randomBytes(4).toString('hex').toUpperCase();
+      const collision = await db<DbUser>('users').where({ referral_code: code }).first();
+      if (!collision) break;
+      attempts++;
+    } while (attempts < 5);
 
     const [user] = await db<DbUser>('users').insert({
       name: name.trim(),
       email: normalizedEmail,
       password_hash: hash,
-      referral_code: code,
+      referral_code: code!,
       balance: 0,
     }).returning('*');
 
     if (referral_code) {
-      const upperCode = referral_code.toUpperCase();
-      if (upperCode !== code) {
-        const referrer = await db<DbUser>('users').where({ referral_code: upperCode }).first();
+      const upperCode = referral_code.toUpperCase().trim();
+      if (upperCode !== code && upperCode.length > 0) {
+        const referrer = await db<DbUser>('users').where({ referral_code: upperCode, is_active: true }).first();
         if (referrer && referrer.id !== user.id) {
           await db('referrals').insert({ referrer_id: referrer.id, referred_id: user.id, commission_earned: 0 });
           await db('earnings').insert({ user_id: referrer.id, task_id: null, amount: 50, type: 'referral_signup', description: `Referral signup bonus — ${name.trim()}` });
@@ -146,11 +173,11 @@ export async function login(req: Request, res: Response, next: NextFunction): Pr
     if (!valid) {
       recordFailure(lockKey);
       const entry = loginAttempts.get(lockKey);
-      const remaining = MAX_ATTEMPTS - (entry?.attempts ?? 0);
+      const isLocked = entry?.lockedUntil && entry.lockedUntil > new Date();
       res.status(401).json({
-        message: remaining > 0
-          ? `Invalid email or password. ${remaining} attempt(s) remaining.`
-          : 'Account locked for 15 minutes due to too many failed attempts.',
+        message: isLocked
+          ? 'Account locked for 15 minutes due to too many failed attempts.'
+          : 'Invalid email or password.',
       });
       return;
     }
@@ -158,6 +185,14 @@ export async function login(req: Request, res: Response, next: NextFunction): Pr
     clearAttempts(lockKey);
     res.json({ token: sign(user), user: safeUser(user) });
   } catch (err) { next(err); }
+}
+
+export async function logout(req: Request, res: Response): Promise<void> {
+  const payload = req.user as AuthPayload & { jti?: string };
+  if (payload?.jti) {
+    tokenBlacklist.add(payload.jti);
+  }
+  res.json({ message: 'Logged out successfully.' });
 }
 
 export async function me(req: Request, res: Response, next: NextFunction): Promise<void> {
