@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import api from '../../services/api';
 import { WithdrawalChannel } from '../../types';
+import { sanitizeInput } from '../../utils/sanitize';
 import styles from './WithdrawForm.module.css';
 
 const CHANNELS: { value: WithdrawalChannel; label: string }[] = [
@@ -41,11 +42,13 @@ export default function WithdrawForm({ balance, onSuccess }: Props) {
     e.preventDefault();
     setError('');
     setSuccess('');
+    const account_number = sanitizeInput(form.account_number);
+    if (!account_number) return setError('Account/wallet number is required.');
     if (parseFloat(form.amount) < 50) return setError('Minimum withdrawal is ₱50.');
     if (parseFloat(form.amount) > numBalance) return setError('Insufficient balance.');
     setLoading(true);
     try {
-      await api.post('/withdrawals', form);
+      await api.post('/withdrawals', { ...form, account_number });
       const eta = INSTANT_CHANNELS.includes(form.channel) ? '1 hour' : '24 hours';
       setSuccess(`Withdrawal of ₱${form.amount} submitted! Processing within ${eta}.`);
       setForm((f) => ({ ...f, amount: '', account_number: '' }));
@@ -77,7 +80,7 @@ export default function WithdrawForm({ balance, onSuccess }: Props) {
 
       <div className="form-group">
         <label>Account / Wallet Number</label>
-        <input type="text" value={form.account_number} onChange={set('account_number')} required placeholder="09XXXXXXXXX or account number" />
+        <input type="text" value={form.account_number} onChange={set('account_number')} required placeholder="09XXXXXXXXX or account number" maxLength={50} autoComplete="off" />
       </div>
 
       {error && <p className="error-msg">{error}</p>}
