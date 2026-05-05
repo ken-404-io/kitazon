@@ -2,7 +2,7 @@ export interface User {
   id: number;
   name: string;
   email: string;
-  balance: number;
+  balance: number | string;
   referral_code: string;
 }
 
@@ -11,13 +11,13 @@ export interface Task {
   title: string;
   description: string;
   category: 'survey' | 'app_install' | 'video' | 'microjob' | 'game';
-  payout: number;
+  payout: number | string;
   is_active: boolean;
 }
 
 export interface Earning {
   id: number;
-  amount: number;
+  amount: number | string;
   type: string;
   created_at: string;
   task_title: string;
@@ -28,9 +28,9 @@ export type WithdrawalChannel = 'gcash' | 'maya' | 'gotyme' | 'bpi' | 'bdo' | 'u
 
 export interface Withdrawal {
   id: number;
-  amount: number;
-  fee: number;
-  net_amount: number;
+  amount: number | string;
+  fee: number | string;
+  net_amount: number | string;
   channel: WithdrawalChannel;
   account_number: string;
   status: WithdrawalStatus;
@@ -39,28 +39,28 @@ export interface Withdrawal {
 
 export interface Payout {
   id: number;
-  amount: number;
+  amount: number | string;
   channel: WithdrawalChannel;
   created_at: string;
   masked_name: string;
 }
 
 export interface UserStats {
-  balance: number;
-  today: number;
-  week: number;
-  total: number;
+  balance: number | string;
+  today: number | string;
+  week: number | string;
+  total: number | string;
 }
 
 export interface ReferralStats {
   referral_code: string;
-  referral_count: number;
-  lifetime_earnings: number;
+  referral_count: number | string;
+  lifetime_earnings: number | string;
 }
 
 export interface ReferralEntry {
   id: number;
   name: string;
-  commission_earned: number;
+  commission_earned: number | string;
   created_at: string;
 }

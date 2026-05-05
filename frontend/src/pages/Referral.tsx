@@ -43,7 +43,7 @@ export default function Referral() {
                 <p className={styles.name}>{r.name}</p>
                 <p className={styles.time}>Joined {new Date(r.created_at).toLocaleDateString('en-PH')}</p>
               </div>
-              <span className="badge badge-gold">+₱{(r.commission_earned ?? 0).toFixed(2)} earned</span>
+              <span className="badge badge-gold">+₱{Number(r.commission_earned ?? 0).toFixed(2)} earned</span>
             </div>
           ))}
         </div>

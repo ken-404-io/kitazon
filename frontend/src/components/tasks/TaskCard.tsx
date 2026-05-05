@@ -25,7 +25,7 @@ export default function TaskCard({ task, onComplete }: Props) {
     try {
       await api.post(`/tasks/${task.id}/complete`);
       setDone(true);
-      onComplete?.(task.payout);
+      onComplete?.(Number(task.payout));
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { message?: string } } }).response?.data?.message;
       alert(msg ?? 'Failed to complete task');
