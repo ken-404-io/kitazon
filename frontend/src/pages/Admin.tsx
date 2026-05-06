@@ -131,8 +131,7 @@ export default function Admin() {
     if (tab === 'users') loadUsers(userPage, userSearch);
     if (tab === 'withdrawals') loadWithdrawals(wPage, wFilter);
     if (tab === 'logs') loadLogs(logPage);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tab, userPage, wPage, wFilter, logPage]);
+  }, [tab, userPage, wPage, wFilter, logPage, stats, loadStats, loadUsers, loadWithdrawals, loadLogs]);
 
   const toggleActive = async (userId: number) => {
     await api.patch(`/admin/users/${userId}/toggle-active`);
