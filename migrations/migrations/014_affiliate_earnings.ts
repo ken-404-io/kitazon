@@ -1,11 +1,17 @@
 import type { Knex } from 'knex';
 
-// Extend earnings type enum to include affiliate offers.
-// Knex creates a named PostgreSQL enum type for .enu() columns.
-// We add the new value and create the affiliate_completions dedup table.
+// The earnings.type column was created with Knex .enu() WITHOUT useNative:true,
+// so it's a VARCHAR + CHECK constraint (not a PostgreSQL named enum type).
+// We drop the old check and add a new one that includes 'affiliate_offer'.
 export async function up(knex: Knex): Promise<void> {
-  // Extend enum safely
-  await knex.raw(`ALTER TYPE earnings_type ADD VALUE IF NOT EXISTS 'affiliate_offer'`);
+  // Drop the existing check constraint and replace it with one that includes the new value.
+  // Knex names the constraint <table>_<column>_check by default.
+  await knex.raw(`
+    ALTER TABLE earnings
+      DROP CONSTRAINT IF EXISTS earnings_type_check,
+      ADD CONSTRAINT earnings_type_check
+        CHECK (type IN ('task','referral_signup','referral_commission','spin','affiliate_offer'))
+  `);
 
   // Track completed offers to prevent duplicate credits
   await knex.schema.createTable('affiliate_completions', (t) => {
@@ -23,5 +29,10 @@ export async function up(knex: Knex): Promise<void> {
 
 export async function down(knex: Knex): Promise<void> {
   await knex.schema.dropTable('affiliate_completions');
-  // PostgreSQL does not support removing enum values — leave type as-is on rollback
+  await knex.raw(`
+    ALTER TABLE earnings
+      DROP CONSTRAINT IF EXISTS earnings_type_check,
+      ADD CONSTRAINT earnings_type_check
+        CHECK (type IN ('task','referral_signup','referral_commission','spin'))
+  `);
 }
