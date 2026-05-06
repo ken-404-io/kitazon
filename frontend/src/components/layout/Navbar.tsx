@@ -21,6 +21,7 @@ export default function Navbar() {
             <Link to="/dashboard">Dashboard</Link>
             <Link to="/tasks">Tasks</Link>
             <Link to="/referral">Referral</Link>
+            <Link to="/account">Settings</Link>
             <Link to="/withdraw">
               <button className="btn-primary">Withdraw</button>
             </Link>

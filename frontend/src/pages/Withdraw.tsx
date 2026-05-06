@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import WithdrawForm from '../components/withdrawal/WithdrawForm';
+import { useAuth } from '../context/AuthContext';
 import api from '../services/api';
 import { UserStats, Withdrawal, WithdrawalStatus } from '../types';
 import styles from './Withdraw.module.css';
@@ -12,6 +13,7 @@ const STATUS_BADGE: Record<WithdrawalStatus, string> = {
 };
 
 export default function Withdraw() {
+  const { user } = useAuth();
   const [stats, setStats] = useState<UserStats | null>(null);
   const [history, setHistory] = useState<Withdrawal[]>([]);
 
@@ -28,7 +30,7 @@ export default function Withdraw() {
       <p style={{ color: 'var(--text-muted)', marginBottom: '2rem' }}>GCash & Maya processed in 1 hour · Banks within 24 hours</p>
 
       <div className={styles.layout}>
-        <WithdrawForm balance={stats?.balance} onSuccess={loadData} />
+        <WithdrawForm balance={stats?.balance} emailVerified={user?.email_verified} onSuccess={loadData} />
 
         <div className={styles.history}>
           <h3>Withdrawal History</h3>

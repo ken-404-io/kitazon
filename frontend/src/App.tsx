@@ -10,6 +10,8 @@ import Tasks from './pages/Tasks';
 import Withdraw from './pages/Withdraw';
 import Referral from './pages/Referral';
 import PayoutProof from './pages/PayoutProof';
+import VerifyEmail from './pages/VerifyEmail';
+import AccountSettings from './pages/AccountSettings';
 import { ReactNode } from 'react';
 
 function PrivateRoute({ children }: { children: ReactNode }) {
@@ -32,12 +34,14 @@ export default function App() {
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/payout-proof" element={<PayoutProof />} />
+          <Route path="/verify-email" element={<VerifyEmail />} />
           <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
           <Route path="/register" element={<PublicRoute><Register /></PublicRoute>} />
           <Route path="/dashboard" element={<PrivateRoute><Dashboard /></PrivateRoute>} />
           <Route path="/tasks" element={<PrivateRoute><Tasks /></PrivateRoute>} />
           <Route path="/withdraw" element={<PrivateRoute><Withdraw /></PrivateRoute>} />
           <Route path="/referral" element={<PrivateRoute><Referral /></PrivateRoute>} />
+          <Route path="/account" element={<PrivateRoute><AccountSettings /></PrivateRoute>} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
         <Footer />

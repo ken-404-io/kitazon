@@ -4,6 +4,7 @@ export interface User {
   email: string;
   balance: number | string;
   referral_code: string;
+  email_verified: boolean;
 }
 
 export interface Task {
