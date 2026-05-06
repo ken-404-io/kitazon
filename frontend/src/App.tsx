@@ -19,6 +19,7 @@ import ResetPassword from './pages/ResetPassword';
 import Admin from './pages/Admin';
 import Leaderboard from './pages/Leaderboard';
 import WithdrawalReceipt from './pages/WithdrawalReceipt';
+import Offers from './pages/Offers';
 import { ReactNode } from 'react';
 
 function PrivateRoute({ children }: { children: ReactNode }) {
@@ -56,6 +57,7 @@ export default function App() {
           <Route path="/admin" element={<PrivateRoute><Admin /></PrivateRoute>} />
           <Route path="/leaderboard" element={<Leaderboard />} />
           <Route path="/withdrawals/:id/receipt" element={<PrivateRoute><WithdrawalReceipt /></PrivateRoute>} />
+          <Route path="/offers" element={<PrivateRoute><Offers /></PrivateRoute>} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
         <Footer />
