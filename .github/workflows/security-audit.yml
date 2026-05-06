@@ -21,7 +21,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-      - run: npm install
+      - run: npm ci
       - name: Audit for high/critical CVEs
         run: npm audit --audit-level=high
 
@@ -36,9 +36,10 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-      - run: npm install
+      # react-scripts 5 has peer-dep conflicts with newer npm — requires legacy mode
+      - run: npm ci --legacy-peer-deps
       # react-scripts bundles webpack/babel with known unfixed high-severity issues
-      # in the build toolchain (not in the production output). Audit at critical only.
+      # in the build toolchain only (not in production output). Audit at critical.
       - name: Audit for critical CVEs
         run: npm audit --audit-level=critical
 
@@ -53,7 +54,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-      - run: npm install
+      - run: npm ci
       # Use the locally installed tsc (version pinned in package.json), not npx latest
       - run: ./node_modules/.bin/tsc --noEmit
 
@@ -68,5 +69,5 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-      - run: npm install
+      - run: npm ci --legacy-peer-deps
       - run: ./node_modules/.bin/tsc --noEmit
