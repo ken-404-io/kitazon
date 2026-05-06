@@ -43,7 +43,7 @@ export async function create(req: Request, res: Response, next: NextFunction): P
 
     const cumulative = parseFloat(String(monthTotal?.total ?? 0));
     const fee = cumulative >= 500 ? 5 : 0;
-    const netAmount = parsed - fee;
+    const netAmount = parseFloat((parsed - fee).toFixed(2));
 
     if (netAmount <= 0) {
       res.status(400).json({ message: 'Amount too low after fee deduction.' });

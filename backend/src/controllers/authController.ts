@@ -5,12 +5,13 @@ import crypto from 'crypto';
 import db from '../../config/database';
 import { DbUser, AuthPayload } from '../types';
 
-// Short-lived access token; use refresh tokens in production for longer sessions
 const TOKEN_TTL = '2h';
+const MAX_PASSWORD_LENGTH = 128;
 
+// JWT contains only id + jti — no PII (email removed to minimize token exposure)
 const sign = (user: DbUser): string =>
   jwt.sign(
-    { id: user.id, email: user.email, jti: crypto.randomUUID() },
+    { id: user.id, jti: crypto.randomUUID() },
     process.env.JWT_SECRET as string,
     { expiresIn: TOKEN_TTL }
   );
@@ -26,12 +27,8 @@ const safeUser = (u: DbUser) => ({
 // ─── Token blacklist (in-memory; use Redis in production) ────────────────────
 export const tokenBlacklist = new Set<string>();
 
-// Prune expired JTIs every hour so memory doesn't grow unbounded
-setInterval(() => {
-  // We can't inspect expiry without decoding, so clear the full set hourly.
-  // Tokens expire in 2h, so any JTI older than that is already invalid.
-  tokenBlacklist.clear();
-}, 60 * 60 * 1000);
+// Tokens expire in 2h, so any JTI older than 2h is already invalid — clear hourly
+setInterval(() => { tokenBlacklist.clear(); }, 60 * 60 * 1000);
 
 // ─── Account lockout (in-memory; use Redis in production) ───────────────────
 interface LockoutEntry { attempts: number; lockedUntil: Date | null; }
@@ -63,6 +60,7 @@ function clearAttempts(key: string): void {
 // ─── Password strength ───────────────────────────────────────────────────────
 function validatePassword(password: string): string | null {
   if (password.length < 8) return 'Password must be at least 8 characters.';
+  if (password.length > MAX_PASSWORD_LENGTH) return `Password must not exceed ${MAX_PASSWORD_LENGTH} characters.`;
   if (!/[A-Za-z]/.test(password)) return 'Password must contain at least one letter.';
   if (!/[0-9]/.test(password)) return 'Password must contain at least one number.';
   return null;
@@ -71,6 +69,17 @@ function validatePassword(password: string): string | null {
 // ─── Email format ────────────────────────────────────────────────────────────
 function isValidEmail(email: string): boolean {
   return /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)+$/.test(email);
+}
+
+// ─── Referral code generator with collision retry ────────────────────────────
+async function generateReferralCode(): Promise<string> {
+  for (let i = 0; i < 10; i++) {
+    const code = crypto.randomBytes(4).toString('hex').toUpperCase();
+    const collision = await db<DbUser>('users').where({ referral_code: code }).first();
+    if (!collision) return code;
+  }
+  // Fallback: use more entropy
+  return crypto.randomBytes(6).toString('hex').toUpperCase();
 }
 
 // ─── Controllers ─────────────────────────────────────────────────────────────
@@ -104,34 +113,37 @@ export async function register(req: Request, res: Response, next: NextFunction):
       return;
     }
 
-    const hash = await bcrypt.hash(password, 12);
-
-    // Generate referral code with collision retry
-    let code: string;
-    let attempts = 0;
-    do {
-      code = crypto.randomBytes(4).toString('hex').toUpperCase();
-      const collision = await db<DbUser>('users').where({ referral_code: code }).first();
-      if (!collision) break;
-      attempts++;
-    } while (attempts < 5);
+    const [hash, code] = await Promise.all([
+      bcrypt.hash(password, 12),
+      generateReferralCode(),
+    ]);
 
     const [user] = await db<DbUser>('users').insert({
       name: name.trim(),
       email: normalizedEmail,
       password_hash: hash,
-      referral_code: code!,
+      referral_code: code,
       balance: 0,
     }).returning('*');
 
+    // Wrap referral bonus in a transaction so earnings + balance increment are atomic
     if (referral_code) {
       const upperCode = referral_code.toUpperCase().trim();
-      if (upperCode !== code && upperCode.length > 0) {
+      if (upperCode.length > 0 && upperCode !== code) {
         const referrer = await db<DbUser>('users').where({ referral_code: upperCode, is_active: true }).first();
         if (referrer && referrer.id !== user.id) {
-          await db('referrals').insert({ referrer_id: referrer.id, referred_id: user.id, commission_earned: 0 });
-          await db('earnings').insert({ user_id: referrer.id, task_id: null, amount: 50, type: 'referral_signup', description: `Referral signup bonus — ${name.trim()}` });
-          await db<DbUser>('users').where({ id: referrer.id }).increment('balance', 50);
+          await db.transaction(async (trx) => {
+            // Idempotency guard: skip if referral already exists (concurrent signup)
+            const existing = await trx('referrals').where({ referred_id: user.id }).first();
+            if (existing) return;
+
+            await trx('referrals').insert({ referrer_id: referrer.id, referred_id: user.id, commission_earned: 0 });
+            await trx('earnings').insert({
+              user_id: referrer.id, task_id: null, amount: 50,
+              type: 'referral_signup', description: `Referral signup bonus — ${name.trim()}`,
+            });
+            await trx<DbUser>('users').where({ id: referrer.id }).increment('balance', 50);
+          });
         }
       }
     }
@@ -149,6 +161,11 @@ export async function login(req: Request, res: Response, next: NextFunction): Pr
     }
     if (!isValidEmail(email)) {
       res.status(400).json({ message: 'Invalid email address.' });
+      return;
+    }
+    // Enforce max length before bcrypt to prevent bcrypt DoS with huge passwords
+    if (password.length > MAX_PASSWORD_LENGTH) {
+      res.status(400).json({ message: 'Invalid credentials.' });
       return;
     }
 
