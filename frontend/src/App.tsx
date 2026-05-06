@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { ToastProvider } from './context/ToastContext';
 import Navbar from './components/layout/Navbar';
 import Footer from './components/layout/Footer';
 import Home from './pages/Home';
@@ -15,6 +16,8 @@ import AccountSettings from './pages/AccountSettings';
 import ForgotPassword from './pages/ForgotPassword';
 import ResetPassword from './pages/ResetPassword';
 import Admin from './pages/Admin';
+import Leaderboard from './pages/Leaderboard';
+import WithdrawalReceipt from './pages/WithdrawalReceipt';
 import { ReactNode } from 'react';
 
 function PrivateRoute({ children }: { children: ReactNode }) {
@@ -32,6 +35,7 @@ function PublicRoute({ children }: { children: ReactNode }) {
 export default function App() {
   return (
     <AuthProvider>
+      <ToastProvider>
       <BrowserRouter>
         <Navbar />
         <Routes>
@@ -48,10 +52,13 @@ export default function App() {
           <Route path="/referral" element={<PrivateRoute><Referral /></PrivateRoute>} />
           <Route path="/account" element={<PrivateRoute><AccountSettings /></PrivateRoute>} />
           <Route path="/admin" element={<PrivateRoute><Admin /></PrivateRoute>} />
+          <Route path="/leaderboard" element={<Leaderboard />} />
+          <Route path="/withdrawals/:id/receipt" element={<PrivateRoute><WithdrawalReceipt /></PrivateRoute>} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
         <Footer />
       </BrowserRouter>
+      </ToastProvider>
     </AuthProvider>
   );
 }

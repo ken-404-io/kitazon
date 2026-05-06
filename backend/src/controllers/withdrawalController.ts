@@ -172,6 +172,16 @@ export async function create(req: Request, res: Response, next: NextFunction): P
   } catch (err) { next(err); }
 }
 
+export async function getOne(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const id = parseInt(req.params.id, 10);
+    if (!Number.isInteger(id) || id <= 0) { res.status(400).json({ message: 'Invalid ID.' }); return; }
+    const w = await db('withdrawals').where({ id, user_id: req.user!.id }).first();
+    if (!w) { res.status(404).json({ message: 'Withdrawal not found.' }); return; }
+    res.json(w);
+  } catch (err) { next(err); }
+}
+
 export async function list(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     const withdrawals = await db('withdrawals')

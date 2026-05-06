@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import styles from './Navbar.module.css';
@@ -5,23 +6,37 @@ import styles from './Navbar.module.css';
 export default function Navbar() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const [open, setOpen] = useState(false);
+
+  const close = () => setOpen(false);
 
   const handleLogout = async (): Promise<void> => {
+    close();
     await logout();
     navigate('/');
   };
 
   return (
     <nav className={styles.navbar}>
-      <Link to="/" className={styles.brand}>💰 Kitazon</Link>
-      <div className={styles.links}>
-        <Link to="/payout-proof">Payout Proof</Link>
+      <Link to="/" className={styles.brand} onClick={close}>💰 Kitazon</Link>
+
+      {/* Hamburger */}
+      <button className={styles.hamburger} onClick={() => setOpen((o) => !o)} aria-label="Toggle menu">
+        <span className={`${styles.bar} ${open ? styles.barTop : ''}`} />
+        <span className={`${styles.bar} ${open ? styles.barMid : ''}`} />
+        <span className={`${styles.bar} ${open ? styles.barBot : ''}`} />
+      </button>
+
+      {/* Links */}
+      <div className={`${styles.links} ${open ? styles.linksOpen : ''}`}>
+        <Link to="/payout-proof" onClick={close}>Payout Proof</Link>
+        <Link to="/leaderboard" onClick={close}>Leaderboard</Link>
         {user ? (
           <>
-            <Link to="/dashboard">Dashboard</Link>
-            <Link to="/tasks">Tasks</Link>
-            <Link to="/referral">Referral</Link>
-            <Link to="/account" style={{ position: 'relative' }}>
+            <Link to="/dashboard" onClick={close}>Dashboard</Link>
+            <Link to="/tasks" onClick={close}>Tasks</Link>
+            <Link to="/referral" onClick={close}>Referral</Link>
+            <Link to="/account" onClick={close} style={{ position: 'relative' }}>
               Settings
               {!user.email_verified && (
                 <span
@@ -31,24 +46,27 @@ export default function Navbar() {
                     background: '#f59e0b', color: '#000',
                     borderRadius: '50%', width: 16, height: 16,
                     fontSize: 10, fontWeight: 700,
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
                   }}
                 >!</span>
               )}
             </Link>
-            {user.is_admin && <Link to="/admin">Admin</Link>}
-            <Link to="/withdraw">
+            {user.is_admin && <Link to="/admin" onClick={close}>Admin</Link>}
+            <Link to="/withdraw" onClick={close}>
               <button className="btn-primary">Withdraw</button>
             </Link>
             <button className="btn-outline" onClick={handleLogout}>Logout</button>
           </>
         ) : (
           <>
-            <Link to="/login">Login</Link>
-            <Link to="/register"><button className="btn-primary">Join Free</button></Link>
+            <Link to="/login" onClick={close}>Login</Link>
+            <Link to="/register" onClick={close}><button className="btn-primary">Join Free</button></Link>
           </>
         )}
       </div>
+
+      {/* Overlay */}
+      {open && <div className={styles.overlay} onClick={close} />}
     </nav>
   );
 }
