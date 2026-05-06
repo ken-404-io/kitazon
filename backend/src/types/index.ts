@@ -27,6 +27,8 @@ export interface DbUser {
   last_login_ip: string | null;
   last_withdrawal_account: string | null;
   last_withdrawal_account_changed_at: Date | null;
+  totp_secret: string | null;
+  totp_enabled: boolean;
   created_at: Date;
   updated_at: Date;
 }

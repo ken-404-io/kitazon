@@ -127,18 +127,20 @@ export async function earningsChart(req: Request, res: Response, next: NextFunct
 
 export async function recentEarnings(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const earnings = await db('earnings')
-      .where({ 'earnings.user_id': req.user!.id })
-      .leftJoin('tasks', 'earnings.task_id', 'tasks.id')
-      .select(
-        'earnings.id',
-        'earnings.amount',
-        'earnings.type',
-        'earnings.created_at',
-        db.raw("COALESCE(tasks.title, earnings.description) as task_title")
-      )
-      .orderBy('earnings.created_at', 'desc')
-      .limit(10);
-    res.json(earnings);
+    const page = Math.max(1, Number(req.query.page ?? 1));
+    const limit = 10;
+    const offset = (page - 1) * limit;
+
+    const [earnings, [count]] = await Promise.all([
+      db('earnings')
+        .where({ 'earnings.user_id': req.user!.id })
+        .leftJoin('tasks', 'earnings.task_id', 'tasks.id')
+        .select('earnings.id', 'earnings.amount', 'earnings.type', 'earnings.created_at', db.raw("COALESCE(tasks.title, earnings.description) as task_title"))
+        .orderBy('earnings.created_at', 'desc')
+        .limit(limit).offset(offset),
+      db('earnings').where({ user_id: req.user!.id }).count('id as total'),
+    ]);
+
+    res.json({ earnings, total: Number(count.total), page, pages: Math.ceil(Number(count.total) / limit) });
   } catch (err) { next(err); }
 }

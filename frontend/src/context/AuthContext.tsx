@@ -6,7 +6,7 @@ import { User } from '../types';
 interface AuthContextValue {
   user: User | null;
   loading: boolean;
-  login: (email: string, password: string, captchaToken?: string) => Promise<void>;
+  login: (email: string, password: string, captchaToken?: string, totpCode?: string) => Promise<void>;
   register: (data: RegisterData) => Promise<void>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
@@ -34,9 +34,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .finally(() => setLoading(false));
   }, []);
 
-  const login = async (email: string, password: string, captchaToken?: string): Promise<void> => {
+  const login = async (email: string, password: string, captchaToken?: string, totpCode?: string): Promise<void> => {
     const res = await api.post<{ token: string; user: User }>('/auth/login', {
-      email, password, ...(captchaToken ? { captcha_token: captchaToken } : {}),
+      email, password,
+      ...(captchaToken ? { captcha_token: captchaToken } : {}),
+      ...(totpCode ? { totp_code: totpCode } : {}),
     });
     setToken(res.data.token);
     setUser(res.data.user);

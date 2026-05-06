@@ -4,6 +4,8 @@ import api from '../services/api';
 import { isStrongPassword } from '../utils/sanitize';
 import styles from './Auth.module.css';
 
+interface TotpSetup { secret: string; qr: string; }
+
 interface LoginEvent {
   id: number;
   success: boolean;
@@ -30,6 +32,12 @@ export default function AccountSettings() {
 
   const [verifyMsg, setVerifyMsg] = useState('');
   const [verifyLoading, setVerifyLoading] = useState(false);
+
+  const [totpSetup, setTotpSetup] = useState<TotpSetup | null>(null);
+  const [totpCode, setTotpCode] = useState('');
+  const [totpMsg, setTotpMsg] = useState('');
+  const [totpLoading, setTotpLoading] = useState(false);
+  const [totpEnabled, setTotpEnabled] = useState(false);
 
   const changePassword = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -141,6 +149,58 @@ export default function AccountSettings() {
             </table>
           </div>
         )}
+      </div>
+
+      {/* Two-factor authentication */}
+      <div className="card" style={{ marginBottom: '1.5rem' }}>
+        <h3>Two-Factor Authentication (2FA)</h3>
+        <p style={{ fontSize: 14, color: 'var(--text-muted)', margin: '0.5rem 0 1rem' }}>
+          {totpEnabled ? '2FA is enabled. Your account is protected.' : 'Add an extra layer of security with an authenticator app.'}
+        </p>
+        {!totpSetup && !totpEnabled && (
+          <button className="btn-primary" disabled={totpLoading} onClick={async () => {
+            setTotpLoading(true); setTotpMsg('');
+            try { const r = await api.post<TotpSetup>('/totp/setup', {}); setTotpSetup(r.data); }
+            catch { setTotpMsg('Failed to start setup.'); }
+            finally { setTotpLoading(false); }
+          }}>{totpLoading ? 'Loading...' : 'Enable 2FA'}</button>
+        )}
+        {totpSetup && (
+          <div>
+            <p style={{ fontSize: 13, marginBottom: 8 }}>Scan this QR code with Google Authenticator or Authy, then enter the 6-digit code to confirm:</p>
+            <img src={totpSetup.qr} alt="QR code" style={{ width: 180, height: 180, borderRadius: 8, marginBottom: 12 }} />
+            <p style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 12, wordBreak: 'break-all' }}>Manual key: {totpSetup.secret}</p>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <input value={totpCode} onChange={e => setTotpCode(e.target.value)} placeholder="000000" maxLength={6} style={{ width: 120 }} />
+              <button className="btn-primary" disabled={totpLoading} onClick={async () => {
+                setTotpLoading(true); setTotpMsg('');
+                try {
+                  await api.post('/totp/verify', { code: totpCode });
+                  setTotpSetup(null); setTotpEnabled(true); setTotpMsg('2FA enabled!');
+                } catch (err: unknown) {
+                  setTotpMsg((err as { response?: { data?: { message?: string } } }).response?.data?.message ?? 'Invalid code.');
+                } finally { setTotpLoading(false); }
+              }}>Confirm</button>
+            </div>
+          </div>
+        )}
+        {totpEnabled && (
+          <div>
+            <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+              <input value={totpCode} onChange={e => setTotpCode(e.target.value)} placeholder="Enter code to disable" maxLength={6} style={{ width: 180 }} />
+              <button className="btn-outline" style={{ borderColor: '#dc2626', color: '#dc2626' }} disabled={totpLoading} onClick={async () => {
+                setTotpLoading(true); setTotpMsg('');
+                try {
+                  await api.post('/totp/disable', { code: totpCode });
+                  setTotpEnabled(false); setTotpMsg('2FA disabled.');
+                } catch (err: unknown) {
+                  setTotpMsg((err as { response?: { data?: { message?: string } } }).response?.data?.message ?? 'Failed.');
+                } finally { setTotpLoading(false); }
+              }}>Disable 2FA</button>
+            </div>
+          </div>
+        )}
+        {totpMsg && <p style={{ marginTop: 8, fontSize: 14, color: totpMsg.includes('!') ? 'green' : 'var(--red)' }}>{totpMsg}</p>}
       </div>
 
       {/* Delete account */}
