@@ -21,7 +21,7 @@ export default function PayoutFeed() {
 
   useEffect(() => {
     api.get<Payout[]>('/payouts/feed')
-      .then((res) => setPayouts(res.data))
+      .then((res) => setPayouts(Array.isArray(res.data) ? res.data : []))
       .catch(() => {})
       .finally(() => setLoading(false));
   }, []);
