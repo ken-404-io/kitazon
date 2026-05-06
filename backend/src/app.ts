@@ -25,7 +25,13 @@ if (!process.env.FRONTEND_URL) {
   console.warn('WARNING: FRONTEND_URL is not set. CORS will only allow http://localhost:3000.');
 }
 
-const ALLOWED_ORIGIN = process.env.FRONTEND_URL ?? 'http://localhost:3000';
+const FRONTEND_URL = process.env.FRONTEND_URL ?? 'http://localhost:3000';
+const ALLOWED_ORIGINS = [
+  FRONTEND_URL,
+  FRONTEND_URL.replace('https://www.', 'https://'),
+  FRONTEND_URL.replace('https://', 'https://www.'),
+  'http://localhost:3000',
+].filter((v, i, a) => a.indexOf(v) === i);
 
 const app = express();
 
@@ -52,7 +58,10 @@ app.use(helmet({
 
 // ─── CORS ─────────────────────────────────────────────────────────────────────
 app.use(cors({
-  origin: ALLOWED_ORIGIN,
+  origin: (origin, cb) => {
+    if (!origin || ALLOWED_ORIGINS.includes(origin)) cb(null, true);
+    else cb(new Error('Not allowed by CORS'));
+  },
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
   allowedHeaders: ['Content-Type', 'Authorization'],
   credentials: true,
