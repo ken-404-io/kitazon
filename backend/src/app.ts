@@ -30,6 +30,8 @@ const ALLOWED_ORIGINS = [
   FRONTEND_URL,
   FRONTEND_URL.replace('https://www.', 'https://'),
   FRONTEND_URL.replace('https://', 'https://www.'),
+  FRONTEND_URL.replace('https://', 'http://'),
+  FRONTEND_URL.replace('https://www.', 'http://www.'),
   'http://localhost:3000',
 ].filter((v, i, a) => a.indexOf(v) === i);
 
