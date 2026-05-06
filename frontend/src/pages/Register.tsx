@@ -57,7 +57,7 @@ export default function Register() {
   return (
     <div className={styles.page}>
       <div className={styles.card}>
-        <h2>Join Kitazon 💰</h2>
+        <h2>Join Kitazon</h2>
         <p className={styles.sub}>Free signup · Start earning today</p>
         <form onSubmit={submit} autoComplete="on">
           <div className="form-group">

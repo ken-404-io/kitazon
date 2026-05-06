@@ -1,0 +1,27 @@
+const s = { width: 20, height: 20, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 2, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const };
+const sm = { ...s, width: 16, height: 16 };
+const lg = { ...s, width: 28, height: 28 };
+
+export const SurveyIcon    = (p?: object) => <svg {...s} {...p}><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><path d="M9 12h6M9 16h4"/></svg>;
+export const PhoneIcon     = (p?: object) => <svg {...s} {...p}><rect x="5" y="2" width="14" height="20" rx="2"/><circle cx="12" cy="17" r="1"/></svg>;
+export const PlayIcon      = (p?: object) => <svg {...s} {...p}><polygon points="5 3 19 12 5 21 5 3"/></svg>;
+export const BriefcaseIcon = (p?: object) => <svg {...s} {...p}><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v2"/><line x1="12" y1="12" x2="12" y2="12"/></svg>;
+export const GamepadIcon   = (p?: object) => <svg {...s} {...p}><line x1="6" y1="12" x2="10" y2="12"/><line x1="8" y1="10" x2="8" y2="14"/><line x1="15" y1="13" x2="15.01" y2="13"/><line x1="18" y1="11" x2="18.01" y2="11"/><rect x="2" y="6" width="20" height="12" rx="2"/></svg>;
+export const UsersIcon     = (p?: object) => <svg {...s} {...p}><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>;
+export const ZapIcon       = (p?: object) => <svg {...s} {...p}><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>;
+export const ClockIcon     = (p?: object) => <svg {...s} {...p}><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>;
+export const ShieldIcon    = (p?: object) => <svg {...s} {...p}><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>;
+export const MapPinIcon    = (p?: object) => <svg {...s} {...p}><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>;
+export const CreditCardIcon= (p?: object) => <svg {...s} {...p}><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>;
+export const BuildingIcon  = (p?: object) => <svg {...s} {...p}><path d="M3 21h18M9 21V7l6-4v18M3 21V11l6-4"/><path d="M21 21V11l-6-4"/><path d="M15 21V7"/></svg>;
+export const CoinsIcon     = (p?: object) => <svg {...s} {...p}><circle cx="8" cy="8" r="6"/><path d="M18.09 10.37A6 6 0 1110.34 18"/><path d="M7 6h1v4"/><path d="M16.71 13.88l.7.71-2.82 2.82"/></svg>;
+export const DollarIcon    = (p?: object) => <svg {...s} {...p}><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>;
+export const CheckIcon     = (p?: object) => <svg {...sm} {...p}><polyline points="20 6 9 17 4 12"/></svg>;
+export const TrophyIcon    = (p?: object) => <svg {...s} {...p}><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 01-2-2v-1a2 2 0 012-2h16a2 2 0 012 2v1a2 2 0 01-2 2h-2"/><rect x="8" y="18" width="8" height="4"/></svg>;
+export const MedalIcon     = (p?: object) => <svg {...s} {...p}><circle cx="12" cy="8" r="6"/><path d="M15.477 12.89L17 22l-5-3-5 3 1.523-9.11"/></svg>;
+export const WalletIcon2   = (p?: object) => <svg {...lg} {...p}><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/><path d="M15 15h2"/></svg>;
+export const SpinIcon      = (p?: object) => <svg {...lg} {...p}><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/></svg>;
+export const XIcon         = (p?: object) => <svg {...sm} {...p}><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>;
+export const AlertIcon     = (p?: object) => <svg {...s} {...p}><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>;
+export const PrintIcon     = (p?: object) => <svg {...s} {...p}><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>;
+export const TagIcon2      = (p?: object) => <svg {...s} {...p}><path d="M7 7h.01"/><path d="M7 3h5a1.414 1.414 0 011 .414l7.586 7.586a2 2 0 010 2.829l-5.172 5.171a2 2 0 01-2.829 0L5 11.414A1.414 1.414 0 014.586 10.5L4.586 6A3 3 0 017 3z"/></svg>;

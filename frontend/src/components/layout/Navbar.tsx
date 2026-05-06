@@ -1,16 +1,36 @@
 import { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
 import api from '../../services/api';
 import { Withdrawal } from '../../types';
 import styles from './Navbar.module.css';
 
+// ─── SVG Icons ────────────────────────────────────────────────────────────────
+const sz = { width: 22, height: 22, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 2, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const };
+
+const HomeIcon    = () => <svg {...sz}><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>;
+const TaskIcon    = () => <svg {...sz}><rect x="9" y="3" width="6" height="4" rx="1"/><path d="M7 3H5a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2V5a2 2 0 00-2-2h-2"/><path d="M9 12l2 2 4-4"/></svg>;
+const TagIcon     = () => <svg {...sz}><path d="M7 7h.01"/><path d="M7 3h5a1.414 1.414 0 011 .414l7.586 7.586a2 2 0 010 2.829l-5.172 5.171a2 2 0 01-2.829 0L5 11.414A1.414 1.414 0 014.586 10.5L4.586 6A3 3 0 017 3z"/></svg>;
+const WalletIcon  = () => <svg {...sz}><rect x="1" y="4" width="22" height="16" rx="2"/><path d="M1 10h22"/><path d="M15 15h2"/></svg>;
+const UserIcon    = () => <svg {...sz}><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>;
+const BellIcon    = () => <svg {...sz}><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg>;
+const SunIcon     = () => <svg {...sz}><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>;
+const MoonIcon    = () => <svg {...sz}><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/></svg>;
+const ShieldIcon  = () => <svg {...sz}><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg>;
+const TrophyIcon  = () => <svg {...sz}><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 01-2-2v-1a2 2 0 012-2h16a2 2 0 012 2v1a2 2 0 01-2 2h-2"/><rect x="8" y="18" width="8" height="4"/></svg>;
+const LoginIcon   = () => <svg {...sz}><path d="M15 3h4a2 2 0 012 2v14a2 2 0 01-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg>;
+const UserPlusIcon= () => <svg {...sz}><path d="M16 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="20" y1="8" x2="20" y2="14"/><line x1="23" y1="11" x2="17" y2="11"/></svg>;
+const LogoutIcon  = () => <svg {...sz}><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>;
+const UsersIcon   = () => <svg {...sz}><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>;
+const SettingsIcon= () => <svg {...sz}><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>;
+
+// ─── Component ────────────────────────────────────────────────────────────────
 export default function Navbar() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const { theme, toggleTheme } = useTheme();
-  const [open, setOpen] = useState(false);
   const [notifications, setNotifications] = useState<Withdrawal[]>([]);
   const [notifOpen, setNotifOpen] = useState(false);
   const [seenIds, setSeenIds] = useState<number[]>(() => {
@@ -19,9 +39,7 @@ export default function Navbar() {
 
   useEffect(() => {
     if (!user) return;
-    const poll = () => {
-      api.get<Withdrawal[]>('/withdrawals').then((r) => setNotifications(r.data)).catch(() => {});
-    };
+    const poll = () => api.get<Withdrawal[]>('/withdrawals').then((r) => setNotifications(r.data)).catch(() => {});
     poll();
     const id = setInterval(poll, 30000);
     return () => clearInterval(id);
@@ -35,102 +53,134 @@ export default function Navbar() {
     localStorage.setItem('seenWithdrawals', JSON.stringify(ids));
   };
 
-  const close = () => setOpen(false);
-
-  const handleLogout = async (): Promise<void> => {
-    close();
+  const handleLogout = async () => {
+    setNotifOpen(false);
     await logout();
     navigate('/');
   };
 
+  const isActive = (path: string) => location.pathname === path;
+
+  const balance = Number(user?.balance ?? 0).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
   return (
-    <nav className={styles.navbar}>
-      <Link to="/" className={styles.brand} onClick={close}>💰 Kitazon</Link>
+    <>
+      {/* ── Top header ─────────────────────────────────────────────────────── */}
+      <header className={styles.topHeader}>
+        <Link to="/" className={styles.brand}>Kitazon</Link>
 
-      {/* Hamburger */}
-      <button className={styles.hamburger} onClick={() => setOpen((o) => !o)} aria-label="Toggle menu">
-        <span className={`${styles.bar} ${open ? styles.barTop : ''}`} />
-        <span className={`${styles.bar} ${open ? styles.barMid : ''}`} />
-        <span className={`${styles.bar} ${open ? styles.barBot : ''}`} />
-      </button>
+        {/* Desktop links */}
+        {user ? (
+          <nav className={styles.desktopLinks}>
+            <Link to="/dashboard" className={isActive('/dashboard') ? styles.activeLink : ''}>Dashboard</Link>
+            <Link to="/tasks"     className={isActive('/tasks')     ? styles.activeLink : ''}>Tasks</Link>
+            <Link to="/offers"    className={isActive('/offers')    ? styles.activeLink : ''}>Offers</Link>
+            <Link to="/referral"  className={isActive('/referral')  ? styles.activeLink : ''}>Referral</Link>
+            {user.is_admin && <Link to="/admin" className={isActive('/admin') ? styles.activeLink : ''}>Admin</Link>}
+          </nav>
+        ) : (
+          <nav className={styles.desktopLinks}>
+            <Link to="/payout-proof" className={isActive('/payout-proof') ? styles.activeLink : ''}>Payout Proof</Link>
+            <Link to="/leaderboard"  className={isActive('/leaderboard')  ? styles.activeLink : ''}>Leaderboard</Link>
+          </nav>
+        )}
 
-      {/* Links */}
-      <div className={`${styles.links} ${open ? styles.linksOpen : ''}`}>
-        <Link to="/payout-proof" onClick={close}>Payout Proof</Link>
-        <Link to="/leaderboard" onClick={close}>Leaderboard</Link>
+        {/* Right controls */}
+        <div className={styles.controls}>
+          {user && (
+            <span className={styles.balanceChip}>
+              <span className={styles.balanceCurrency}>₱</span>
+              {balance}
+            </span>
+          )}
+
+          {/* Notification bell */}
+          {user && (
+            <div className={styles.bellWrap}>
+              <button
+                className={styles.iconBtn}
+                onClick={() => { setNotifOpen((o) => !o); if (!notifOpen) markAllRead(); }}
+                aria-label="Notifications"
+              >
+                <BellIcon />
+                {unread > 0 && <span className={styles.badge}>{unread}</span>}
+              </button>
+
+              {notifOpen && (
+                <div className={styles.notifDropdown}>
+                  <div className={styles.notifHeader}>Withdrawal Updates</div>
+                  {notifications.filter((n) => n.status !== 'pending').length === 0 ? (
+                    <p className={styles.notifEmpty}>No updates yet.</p>
+                  ) : notifications.filter((n) => n.status !== 'pending').slice(0, 8).map((n) => (
+                    <div key={n.id} className={styles.notifItem}>
+                      <span className={`${styles.notifStatus} ${styles[`status_${n.status}`]}`}>{n.status.toUpperCase()}</span>
+                      {' — '}₱{Number(n.net_amount).toFixed(2)} via {n.channel.toUpperCase()}
+                      <div className={styles.notifDate}>{new Date(n.created_at).toLocaleString('en-PH')}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Theme toggle */}
+          <button className={styles.iconBtn} onClick={toggleTheme} aria-label="Toggle theme">
+            {theme === 'dark' ? <SunIcon /> : <MoonIcon />}
+          </button>
+
+          {/* Desktop auth actions */}
+          {user ? (
+            <div className={styles.desktopActions}>
+              <Link to="/withdraw"><button className="btn-primary" style={{ padding: '0.5rem 1rem', fontSize: '0.85rem' }}>Withdraw</button></Link>
+              <button className={styles.iconBtn} onClick={handleLogout} aria-label="Logout" title="Logout"><LogoutIcon /></button>
+            </div>
+          ) : (
+            <div className={styles.desktopActions}>
+              <Link to="/login"><button className="btn-outline" style={{ padding: '0.5rem 1rem', fontSize: '0.85rem' }}>Login</button></Link>
+              <Link to="/register"><button className="btn-primary" style={{ padding: '0.5rem 1rem', fontSize: '0.85rem' }}>Sign Up</button></Link>
+            </div>
+          )}
+        </div>
+      </header>
+
+      {/* Notif overlay */}
+      {notifOpen && <div className={styles.notifOverlay} onClick={() => setNotifOpen(false)} />}
+
+      {/* ── Bottom nav (mobile only) ────────────────────────────────────────── */}
+      <nav className={styles.bottomNav}>
         {user ? (
           <>
-            <Link to="/dashboard" onClick={close}>Dashboard</Link>
-            <Link to="/tasks" onClick={close}>Tasks</Link>
-            <Link to="/offers" onClick={close}>Offers</Link>
-            <Link to="/referral" onClick={close}>Referral</Link>
-            <Link to="/account" onClick={close} style={{ position: 'relative' }}>
-              Settings
-              {!user.email_verified && (
-                <span
-                  title="Email not verified — withdrawals disabled"
-                  style={{
-                    position: 'absolute', top: -6, right: -10,
-                    background: '#f59e0b', color: '#000',
-                    borderRadius: '50%', width: 16, height: 16,
-                    fontSize: 10, fontWeight: 700,
-                    display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                  }}
-                >!</span>
-              )}
-            </Link>
-            {user.is_admin && <Link to="/admin" onClick={close}>Admin</Link>}
-            <Link to="/withdraw" onClick={close}>
-              <button className="btn-primary">Withdraw</button>
-            </Link>
-            <button className="btn-outline" onClick={handleLogout}>Logout</button>
+            <NavTab to="/dashboard" label="Home"    icon={<HomeIcon />}   active={isActive('/dashboard')} />
+            <NavTab to="/tasks"     label="Tasks"   icon={<TaskIcon />}   active={isActive('/tasks')} />
+            <NavTab to="/offers"    label="Offers"  icon={<TagIcon />}    active={isActive('/offers')} />
+            <NavTab to="/withdraw"  label="Wallet"  icon={<WalletIcon />} active={isActive('/withdraw')} />
+            <NavTab to="/account"   label="Profile" icon={<UserIcon />}   active={isActive('/account')}
+              badge={!user.email_verified ? '!' : undefined} />
           </>
         ) : (
           <>
-            <Link to="/login" onClick={close}>Login</Link>
-            <Link to="/register" onClick={close}><button className="btn-primary">Join Free</button></Link>
+            <NavTab to="/"            label="Home"      icon={<HomeIcon />}    active={isActive('/')} />
+            <NavTab to="/payout-proof"label="Proof"     icon={<ShieldIcon />}  active={isActive('/payout-proof')} />
+            <NavTab to="/leaderboard" label="Leaders"   icon={<TrophyIcon />}  active={isActive('/leaderboard')} />
+            <NavTab to="/login"       label="Login"     icon={<LoginIcon />}   active={isActive('/login')} />
+            <NavTab to="/register"    label="Sign Up"   icon={<UserPlusIcon />}active={isActive('/register')} />
           </>
         )}
-      </div>
+      </nav>
+    </>
+  );
+}
 
-      {/* Theme + Notification controls */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-        <button
-          onClick={toggleTheme}
-          style={{ background: 'none', border: 'none', fontSize: 18, cursor: 'pointer', padding: 4 }}
-          aria-label="Toggle theme"
-        >{theme === 'dark' ? '☀️' : '🌙'}</button>
-
-        {user && (
-          <div style={{ position: 'relative' }}>
-            <button
-              onClick={() => { setNotifOpen((o) => !o); if (!notifOpen) markAllRead(); }}
-              style={{ background: 'none', border: 'none', fontSize: 18, cursor: 'pointer', padding: 4 }}
-              aria-label="Notifications"
-            >🔔</button>
-            {unread > 0 && (
-              <span style={{ position: 'absolute', top: -2, right: -2, background: '#dc2626', color: '#fff', borderRadius: '50%', width: 16, height: 16, fontSize: 10, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{unread}</span>
-            )}
-            {notifOpen && (
-              <div style={{ position: 'absolute', right: 0, top: '120%', background: 'var(--dark-card)', border: '1px solid var(--dark-border)', borderRadius: 10, width: 300, zIndex: 300, boxShadow: '0 8px 24px rgba(0,0,0,0.4)', overflow: 'hidden' }}>
-                <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--dark-border)', fontWeight: 700, fontSize: 14 }}>Withdrawal Updates</div>
-                {notifications.filter((n) => n.status !== 'pending').length === 0 ? (
-                  <p style={{ padding: 14, fontSize: 13, color: 'var(--text-muted)' }}>No updates yet.</p>
-                ) : notifications.filter((n) => n.status !== 'pending').slice(0, 8).map((n) => (
-                  <div key={n.id} style={{ padding: '10px 14px', borderBottom: '1px solid var(--dark-border)', fontSize: 13 }}>
-                    <span style={{ fontWeight: 600, color: n.status === 'completed' ? '#16a34a' : n.status === 'failed' ? '#dc2626' : '#2563eb' }}>{n.status.toUpperCase()}</span>
-                    {' — '}₱{Number(n.net_amount).toFixed(2)} via {n.channel.toUpperCase()}
-                    <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>{new Date(n.created_at).toLocaleString('en-PH')}</div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
-      </div>
-
-      {/* Overlay */}
-      {(open || notifOpen) && <div className={styles.overlay} onClick={() => { close(); setNotifOpen(false); }} />}
-    </nav>
+function NavTab({ to, label, icon, active, badge }: {
+  to: string; label: string; icon: React.ReactNode; active: boolean; badge?: string;
+}) {
+  return (
+    <Link to={to} className={`${styles.navTab} ${active ? styles.navTabActive : ''}`}>
+      <span className={styles.navTabIcon}>
+        {icon}
+        {badge && <span className={styles.navTabBadge}>{badge}</span>}
+      </span>
+      <span className={styles.navTabLabel}>{label}</span>
+    </Link>
   );
 }

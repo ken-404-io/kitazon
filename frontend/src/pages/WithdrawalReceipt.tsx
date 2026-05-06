@@ -3,6 +3,7 @@ import { useParams, Link } from 'react-router-dom';
 import api from '../services/api';
 import { Withdrawal } from '../types';
 import { Skeleton } from '../components/ui/Skeleton';
+import { WalletIcon2, PrintIcon } from '../components/ui/Icons';
 
 const STATUS_COLORS: Record<string, string> = {
   pending: '#d97706', processing: '#2563eb', completed: '#16a34a', failed: '#dc2626',
@@ -20,8 +21,6 @@ export default function WithdrawalReceipt() {
       .catch(() => setError('Withdrawal not found.'))
       .finally(() => setLoading(false));
   }, [id]);
-
-  const print = () => window.print();
 
   if (loading) return (
     <div className="page-container" style={{ maxWidth: 480 }}>
@@ -41,7 +40,9 @@ export default function WithdrawalReceipt() {
     <div className="page-container" style={{ maxWidth: 480 }}>
       <div className="card" id="receipt" style={{ padding: '2rem' }}>
         <div style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
-          <div style={{ fontSize: 40 }}>💰</div>
+          <span style={{ color: 'var(--gold)', display: 'flex', justifyContent: 'center', marginBottom: 8 }}>
+            <WalletIcon2 />
+          </span>
           <h2 style={{ margin: '0.5rem 0' }}>Kitazon</h2>
           <p style={{ color: 'var(--text-muted)', fontSize: 13 }}>Withdrawal Receipt</p>
         </div>
@@ -70,12 +71,14 @@ export default function WithdrawalReceipt() {
         </div>
 
         <p style={{ fontSize: 11, color: 'var(--text-muted)', textAlign: 'center' }}>
-          Thank you for using Kitazon. Keep earning! 🎉
+          Thank you for using Kitazon. Keep earning!
         </p>
       </div>
 
       <div style={{ display: 'flex', gap: 8, marginTop: '1rem' }} className="no-print">
-        <button className="btn-primary" onClick={print} style={{ flex: 1 }}>🖨 Print Receipt</button>
+        <button className="btn-primary" onClick={() => window.print()} style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+          <PrintIcon /> Print Receipt
+        </button>
         <Link to="/withdraw" style={{ flex: 1 }}>
           <button className="btn-outline" style={{ width: '100%' }}>Back</button>
         </Link>

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { CheckIcon } from '../ui/Icons';
 import styles from './ReferralCard.module.css';
 
 interface Tier {
@@ -9,9 +10,9 @@ interface Tier {
 }
 
 const TIERS: Tier[] = [
-  { name: 'Bronze', min: 5, bonus: '5%', color: '#cd7f32' },
-  { name: 'Silver', min: 20, bonus: '10%', color: '#c0c0c0' },
-  { name: 'Gold', min: 100, bonus: '15%', color: '#f59e0b' },
+  { name: 'Bronze', min: 5,   bonus: '5%',  color: '#cd7f32' },
+  { name: 'Silver', min: 20,  bonus: '10%', color: '#c0c0c0' },
+  { name: 'Gold',   min: 100, bonus: '15%', color: '#f59e0b' },
 ];
 
 interface Props {
@@ -41,7 +42,13 @@ export default function ReferralCard({ referralCode = '', referralCount = 0, lif
 
       <div className={styles.linkBox}>
         <span className={styles.link}>{link}</span>
-        <button className="btn-primary" onClick={copy}>{copied ? '✅ Copied!' : 'Copy'}</button>
+        <button
+          className="btn-primary"
+          onClick={copy}
+          style={{ display: 'flex', alignItems: 'center', gap: 4, whiteSpace: 'nowrap' }}
+        >
+          {copied ? <><CheckIcon /> Copied</> : 'Copy'}
+        </button>
       </div>
 
       <div className={styles.stats}>

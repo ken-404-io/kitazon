@@ -70,7 +70,7 @@ export default function Offers() {
   return (
     <div className="page-container">
       <div style={{ marginBottom: '1.5rem' }}>
-        <h1>💼 Earn with Offers</h1>
+        <h1>Earn with Offers</h1>
         <p style={{ color: 'var(--text-muted)', marginTop: 4 }}>
           Complete sponsored offers — surveys, app installs, and more — to earn real ₱ instantly.
         </p>
@@ -136,7 +136,7 @@ export default function Offers() {
                   <span style={{ fontWeight: 700 }}>{NETWORKS[active].name}</span>
                   <span style={{ fontSize: 13, color: 'var(--text-muted)', marginLeft: 8 }}>{NETWORKS[active].description}</span>
                 </div>
-                <button onClick={() => setActive(null)} style={{ background: 'none', border: 'none', fontSize: 18, cursor: 'pointer', color: 'var(--text-muted)' }}>✕</button>
+                <button onClick={() => setActive(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', padding: 4 }}><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
               </div>
               <iframe
                 src={NETWORKS[active].getUrl(user?.id ?? 0)}
@@ -152,7 +152,7 @@ export default function Offers() {
       {/* Setup instructions (shown when no networks configured) */}
       {configured.length === 0 && (
         <div className="card" style={{ marginBottom: '2rem' }}>
-          <h3 style={{ marginBottom: '1rem', color: 'var(--gold)' }}>⚡ Setup Required</h3>
+          <h3 style={{ marginBottom: '1rem', color: 'var(--gold)' }}>Setup Required</h3>
           <p style={{ fontSize: 14, marginBottom: '1rem', color: 'var(--text-muted)' }}>
             To activate offers, sign up for one or more networks and add your keys to <code>frontend/.env</code> and <code>backend/.env</code>.
           </p>

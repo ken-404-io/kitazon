@@ -1,17 +1,18 @@
 import { useEffect, useState } from 'react';
 import api from '../../services/api';
 import { Payout, WithdrawalChannel } from '../../types';
+import { CreditCardIcon, BuildingIcon, CoinsIcon, DollarIcon } from '../ui/Icons';
 import styles from './PayoutFeed.module.css';
 
-const CHANNEL_ICONS: Record<WithdrawalChannel, string> = {
-  gcash: '💙',
-  maya: '💚',
-  bpi: '🏦',
-  bdo: '🏦',
-  unionbank: '🏦',
-  gotyme: '💳',
-  coins: '🪙',
-  usdt: '💵',
+const CHANNEL_ICONS: Record<WithdrawalChannel, React.ReactNode> = {
+  gcash:     <CreditCardIcon />,
+  maya:      <CreditCardIcon />,
+  bpi:       <BuildingIcon />,
+  bdo:       <BuildingIcon />,
+  unionbank: <BuildingIcon />,
+  gotyme:    <CreditCardIcon />,
+  coins:     <CoinsIcon />,
+  usdt:      <DollarIcon />,
 };
 
 export default function PayoutFeed() {
@@ -46,7 +47,7 @@ export default function PayoutFeed() {
       {payouts.length === 0 && <p className={styles.empty}>No payouts yet. Be the first!</p>}
       {payouts.map((p) => (
         <div key={p.id} className={`card ${styles.row}`}>
-          <span>{CHANNEL_ICONS[p.channel] ?? '💰'}</span>
+          <span className={styles.channelIcon}>{CHANNEL_ICONS[p.channel] ?? <CreditCardIcon />}</span>
           <div className={styles.info}>
             <p className={styles.name}>{p.masked_name}</p>
             <p className={styles.time}>{new Date(p.created_at).toLocaleString('en-PH')}</p>
