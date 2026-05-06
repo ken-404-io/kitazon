@@ -62,6 +62,7 @@ export default function Navbar() {
           <>
             <Link to="/dashboard" onClick={close}>Dashboard</Link>
             <Link to="/tasks" onClick={close}>Tasks</Link>
+            <Link to="/offers" onClick={close}>Offers</Link>
             <Link to="/referral" onClick={close}>Referral</Link>
             <Link to="/account" onClick={close} style={{ position: 'relative' }}>
               Settings
