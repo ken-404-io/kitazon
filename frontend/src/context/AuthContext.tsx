@@ -7,7 +7,7 @@ interface AuthContextValue {
   loading: boolean;
   login: (email: string, password: string) => Promise<void>;
   register: (data: RegisterData) => Promise<void>;
-  logout: () => void;
+  logout: () => Promise<void>;
 }
 
 interface RegisterData {
@@ -15,6 +15,15 @@ interface RegisterData {
   email: string;
   password: string;
   referral_code?: string;
+}
+
+function parseJwtExpiry(token: string): number | null {
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1]));
+    return typeof payload.exp === 'number' ? payload.exp * 1000 : null;
+  } catch {
+    return null;
+  }
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -26,6 +35,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const token = localStorage.getItem('token');
     if (token) {
+      const expiry = parseJwtExpiry(token);
+      if (expiry && Date.now() >= expiry) {
+        // Token already expired — clear immediately without a network round-trip
+        localStorage.removeItem('token');
+        setLoading(false);
+        return;
+      }
       api.get<User>('/auth/me')
         .then((res) => setUser(res.data))
         .catch(() => localStorage.removeItem('token'))
@@ -47,9 +63,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(res.data.user);
   };
 
-  const logout = (): void => {
-    localStorage.removeItem('token');
-    setUser(null);
+  const logout = async (): Promise<void> => {
+    try {
+      await api.post('/auth/logout');
+    } catch {
+      // Best-effort: still clear local state even if server call fails
+    } finally {
+      localStorage.removeItem('token');
+      setUser(null);
+    }
   };
 
   return (

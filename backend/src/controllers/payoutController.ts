@@ -11,7 +11,8 @@ export async function feed(_req: Request, res: Response, next: NextFunction): Pr
         'withdrawals.amount',
         'withdrawals.channel',
         'withdrawals.created_at',
-        db.raw("CONCAT(LEFT(users.name, 1), REPEAT('*', GREATEST(LENGTH(users.name) - 2, 1)), RIGHT(users.name, 1)) as masked_name")
+        // PostgreSQL: mask name showing first and last char only
+        db.raw(`LEFT(users.name, 1) || REPEAT('*', GREATEST(LENGTH(users.name) - 2, 1)) || RIGHT(users.name, 1) as masked_name`)
       )
       .orderBy('withdrawals.created_at', 'desc')
       .limit(50);

@@ -13,7 +13,9 @@ api.interceptors.request.use((config) => {
 api.interceptors.response.use(
   (res) => res,
   (err) => {
-    if (err.response?.status === 401) {
+    // Only redirect to login on 401 from our own API, not from third-party calls
+    const isOwnApi = err.config?.baseURL === '/api' || err.config?.url?.startsWith('/api');
+    if (err.response?.status === 401 && isOwnApi) {
       localStorage.removeItem('token');
       window.location.href = '/login';
     }
