@@ -19,6 +19,7 @@ export interface DbUser {
   referral_code: string;
   balance: number;
   is_active: boolean;
+  is_admin: boolean;
   email_verified: boolean;
   email_verification_token: string | null;
   email_verification_expires: Date | null;

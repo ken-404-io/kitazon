@@ -78,3 +78,39 @@ export async function sendWithdrawalConfirmation(to: string, name: string, amoun
     <p>You will receive your funds within 1–24 hours depending on your chosen channel.</p>
   `);
 }
+
+export async function sendPasswordResetEmail(to: string, name: string, token: string): Promise<void> {
+  const link = `${process.env.FRONTEND_URL ?? 'http://localhost:3000'}/reset-password?token=${token}`;
+  await send(to, 'Reset your Kitazon password', `
+    <h2>Hi ${name},</h2>
+    <p>We received a request to reset your Kitazon password. Click the button below to choose a new password.</p>
+    <p><a href="${link}" style="background:#f59e0b;color:#000;padding:12px 24px;border-radius:6px;text-decoration:none;font-weight:bold;">Reset Password</a></p>
+    <p>This link expires in <strong>30 minutes</strong>.</p>
+    <p>If you did not request a password reset, you can safely ignore this email.</p>
+  `);
+}
+
+export async function sendWithdrawalStatusEmail(to: string, name: string, amount: number, channel: string, status: string): Promise<void> {
+  const statusMessages: Record<string, string> = {
+    processing: 'Your withdrawal is now being processed.',
+    completed: 'Your withdrawal has been completed! Funds have been sent to your account.',
+    failed: 'Unfortunately, your withdrawal could not be processed. Your balance has been refunded. Please contact support if you need help.',
+  };
+  const statusColors: Record<string, string> = {
+    processing: '#2563eb',
+    completed: '#16a34a',
+    failed: '#dc2626',
+  };
+  const msg = statusMessages[status] ?? `Your withdrawal status has been updated to: ${status}.`;
+  const color = statusColors[status] ?? '#f59e0b';
+  await send(to, `Kitazon Withdrawal ${status.charAt(0).toUpperCase() + status.slice(1)}`, `
+    <h2>Hi ${name},</h2>
+    <p>${msg}</p>
+    <ul>
+      <li><strong>Amount:</strong> ₱${amount.toFixed(2)}</li>
+      <li><strong>Channel:</strong> ${channel.toUpperCase()}</li>
+      <li><strong>Status:</strong> <span style="color:${color};font-weight:bold;">${status.toUpperCase()}</span></li>
+    </ul>
+    <p>Log in to your Kitazon account to view your updated balance.</p>
+  `);
+}

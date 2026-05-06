@@ -12,6 +12,7 @@ import withdrawalRoutes from './routes/withdrawals';
 import referralRoutes from './routes/referrals';
 import payoutRoutes from './routes/payouts';
 import accountRoutes from './routes/account';
+import adminRoutes from './routes/admin';
 
 // ─── Startup guards ────────────────────────────────────────────────────────────
 if (!process.env.JWT_SECRET || process.env.JWT_SECRET.length < 32) {
@@ -80,6 +81,7 @@ app.use('/api/withdrawals', withdrawalRoutes);
 app.use('/api/referrals', referralRoutes);
 app.use('/api/payouts', payoutRoutes);
 app.use('/api/account', accountRoutes);
+app.use('/api/admin', adminRoutes);
 
 // ─── 404 catch-all ────────────────────────────────────────────────────────────
 app.use((_req, res) => res.status(404).json({ message: 'Not found.' }));
