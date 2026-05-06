@@ -1,5 +1,5 @@
 import 'dotenv/config';
-import express from 'express';
+import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import { generalLimiter } from './middleware/rateLimiter';
@@ -11,11 +11,16 @@ import withdrawalRoutes from './routes/withdrawals';
 import referralRoutes from './routes/referrals';
 import payoutRoutes from './routes/payouts';
 
-// ─── Startup guard ────────────────────────────────────────────────────────────
+// ─── Startup guards ────────────────────────────────────────────────────────────
 if (!process.env.JWT_SECRET || process.env.JWT_SECRET.length < 32) {
   console.error('FATAL: JWT_SECRET is missing or too short (min 32 chars). Refusing to start.');
   process.exit(1);
 }
+if (!process.env.FRONTEND_URL) {
+  console.warn('WARNING: FRONTEND_URL is not set. CORS will only allow http://localhost:3000.');
+}
+
+const ALLOWED_ORIGIN = process.env.FRONTEND_URL ?? 'http://localhost:3000';
 
 const app = express();
 
@@ -31,13 +36,19 @@ app.use(helmet({
       connectSrc: ["'self'"],
       frameSrc: ["'none'"],
       objectSrc: ["'none'"],
+      upgradeInsecureRequests: [],
     },
+  },
+  hsts: {
+    maxAge: 31536000,
+    includeSubDomains: true,
+    preload: true,
   },
 }));
 
 // ─── CORS ─────────────────────────────────────────────────────────────────────
 app.use(cors({
-  origin: process.env.FRONTEND_URL ?? 'http://localhost:3000',
+  origin: ALLOWED_ORIGIN,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
   allowedHeaders: ['Content-Type', 'Authorization'],
   credentials: true,
@@ -46,6 +57,19 @@ app.use(cors({
 // ─── Body / request hardening ─────────────────────────────────────────────────
 app.use(express.json({ limit: '10kb' }));
 app.use(express.urlencoded({ extended: false, limit: '10kb' }));
+
+// Reject mutation requests that aren't application/json
+app.use((req: Request, res: Response, next: NextFunction): void => {
+  const method = req.method;
+  if (['POST', 'PUT', 'PATCH'].includes(method)) {
+    const ct = req.headers['content-type'] ?? '';
+    if (!ct.includes('application/json')) {
+      res.status(415).json({ message: 'Content-Type must be application/json.' });
+      return;
+    }
+  }
+  next();
+});
 
 // ─── Global middleware ────────────────────────────────────────────────────────
 app.use(sanitize);
