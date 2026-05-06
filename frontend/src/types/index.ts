@@ -5,6 +5,7 @@ export interface User {
   balance: number | string;
   referral_code: string;
   email_verified: boolean;
+  is_admin?: boolean;
 }
 
 export interface Task {

@@ -64,6 +64,7 @@ export default function Login() {
             {loading ? 'Logging in...' : 'Login'}
           </button>
         </form>
+        <p className={styles.switch}><Link to="/forgot-password">Forgot password?</Link></p>
         <p className={styles.switch}>No account? <Link to="/register">Join free</Link></p>
       </div>
     </div>

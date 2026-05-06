@@ -1,0 +1,370 @@
+import { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
+import api from '../services/api';
+import { WithdrawalStatus, WithdrawalChannel } from '../types';
+
+type Tab = 'stats' | 'users' | 'withdrawals' | 'logs';
+
+interface PlatformStats {
+  users: number;
+  active_users: number;
+  verified_users: number;
+  pending_withdrawals: number;
+  total_paid_out: number;
+  total_earnings_distributed: number;
+}
+
+interface AdminUser {
+  id: number;
+  name: string;
+  email: string;
+  balance: number | string;
+  is_active: boolean;
+  is_admin: boolean;
+  email_verified: boolean;
+  created_at: string;
+  last_login_at: string | null;
+}
+
+interface AdminWithdrawal {
+  id: number;
+  amount: number | string;
+  fee: number | string;
+  net_amount: number | string;
+  channel: WithdrawalChannel;
+  account_number: string;
+  status: WithdrawalStatus;
+  created_at: string;
+  user_id: number;
+  user_name: string;
+  user_email: string;
+}
+
+interface AuditLog {
+  id: number;
+  action: string;
+  amount: number | null;
+  ip_address: string | null;
+  metadata: Record<string, unknown> | null;
+  created_at: string;
+  user_name: string | null;
+  user_email: string | null;
+}
+
+const fmt = (n: number | string) => Number(n).toFixed(2);
+const STATUS_COLORS: Record<string, string> = {
+  pending: '#d97706', processing: '#2563eb', completed: '#16a34a', failed: '#dc2626',
+};
+
+export default function Admin() {
+  const { user } = useAuth();
+  const navigate = useNavigate();
+  const [tab, setTab] = useState<Tab>('stats');
+
+  // Stats
+  const [stats, setStats] = useState<PlatformStats | null>(null);
+
+  // Users
+  const [users, setUsers] = useState<AdminUser[]>([]);
+  const [userPage, setUserPage] = useState(1);
+  const [userPages, setUserPages] = useState(1);
+  const [userSearch, setUserSearch] = useState('');
+  const [userLoading, setUserLoading] = useState(false);
+
+  // Withdrawals
+  const [withdrawals, setWithdrawals] = useState<AdminWithdrawal[]>([]);
+  const [wPage, setWPage] = useState(1);
+  const [wPages, setWPages] = useState(1);
+  const [wFilter, setWFilter] = useState('');
+  const [wLoading, setWLoading] = useState(false);
+
+  // Audit logs
+  const [logs, setLogs] = useState<AuditLog[]>([]);
+  const [logPage, setLogPage] = useState(1);
+  const [logPages, setLogPages] = useState(1);
+  const [logLoading, setLogLoading] = useState(false);
+
+  // Redirect non-admins
+  useEffect(() => {
+    if (user && !user.is_admin) navigate('/dashboard', { replace: true });
+  }, [user, navigate]);
+
+  const loadStats = useCallback(async () => {
+    const res = await api.get<PlatformStats>('/admin/stats');
+    setStats(res.data);
+  }, []);
+
+  const loadUsers = useCallback(async (page: number, search: string) => {
+    setUserLoading(true);
+    try {
+      const res = await api.get<{ users: AdminUser[]; total: number; pages: number }>(
+        `/admin/users?page=${page}&search=${encodeURIComponent(search)}`
+      );
+      setUsers(res.data.users);
+      setUserPages(res.data.pages);
+    } finally { setUserLoading(false); }
+  }, []);
+
+  const loadWithdrawals = useCallback(async (page: number, status: string) => {
+    setWLoading(true);
+    try {
+      const res = await api.get<{ withdrawals: AdminWithdrawal[]; pages: number }>(
+        `/admin/withdrawals?page=${page}${status ? `&status=${status}` : ''}`
+      );
+      setWithdrawals(res.data.withdrawals);
+      setWPages(res.data.pages);
+    } finally { setWLoading(false); }
+  }, []);
+
+  const loadLogs = useCallback(async (page: number) => {
+    setLogLoading(true);
+    try {
+      const res = await api.get<{ logs: AuditLog[]; pages: number }>(`/admin/audit-logs?page=${page}`);
+      setLogs(res.data.logs);
+      setLogPages(res.data.pages);
+    } finally { setLogLoading(false); }
+  }, []);
+
+  useEffect(() => {
+    if (tab === 'stats' && !stats) loadStats();
+    if (tab === 'users') loadUsers(userPage, userSearch);
+    if (tab === 'withdrawals') loadWithdrawals(wPage, wFilter);
+    if (tab === 'logs') loadLogs(logPage);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab, userPage, wPage, wFilter, logPage]);
+
+  const toggleActive = async (userId: number) => {
+    await api.patch(`/admin/users/${userId}/toggle-active`);
+    loadUsers(userPage, userSearch);
+  };
+
+  const updateWStatus = async (id: number, status: string) => {
+    await api.patch(`/admin/withdrawals/${id}/status`, { status });
+    loadWithdrawals(wPage, wFilter);
+  };
+
+  const tabStyle = (t: Tab) => ({
+    padding: '8px 18px',
+    background: tab === t ? 'var(--gold)' : 'transparent',
+    color: tab === t ? '#000' : 'inherit',
+    border: '1px solid var(--gold)',
+    borderRadius: 6,
+    cursor: 'pointer',
+    fontWeight: tab === t ? 700 : 400,
+  });
+
+  return (
+    <div style={{ maxWidth: 1100, margin: '2rem auto', padding: '0 1rem' }}>
+      <h2>Admin Panel</h2>
+      <div style={{ display: 'flex', gap: 8, marginBottom: '1.5rem', flexWrap: 'wrap' }}>
+        {(['stats', 'users', 'withdrawals', 'logs'] as Tab[]).map(t => (
+          <button key={t} style={tabStyle(t)} onClick={() => setTab(t)}>
+            {t.charAt(0).toUpperCase() + t.slice(1)}
+          </button>
+        ))}
+      </div>
+
+      {/* ── Stats ── */}
+      {tab === 'stats' && (
+        <div>
+          {!stats ? <p>Loading...</p> : (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '1rem' }}>
+              {[
+                { label: 'Total Users', value: stats.users },
+                { label: 'Active Users', value: stats.active_users },
+                { label: 'Verified Users', value: stats.verified_users },
+                { label: 'Pending Withdrawals', value: stats.pending_withdrawals },
+                { label: 'Total Paid Out', value: `₱${fmt(stats.total_paid_out)}` },
+                { label: 'Total Earnings Distributed', value: `₱${fmt(stats.total_earnings_distributed)}` },
+              ].map(s => (
+                <div key={s.label} className="card" style={{ textAlign: 'center' }}>
+                  <div style={{ fontSize: 28, fontWeight: 700, color: 'var(--gold)' }}>{s.value}</div>
+                  <div style={{ fontSize: 13, color: '#6b7280', marginTop: 4 }}>{s.label}</div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── Users ── */}
+      {tab === 'users' && (
+        <div>
+          <div style={{ display: 'flex', gap: 8, marginBottom: '1rem' }}>
+            <input
+              style={{ flex: 1, padding: '8px 12px', borderRadius: 6, border: '1px solid #e5e7eb' }}
+              placeholder="Search by name or email..."
+              value={userSearch}
+              onChange={e => { setUserSearch(e.target.value); setUserPage(1); }}
+              onKeyDown={e => { if (e.key === 'Enter') loadUsers(1, userSearch); }}
+            />
+            <button className="btn-primary" onClick={() => loadUsers(1, userSearch)}>Search</button>
+          </div>
+          {userLoading ? <p>Loading...</p> : (
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+                <thead>
+                  <tr style={{ borderBottom: '2px solid #e5e7eb', background: '#f9fafb' }}>
+                    {['ID', 'Name', 'Email', 'Balance', 'Verified', 'Active', 'Joined', 'Actions'].map(h => (
+                      <th key={h} style={{ padding: '8px 10px', textAlign: 'left', whiteSpace: 'nowrap' }}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {users.map(u => (
+                    <tr key={u.id} style={{ borderBottom: '1px solid #f3f4f6' }}>
+                      <td style={{ padding: '8px 10px' }}>{u.id}</td>
+                      <td style={{ padding: '8px 10px' }}>{u.name}</td>
+                      <td style={{ padding: '8px 10px' }}>{u.email}</td>
+                      <td style={{ padding: '8px 10px' }}>₱{fmt(u.balance)}</td>
+                      <td style={{ padding: '8px 10px', color: u.email_verified ? 'green' : '#d97706' }}>
+                        {u.email_verified ? 'Yes' : 'No'}
+                      </td>
+                      <td style={{ padding: '8px 10px', color: u.is_active ? 'green' : '#dc2626' }}>
+                        {u.is_active ? 'Active' : 'Disabled'}
+                      </td>
+                      <td style={{ padding: '8px 10px', whiteSpace: 'nowrap' }}>
+                        {new Date(u.created_at).toLocaleDateString()}
+                      </td>
+                      <td style={{ padding: '8px 10px' }}>
+                        {!u.is_admin && (
+                          <button
+                            className="btn-outline"
+                            style={{ fontSize: 12, padding: '4px 10px', borderColor: u.is_active ? '#dc2626' : 'green', color: u.is_active ? '#dc2626' : 'green' }}
+                            onClick={() => toggleActive(u.id)}
+                          >
+                            {u.is_active ? 'Disable' : 'Enable'}
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+          <div style={{ display: 'flex', gap: 8, marginTop: '1rem', alignItems: 'center' }}>
+            <button className="btn-outline" disabled={userPage <= 1} onClick={() => setUserPage(p => p - 1)}>Prev</button>
+            <span style={{ fontSize: 13 }}>Page {userPage} of {userPages}</span>
+            <button className="btn-outline" disabled={userPage >= userPages} onClick={() => setUserPage(p => p + 1)}>Next</button>
+          </div>
+        </div>
+      )}
+
+      {/* ── Withdrawals ── */}
+      {tab === 'withdrawals' && (
+        <div>
+          <div style={{ display: 'flex', gap: 8, marginBottom: '1rem', flexWrap: 'wrap', alignItems: 'center' }}>
+            <label style={{ fontSize: 13 }}>Filter by status:</label>
+            <select
+              value={wFilter}
+              onChange={e => { setWFilter(e.target.value); setWPage(1); }}
+              style={{ padding: '6px 10px', borderRadius: 6, border: '1px solid #e5e7eb' }}
+            >
+              <option value="">All</option>
+              <option value="pending">Pending</option>
+              <option value="processing">Processing</option>
+              <option value="completed">Completed</option>
+              <option value="failed">Failed</option>
+            </select>
+          </div>
+          {wLoading ? <p>Loading...</p> : (
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+                <thead>
+                  <tr style={{ borderBottom: '2px solid #e5e7eb', background: '#f9fafb' }}>
+                    {['ID', 'User', 'Amount', 'Net', 'Channel', 'Account', 'Status', 'Date', 'Update Status'].map(h => (
+                      <th key={h} style={{ padding: '8px 10px', textAlign: 'left', whiteSpace: 'nowrap' }}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {withdrawals.map(w => (
+                    <tr key={w.id} style={{ borderBottom: '1px solid #f3f4f6' }}>
+                      <td style={{ padding: '8px 10px' }}>{w.id}</td>
+                      <td style={{ padding: '8px 10px' }}>
+                        <div>{w.user_name}</div>
+                        <div style={{ fontSize: 11, color: '#9ca3af' }}>{w.user_email}</div>
+                      </td>
+                      <td style={{ padding: '8px 10px' }}>₱{fmt(w.amount)}</td>
+                      <td style={{ padding: '8px 10px' }}>₱{fmt(w.net_amount)}</td>
+                      <td style={{ padding: '8px 10px' }}>{w.channel.toUpperCase()}</td>
+                      <td style={{ padding: '8px 10px' }}>{w.account_number}</td>
+                      <td style={{ padding: '8px 10px' }}>
+                        <span style={{ color: STATUS_COLORS[w.status] ?? '#374151', fontWeight: 600 }}>
+                          {w.status.toUpperCase()}
+                        </span>
+                      </td>
+                      <td style={{ padding: '8px 10px', whiteSpace: 'nowrap' }}>
+                        {new Date(w.created_at).toLocaleDateString()}
+                      </td>
+                      <td style={{ padding: '8px 10px' }}>
+                        <select
+                          value={w.status}
+                          onChange={e => updateWStatus(w.id, e.target.value)}
+                          style={{ padding: '4px 8px', borderRadius: 4, border: '1px solid #e5e7eb', fontSize: 12 }}
+                        >
+                          <option value="pending">Pending</option>
+                          <option value="processing">Processing</option>
+                          <option value="completed">Completed</option>
+                          <option value="failed">Failed</option>
+                        </select>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+          <div style={{ display: 'flex', gap: 8, marginTop: '1rem', alignItems: 'center' }}>
+            <button className="btn-outline" disabled={wPage <= 1} onClick={() => setWPage(p => p - 1)}>Prev</button>
+            <span style={{ fontSize: 13 }}>Page {wPage} of {wPages}</span>
+            <button className="btn-outline" disabled={wPage >= wPages} onClick={() => setWPage(p => p + 1)}>Next</button>
+          </div>
+        </div>
+      )}
+
+      {/* ── Audit Logs ── */}
+      {tab === 'logs' && (
+        <div>
+          {logLoading ? <p>Loading...</p> : (
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+                <thead>
+                  <tr style={{ borderBottom: '2px solid #e5e7eb', background: '#f9fafb' }}>
+                    {['Time', 'User', 'Action', 'Amount', 'IP', 'Details'].map(h => (
+                      <th key={h} style={{ padding: '8px 10px', textAlign: 'left', whiteSpace: 'nowrap' }}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {logs.map(l => (
+                    <tr key={l.id} style={{ borderBottom: '1px solid #f3f4f6' }}>
+                      <td style={{ padding: '8px 10px', whiteSpace: 'nowrap' }}>{new Date(l.created_at).toLocaleString()}</td>
+                      <td style={{ padding: '8px 10px' }}>
+                        <div>{l.user_name ?? '—'}</div>
+                        <div style={{ fontSize: 11, color: '#9ca3af' }}>{l.user_email ?? ''}</div>
+                      </td>
+                      <td style={{ padding: '8px 10px', fontFamily: 'monospace' }}>{l.action}</td>
+                      <td style={{ padding: '8px 10px' }}>{l.amount != null ? `₱${fmt(l.amount)}` : '—'}</td>
+                      <td style={{ padding: '8px 10px' }}>{l.ip_address ?? '—'}</td>
+                      <td style={{ padding: '8px 10px', maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {l.metadata ? JSON.stringify(l.metadata) : '—'}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+          <div style={{ display: 'flex', gap: 8, marginTop: '1rem', alignItems: 'center' }}>
+            <button className="btn-outline" disabled={logPage <= 1} onClick={() => setLogPage(p => p - 1)}>Prev</button>
+            <span style={{ fontSize: 13 }}>Page {logPage} of {logPages}</span>
+            <button className="btn-outline" disabled={logPage >= logPages} onClick={() => setLogPage(p => p + 1)}>Next</button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

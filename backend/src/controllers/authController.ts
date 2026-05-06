@@ -4,7 +4,7 @@ import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
 import db from '../../config/database';
 import { DbUser, DbRefreshToken, AuthPayload } from '../types';
-import { sendVerificationEmail, sendLoginAlert, sendPasswordChangedEmail } from '../services/email';
+import { sendVerificationEmail, sendLoginAlert, sendPasswordChangedEmail, sendPasswordResetEmail } from '../services/email';
 import { createOtp, verifyOtp } from '../services/otp';
 import { logAudit, logLoginEvent } from '../services/audit';
 
@@ -51,6 +51,7 @@ const safeUser = (u: DbUser) => ({
   balance: u.balance,
   referral_code: u.referral_code,
   email_verified: u.email_verified,
+  is_admin: u.is_admin ?? false,
 });
 
 // ─── Token blacklist (access tokens; in-memory, clears hourly) ───────────────
@@ -346,6 +347,62 @@ export async function me(req: Request, res: Response, next: NextFunction): Promi
     const user = await db<DbUser>('users').where({ id: req.user!.id }).first();
     if (!user) { res.status(404).json({ message: 'User not found.' }); return; }
     res.json(safeUser(user));
+  } catch (err) { next(err); }
+}
+
+export async function forgotPassword(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const { email } = req.body as { email: string };
+    if (!email?.trim() || !isValidEmail(email)) {
+      // Always return 200 to prevent email enumeration
+      res.json({ message: 'If that email is registered you will receive a reset link shortly.' });
+      return;
+    }
+    const user = await db<DbUser>('users').where({ email: email.toLowerCase().trim(), is_active: true }).first();
+    if (user) {
+      const token = await createOtp(user.id, 'password_reset', 30);
+      sendPasswordResetEmail(user.email, user.name, token).catch(() => {});
+    }
+    res.json({ message: 'If that email is registered you will receive a reset link shortly.' });
+  } catch (err) { next(err); }
+}
+
+export async function resetPassword(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const { token, password } = req.body as { token: string; password: string };
+    if (!token || typeof token !== 'string') {
+      res.status(400).json({ message: 'Reset token is required.' });
+      return;
+    }
+    const pwError = validatePassword(password);
+    if (pwError) { res.status(400).json({ message: pwError }); return; }
+
+    const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+    const otpRecord = await db('otp_tokens')
+      .where({ token_hash: tokenHash, purpose: 'password_reset' })
+      .whereNull('used_at')
+      .where('expires_at', '>', new Date())
+      .first();
+
+    if (!otpRecord) {
+      res.status(400).json({ message: 'Invalid or expired reset link.' });
+      return;
+    }
+
+    const user = await db<DbUser>('users').where({ id: otpRecord.user_id, is_active: true }).first();
+    if (!user) { res.status(400).json({ message: 'Invalid or expired reset link.' }); return; }
+
+    const newHash = await bcrypt.hash(password, 12);
+
+    await db.transaction(async (trx) => {
+      await trx('otp_tokens').where({ id: otpRecord.id }).update({ used_at: new Date() });
+      await trx('users').where({ id: user.id }).update({ password_hash: newHash });
+      // Revoke all refresh tokens so old sessions cannot be reused
+      await trx('refresh_tokens').where({ user_id: user.id }).update({ revoked_at: new Date() });
+    });
+
+    sendPasswordChangedEmail(user.email, user.name).catch(() => {});
+    res.json({ message: 'Password reset successfully. Please log in with your new password.' });
   } catch (err) { next(err); }
 }
 
