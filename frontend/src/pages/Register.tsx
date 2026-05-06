@@ -46,6 +46,7 @@ export default function Register() {
       }
       await register({ name, email, password: form.password, referral_code, captcha_token });
     } catch (err: unknown) {
+      console.error('Register error:', err);
       captchaRef.current?.resetCaptcha();
       const msg = (err as { response?: { data?: { message?: string } } }).response?.data?.message;
       setError(msg ?? 'Registration failed. Try again.');
