@@ -27,6 +27,9 @@ const ALLOWED_ORIGIN = process.env.FRONTEND_URL ?? 'http://localhost:3000';
 
 const app = express();
 
+// Trust proxy in dev so express-rate-limit can read X-Forwarded-For correctly
+app.set('trust proxy', 1);
+
 // ─── Security headers ─────────────────────────────────────────────────────────
 app.use(helmet({
   crossOriginEmbedderPolicy: false,
