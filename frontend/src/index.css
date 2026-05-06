@@ -121,7 +121,11 @@ label {
 .page-container {
   max-width: 1200px;
   margin: 0 auto;
-  padding: 2rem 1rem;
+  padding: 2rem 1rem 6rem; /* 6rem bottom = space for mobile bottom nav */
+}
+
+@media (min-width: 769px) {
+  .page-container { padding-bottom: 2rem; }
 }
 
 .grid-2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem; }

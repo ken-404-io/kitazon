@@ -1,14 +1,15 @@
 import { useState } from 'react';
 import api from '../../services/api';
 import { Task } from '../../types';
+import { SurveyIcon, PhoneIcon, PlayIcon, BriefcaseIcon, GamepadIcon, CheckIcon } from '../ui/Icons';
 import styles from './TaskCard.module.css';
 
-const CATEGORY_ICONS: Record<Task['category'], string> = {
-  survey: '📋',
-  app_install: '📱',
-  video: '🎬',
-  microjob: '💼',
-  game: '🎮',
+const CATEGORY_ICONS: Record<Task['category'], React.ReactNode> = {
+  survey:      <SurveyIcon />,
+  app_install: <PhoneIcon />,
+  video:       <PlayIcon />,
+  microjob:    <BriefcaseIcon />,
+  game:        <GamepadIcon />,
 };
 
 interface Props {
@@ -37,7 +38,7 @@ export default function TaskCard({ task, onComplete }: Props) {
   return (
     <div className={`card ${styles.card} ${done ? styles.done : ''}`}>
       <div className={styles.header}>
-        <span className={styles.icon}>{CATEGORY_ICONS[task.category] ?? '⭐'}</span>
+        <span className={styles.icon}>{CATEGORY_ICONS[task.category]}</span>
         <span className={`badge badge-gold ${styles.payout}`}>₱{task.payout}</span>
       </div>
       <h4 className={styles.title}>{task.title}</h4>
@@ -46,8 +47,9 @@ export default function TaskCard({ task, onComplete }: Props) {
         className={done ? styles.doneBtn : 'btn-primary'}
         onClick={handleComplete}
         disabled={loading || done}
+        style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}
       >
-        {done ? '✅ Completed' : loading ? 'Processing...' : 'Complete Task'}
+        {done ? <><CheckIcon /> Completed</> : loading ? 'Processing...' : 'Complete Task'}
       </button>
     </div>
   );

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import api from '../services/api';
 import { Skeleton } from '../components/ui/Skeleton';
+import { TrophyIcon, MedalIcon } from '../components/ui/Icons';
 
 interface Leader {
   rank: number;
@@ -9,7 +10,7 @@ interface Leader {
   total_earned: number;
 }
 
-const MEDALS = ['🥇', '🥈', '🥉'];
+const MEDAL_COLORS = ['#f59e0b', '#9ca3af', '#b45309'];
 
 export default function Leaderboard() {
   const [leaders, setLeaders] = useState<Leader[]>([]);
@@ -24,7 +25,10 @@ export default function Leaderboard() {
 
   return (
     <div className="page-container" style={{ maxWidth: 640 }}>
-      <h1>🏆 Referral Leaderboard</h1>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
+        <span style={{ color: 'var(--gold)' }}><TrophyIcon /></span>
+        <h1>Referral Leaderboard</h1>
+      </div>
       <p style={{ color: 'var(--text-muted)', marginBottom: '1.5rem' }}>Top earners from referrals this month</p>
 
       {loading ? (
@@ -45,8 +49,10 @@ export default function Leaderboard() {
       ) : (
         leaders.map((l) => (
           <div key={l.rank} className="card" style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 8 }}>
-            <div style={{ fontSize: l.rank <= 3 ? 28 : 16, fontWeight: 700, minWidth: 36, textAlign: 'center', color: 'var(--gold)' }}>
-              {l.rank <= 3 ? MEDALS[l.rank - 1] : `#${l.rank}`}
+            <div style={{ minWidth: 36, textAlign: 'center', color: l.rank <= 3 ? MEDAL_COLORS[l.rank - 1] : 'var(--text-muted)', fontWeight: 700, fontSize: l.rank <= 3 ? 14 : 14 }}>
+              {l.rank <= 3
+                ? <span style={{ color: MEDAL_COLORS[l.rank - 1] }}><MedalIcon /></span>
+                : <span>#{l.rank}</span>}
             </div>
             <div style={{ flex: 1 }}>
               <div style={{ fontWeight: 600 }}>{l.name}</div>

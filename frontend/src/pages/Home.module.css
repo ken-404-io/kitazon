@@ -45,11 +45,12 @@
 }
 
 .catCard { text-align: center; }
-.catIcon { font-size: 2.2rem; display: block; margin-bottom: 0.5rem; }
+.catIcon { display: flex; justify-content: center; margin-bottom: 0.75rem; color: var(--gold); }
 .catCard h3 { margin-bottom: 0.25rem; }
 .range { color: var(--gold); font-weight: 700; font-size: 0.9rem; margin-bottom: 0.4rem; }
 .catDesc { color: var(--text-muted); font-size: 0.83rem; }
 
 .whySection { background: var(--dark-card); padding: 3rem 0; margin: 3rem 0; }
-.whyCard { text-align: center; display: flex; flex-direction: column; gap: 0.4rem; }
+.whyCard { text-align: center; display: flex; flex-direction: column; gap: 0.4rem; align-items: center; }
+.whyIcon { color: var(--gold); margin-bottom: 0.25rem; }
 .whyCard p { color: var(--text-muted); font-size: 0.83rem; }

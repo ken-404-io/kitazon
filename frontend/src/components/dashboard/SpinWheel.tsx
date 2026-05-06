@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import api from '../../services/api';
+import { SpinIcon, WalletIcon2 } from '../ui/Icons';
 import styles from './SpinWheel.module.css';
 
 interface Props {
@@ -32,12 +33,14 @@ export default function SpinWheel({ onWin }: Props) {
 
   return (
     <div className={`card ${styles.wrap}`}>
-      <h3>Daily Spin Wheel</h3>
+      <h3>Daily Spin</h3>
       <p className={styles.sub}>Spin once per day — win ₱5 to ₱100!</p>
       <div className={`${styles.wheel} ${spinning ? styles.spinning : ''}`}>
-        {spinning ? '🌀' : result ? `₱${result}` : '💰'}
+        {result !== null
+          ? <span className={styles.resultText}>₱{result}</span>
+          : <span className={styles.wheelIcon}>{spinning ? <SpinIcon /> : <WalletIcon2 />}</span>}
       </div>
-      {result !== null && <p className={styles.win}>You won ₱{result}! 🎉</p>}
+      {result !== null && <p className={styles.win}>You won ₱{result}!</p>}
       {error && <p className="error-msg">{error}</p>}
       <button className="btn-primary" onClick={spin} disabled={spinning}>
         {spinning ? 'Spinning...' : 'Spin Now'}
