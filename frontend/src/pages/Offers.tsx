@@ -21,7 +21,7 @@ export default function Offers() {
   }, []);
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 64px)' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 56px - 64px)' }}>
       {/* Stats bar */}
       <div style={{
         display: 'flex',
