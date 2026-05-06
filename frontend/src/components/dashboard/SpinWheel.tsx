@@ -17,7 +17,7 @@ export default function SpinWheel({ onWin }: Props) {
     setResult(null);
     setError('');
     try {
-      const res = await api.post<{ amount: number }>('/tasks/spin');
+      const res = await api.post<{ amount: number }>('/tasks/spin', {});
       setTimeout(() => {
         setResult(res.data.amount);
         setSpinning(false);

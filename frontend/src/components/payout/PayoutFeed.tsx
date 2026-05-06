@@ -25,7 +25,21 @@ export default function PayoutFeed() {
       .finally(() => setLoading(false));
   }, []);
 
-  if (loading) return <p className={styles.loading}>Loading payouts...</p>;
+  if (loading) return (
+    <div className={styles.feed}>
+      {Array.from({ length: 6 }).map((_, i) => (
+        <div key={i} className={`card ${styles.row}`} style={{ gap: 12 }}>
+          <div style={{ width: 28, height: 28, borderRadius: '50%', background: '#2a2a2a', animation: 'shimmer 1.4s infinite', backgroundSize: '200% 100%', backgroundImage: 'linear-gradient(90deg,#2a2a2a 25%,#3a3a3a 50%,#2a2a2a 75%)' }} />
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <div style={{ height: 14, width: '40%', borderRadius: 4, background: '#2a2a2a', animation: 'shimmer 1.4s infinite', backgroundSize: '200% 100%', backgroundImage: 'linear-gradient(90deg,#2a2a2a 25%,#3a3a3a 50%,#2a2a2a 75%)' }} />
+            <div style={{ height: 11, width: '25%', borderRadius: 4, background: '#2a2a2a', animation: 'shimmer 1.4s infinite', backgroundSize: '200% 100%', backgroundImage: 'linear-gradient(90deg,#2a2a2a 25%,#3a3a3a 50%,#2a2a2a 75%)' }} />
+          </div>
+          <div style={{ height: 20, width: 60, borderRadius: 4, background: '#2a2a2a', animation: 'shimmer 1.4s infinite', backgroundSize: '200% 100%', backgroundImage: 'linear-gradient(90deg,#2a2a2a 25%,#3a3a3a 50%,#2a2a2a 75%)' }} />
+        </div>
+      ))}
+      <style>{`@keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}`}</style>
+    </div>
+  );
 
   return (
     <div className={styles.feed}>

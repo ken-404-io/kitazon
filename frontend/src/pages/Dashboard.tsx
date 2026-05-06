@@ -17,6 +17,8 @@ export default function Dashboard() {
   const [recentEarnings, setRecentEarnings] = useState<Earning[]>([]);
   const [loadingStats, setLoadingStats] = useState(true);
   const [loadingEarnings, setLoadingEarnings] = useState(true);
+  const [earningsPage, setEarningsPage] = useState(1);
+  const [earningsPages, setEarningsPages] = useState(1);
 
   const loadStats = (): void => {
     api.get<UserStats>('/auth/me/stats').then((res) => setStats(res.data)).catch(() => {}).finally(() => setLoadingStats(false));
@@ -24,11 +26,15 @@ export default function Dashboard() {
 
   useEffect(() => {
     loadStats();
-    api.get<Earning[]>('/tasks/earnings/recent')
-      .then((res) => setRecentEarnings(res.data))
+  }, []);
+
+  useEffect(() => {
+    setLoadingEarnings(true);
+    api.get<{ earnings: Earning[]; pages: number }>(`/tasks/earnings/recent?page=${earningsPage}`)
+      .then((res) => { setRecentEarnings(res.data.earnings); setEarningsPages(res.data.pages); })
       .catch(() => {})
       .finally(() => setLoadingEarnings(false));
-  }, []);
+  }, [earningsPage]);
 
   return (
     <div className="page-container">
@@ -76,6 +82,13 @@ export default function Dashboard() {
               <span className="badge badge-green">+₱{e.amount}</span>
             </div>
           ))}
+          {earningsPages > 1 && (
+            <div style={{ display: 'flex', gap: 8, marginTop: '0.75rem', alignItems: 'center' }}>
+              <button className="btn-outline" style={{ padding: '4px 12px', fontSize: 13 }} disabled={earningsPage <= 1} onClick={() => setEarningsPage((p) => p - 1)}>← Prev</button>
+              <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>{earningsPage} / {earningsPages}</span>
+              <button className="btn-outline" style={{ padding: '4px 12px', fontSize: 13 }} disabled={earningsPage >= earningsPages} onClick={() => setEarningsPage((p) => p + 1)}>Next →</button>
+            </div>
+          )}
           <EarningsChart />
         </div>
         <SpinWheel onWin={() => { loadStats(); showToast('🎉 Spin reward added to your balance!', 'success'); }} />

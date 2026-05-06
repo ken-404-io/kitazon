@@ -7,6 +7,7 @@ import { DbUser, DbRefreshToken, AuthPayload } from '../types';
 import { sendVerificationEmail, sendLoginAlert, sendPasswordChangedEmail, sendPasswordResetEmail } from '../services/email';
 import { createOtp, verifyOtp } from '../services/otp';
 import { logAudit, logLoginEvent } from '../services/audit';
+import { verifyTotpLogin } from './totpController';
 
 const ACCESS_TOKEN_TTL = '15m';
 const REFRESH_TOKEN_TTL_DAYS = 30;
@@ -193,7 +194,7 @@ export async function register(req: Request, res: Response, next: NextFunction):
 
 export async function login(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const { email, password, captcha_token } = req.body as { email: string; password: string; captcha_token?: string };
+    const { email, password, captcha_token, totp_code } = req.body as { email: string; password: string; captcha_token?: string; totp_code?: string };
 
     if (captcha_token !== undefined && !(await verifyCaptcha(captcha_token))) {
       res.status(400).json({ message: 'Captcha verification failed.' });
@@ -227,6 +228,20 @@ export async function login(req: Request, res: Response, next: NextFunction): Pr
       const isLocked = entry?.lockedUntil && entry.lockedUntil > new Date();
       res.status(401).json({ message: isLocked ? 'Account locked for 15 minutes due to too many failed attempts.' : 'Invalid email or password.' });
       return;
+    }
+
+    // 2FA check
+    if (user.totp_enabled) {
+      if (!totp_code) {
+        res.status(200).json({ requires_totp: true });
+        return;
+      }
+      const totpOk = await verifyTotpLogin(user.id, totp_code);
+      if (!totpOk) {
+        recordFailure(lockKey);
+        res.status(401).json({ message: 'Invalid 2FA code.' });
+        return;
+      }
     }
 
     clearAttempts(lockKey);

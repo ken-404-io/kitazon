@@ -10,6 +10,8 @@ const HCAPTCHA_SITE_KEY = process.env.REACT_APP_HCAPTCHA_SITE_KEY ?? '';
 export default function Login() {
   const { login } = useAuth();
   const [form, setForm] = useState({ email: '', password: '' });
+  const [totpCode, setTotpCode] = useState('');
+  const [requiresTotp, setRequiresTotp] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const captchaRef = useRef<HCaptcha>(null);
@@ -32,11 +34,12 @@ export default function Login() {
         const result = await captchaRef.current?.execute({ async: true });
         captchaToken = result?.response;
       }
-      await login(email, form.password, captchaToken);
+      await login(email, form.password, captchaToken, requiresTotp ? totpCode : undefined);
     } catch (err: unknown) {
       captchaRef.current?.resetCaptcha();
-      const msg = (err as { response?: { data?: { message?: string } } }).response?.data?.message;
-      setError(msg ?? 'Invalid email or password.');
+      const data = (err as { response?: { data?: { message?: string; requires_totp?: boolean } } }).response?.data;
+      if (data?.requires_totp) { setRequiresTotp(true); setError(''); return; }
+      setError(data?.message ?? 'Invalid email or password.');
     } finally {
       setLoading(false);
     }
@@ -56,6 +59,13 @@ export default function Login() {
             <label>Password</label>
             <input type="password" value={form.password} onChange={set('password')} required autoComplete="current-password" maxLength={128} />
           </div>
+          {requiresTotp && (
+            <div className="form-group">
+              <label>Authenticator Code</label>
+              <input type="text" inputMode="numeric" value={totpCode} onChange={e => setTotpCode(e.target.value)} placeholder="000000" maxLength={6} autoFocus autoComplete="one-time-code" />
+              <p style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>Enter the 6-digit code from your authenticator app.</p>
+            </div>
+          )}
           {HCAPTCHA_SITE_KEY && (
             <HCaptcha ref={captchaRef} sitekey={HCAPTCHA_SITE_KEY} size="invisible" />
           )}
