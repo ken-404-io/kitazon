@@ -1,13 +1,15 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import api from '../services/api';
+import { getToken, setToken } from '../utils/tokenStore';
 import { User } from '../types';
 
 interface AuthContextValue {
   user: User | null;
   loading: boolean;
-  login: (email: string, password: string) => Promise<void>;
+  login: (email: string, password: string, captchaToken?: string) => Promise<void>;
   register: (data: RegisterData) => Promise<void>;
   logout: () => Promise<void>;
+  refreshUser: () => Promise<void>;
 }
 
 interface RegisterData {
@@ -15,15 +17,7 @@ interface RegisterData {
   email: string;
   password: string;
   referral_code?: string;
-}
-
-function parseJwtExpiry(token: string): number | null {
-  try {
-    const payload = JSON.parse(atob(token.split('.')[1]));
-    return typeof payload.exp === 'number' ? payload.exp * 1000 : null;
-  } catch {
-    return null;
-  }
+  captcha_token?: string;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -33,49 +27,45 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const token = localStorage.getItem('token');
-    if (token) {
-      const expiry = parseJwtExpiry(token);
-      if (expiry && Date.now() >= expiry) {
-        // Token already expired — clear immediately without a network round-trip
-        localStorage.removeItem('token');
-        setLoading(false);
-        return;
-      }
-      api.get<User>('/auth/me')
-        .then((res) => setUser(res.data))
-        .catch(() => localStorage.removeItem('token'))
-        .finally(() => setLoading(false));
-    } else {
-      setLoading(false);
-    }
+    // On app load, try to restore session via httpOnly cookie (silent refresh)
+    api.post<{ token: string; user: User }>('/auth/refresh', {})
+      .then((res) => { setToken(res.data.token); setUser(res.data.user); })
+      .catch(() => setToken(null))
+      .finally(() => setLoading(false));
   }, []);
 
-  const login = async (email: string, password: string): Promise<void> => {
-    const res = await api.post<{ token: string; user: User }>('/auth/login', { email, password });
-    localStorage.setItem('token', res.data.token);
+  const login = async (email: string, password: string, captchaToken?: string): Promise<void> => {
+    const res = await api.post<{ token: string; user: User }>('/auth/login', {
+      email, password, ...(captchaToken ? { captcha_token: captchaToken } : {}),
+    });
+    setToken(res.data.token);
     setUser(res.data.user);
   };
 
   const register = async (data: RegisterData): Promise<void> => {
     const res = await api.post<{ token: string; user: User }>('/auth/register', data);
-    localStorage.setItem('token', res.data.token);
+    setToken(res.data.token);
     setUser(res.data.user);
   };
 
   const logout = async (): Promise<void> => {
     try {
-      await api.post('/auth/logout');
+      if (getToken()) await api.post('/auth/logout');
     } catch {
-      // Best-effort: still clear local state even if server call fails
+      // Best-effort
     } finally {
-      localStorage.removeItem('token');
+      setToken(null);
       setUser(null);
     }
   };
 
+  const refreshUser = async (): Promise<void> => {
+    const res = await api.get<User>('/auth/me');
+    setUser(res.data);
+  };
+
   return (
-    <AuthContext.Provider value={{ user, loading, login, register, logout }}>
+    <AuthContext.Provider value={{ user, loading, login, register, logout, refreshUser }}>
       {children}
     </AuthContext.Provider>
   );

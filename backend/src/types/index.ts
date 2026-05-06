@@ -1,6 +1,6 @@
 export interface AuthPayload {
   id: number;
-  email: string;
+  jti?: string;
 }
 
 declare global {
@@ -19,6 +19,13 @@ export interface DbUser {
   referral_code: string;
   balance: number;
   is_active: boolean;
+  email_verified: boolean;
+  email_verification_token: string | null;
+  email_verification_expires: Date | null;
+  last_login_at: Date | null;
+  last_login_ip: string | null;
+  last_withdrawal_account: string | null;
+  last_withdrawal_account_changed_at: Date | null;
   created_at: Date;
   updated_at: Date;
 }
@@ -62,5 +69,44 @@ export interface DbReferral {
   referrer_id: number;
   referred_id: number;
   commission_earned: number;
+  created_at: Date;
+}
+
+export interface DbOtpToken {
+  id: number;
+  user_id: number;
+  token_hash: string;
+  purpose: 'email_verify' | 'withdrawal_otp' | 'password_reset';
+  expires_at: Date;
+  used_at: Date | null;
+  created_at: Date;
+}
+
+export interface DbRefreshToken {
+  id: number;
+  user_id: number;
+  token_hash: string;
+  expires_at: Date;
+  revoked_at: Date | null;
+  created_at: Date;
+}
+
+export interface DbLoginEvent {
+  id: number;
+  user_id: number;
+  success: boolean;
+  ip_address: string | null;
+  user_agent: string | null;
+  created_at: Date;
+}
+
+export interface DbAuditLog {
+  id: number;
+  user_id: number;
+  action: string;
+  amount: number | null;
+  ip_address: string | null;
+  user_agent: string | null;
+  metadata: Record<string, unknown> | null;
   created_at: Date;
 }

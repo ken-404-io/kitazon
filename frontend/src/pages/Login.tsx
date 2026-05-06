@@ -1,14 +1,18 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { Link } from 'react-router-dom';
+import HCaptcha from '@hcaptcha/react-hcaptcha';
 import { useAuth } from '../context/AuthContext';
 import { sanitizeEmail, isValidEmail } from '../utils/sanitize';
 import styles from './Auth.module.css';
+
+const HCAPTCHA_SITE_KEY = process.env.REACT_APP_HCAPTCHA_SITE_KEY ?? '';
 
 export default function Login() {
   const { login } = useAuth();
   const [form, setForm] = useState({ email: '', password: '' });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const captchaRef = useRef<HCaptcha>(null);
 
   const set = (f: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement>) =>
     setForm((p) => ({ ...p, [f]: e.target.value }));
@@ -23,8 +27,14 @@ export default function Login() {
 
     setLoading(true);
     try {
-      await login(email, form.password);
+      let captchaToken: string | undefined;
+      if (HCAPTCHA_SITE_KEY) {
+        const result = await captchaRef.current?.execute({ async: true });
+        captchaToken = result?.response;
+      }
+      await login(email, form.password, captchaToken);
     } catch (err: unknown) {
+      captchaRef.current?.resetCaptcha();
       const msg = (err as { response?: { data?: { message?: string } } }).response?.data?.message;
       setError(msg ?? 'Invalid email or password.');
     } finally {
@@ -46,6 +56,9 @@ export default function Login() {
             <label>Password</label>
             <input type="password" value={form.password} onChange={set('password')} required autoComplete="current-password" maxLength={128} />
           </div>
+          {HCAPTCHA_SITE_KEY && (
+            <HCaptcha ref={captchaRef} sitekey={HCAPTCHA_SITE_KEY} size="invisible" />
+          )}
           {error && <p className="error-msg">{error}</p>}
           <button className="btn-primary" style={{ width: '100%' }} type="submit" disabled={loading}>
             {loading ? 'Logging in...' : 'Login'}
