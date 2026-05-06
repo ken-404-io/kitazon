@@ -61,6 +61,28 @@ export default function Dashboard() {
         )}
       </div>
 
+      {/* Bonus & Guide quick access */}
+      <div className="grid-2" style={{ marginBottom: '1.5rem' }}>
+        <Link to="/bonus" style={{ textDecoration: 'none' }}>
+          <div className="card" style={{ background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.25)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 14 }}>
+            <span style={{ fontSize: 32 }}>🎁</span>
+            <div>
+              <div style={{ fontWeight: 700, color: 'var(--gold)' }}>Claim Bonus ₱20</div>
+              <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>Complete one offer to unlock</div>
+            </div>
+          </div>
+        </Link>
+        <Link to="/guide" style={{ textDecoration: 'none' }}>
+          <div className="card" style={{ background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.25)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 14 }}>
+            <span style={{ fontSize: 32 }}>📖</span>
+            <div>
+              <div style={{ fontWeight: 700, color: '#10b981' }}>Free Earning Guide</div>
+              <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>Unlock tips to earn faster</div>
+            </div>
+          </div>
+        </Link>
+      </div>
+
       <div className={styles.mainGrid}>
         <div>
           <div className={styles.sectionHeader}>
