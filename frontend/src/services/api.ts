@@ -1,9 +1,13 @@
 import axios from 'axios';
 import { getToken, setToken } from '../utils/tokenStore';
 
+const BASE = process.env.REACT_APP_API_URL
+  ? `${process.env.REACT_APP_API_URL}/api`
+  : '/api';
+
 const api = axios.create({
-  baseURL: '/api',
-  withCredentials: true, // sends httpOnly refresh_token cookie automatically
+  baseURL: BASE,
+  withCredentials: true,
 });
 
 api.interceptors.request.use((config) => {
@@ -17,7 +21,10 @@ let refreshPromise: Promise<string | null> | null = null;
 async function tryRefresh(): Promise<string | null> {
   if (refreshPromise) return refreshPromise;
   refreshPromise = axios
-    .post<{ token: string }>('/api/auth/refresh', {}, { withCredentials: true })
+    .post<{ token: string }>(`${BASE}/auth/refresh`, {}, {
+      withCredentials: true,
+      headers: { 'Content-Type': 'application/json' },
+    })
     .then((r) => { setToken(r.data.token); return r.data.token; })
     .catch(() => { setToken(null); return null; })
     .finally(() => { refreshPromise = null; });
@@ -28,7 +35,6 @@ api.interceptors.response.use(
   (res) => res,
   async (err) => {
     const original = err.config;
-    // On 401, try silent refresh once — but not if the failing request IS the refresh endpoint
     if (err.response?.status === 401 && !original._retry && !original.url?.includes('/auth/refresh')) {
       original._retry = true;
       const newToken = await tryRefresh();
@@ -36,7 +42,6 @@ api.interceptors.response.use(
         original.headers.Authorization = `Bearer ${newToken}`;
         return api(original);
       }
-      // Refresh failed — send user to login
       window.location.href = '/login';
     }
     return Promise.reject(err);
