@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import WithdrawForm from '../components/withdrawal/WithdrawForm';
 import { useAuth } from '../context/AuthContext';
+import { useToast } from '../context/ToastContext';
 import api from '../services/api';
 import { UserStats, Withdrawal, WithdrawalStatus } from '../types';
 import styles from './Withdraw.module.css';
@@ -14,6 +16,7 @@ const STATUS_BADGE: Record<WithdrawalStatus, string> = {
 
 export default function Withdraw() {
   const { user } = useAuth();
+  const { showToast } = useToast();
   const [stats, setStats] = useState<UserStats | null>(null);
   const [history, setHistory] = useState<Withdrawal[]>([]);
 
@@ -30,7 +33,7 @@ export default function Withdraw() {
       <p style={{ color: 'var(--text-muted)', marginBottom: '2rem' }}>GCash & Maya processed in 1 hour · Banks within 24 hours</p>
 
       <div className={styles.layout}>
-        <WithdrawForm balance={stats?.balance} emailVerified={user?.email_verified} onSuccess={loadData} />
+        <WithdrawForm balance={stats?.balance} emailVerified={user?.email_verified} onSuccess={() => { loadData(); showToast('Withdrawal submitted successfully!', 'success'); }} />
 
         <div className={styles.history}>
           <h3>Withdrawal History</h3>
@@ -45,6 +48,7 @@ export default function Withdraw() {
               <div className={styles.right}>
                 <p className={styles.amount}>₱{parseFloat(String(w.amount)).toFixed(2)}</p>
                 <span className={`badge ${STATUS_BADGE[w.status] ?? 'badge-gold'}`}>{w.status}</span>
+                <Link to={`/withdrawals/${w.id}/receipt`} style={{ fontSize: 11, color: 'var(--text-muted)' }}>Receipt</Link>
               </div>
             </div>
           ))}

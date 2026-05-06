@@ -101,6 +101,30 @@ export async function spin(req: Request, res: Response, next: NextFunction): Pro
   } catch (err) { next(err); }
 }
 
+export async function earningsChart(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const days = 7;
+    const rows = await db('earnings')
+      .where({ user_id: req.user!.id })
+      .where('created_at', '>=', db.raw(`NOW() - INTERVAL '${days} days'`))
+      .select(db.raw('DATE(created_at) as date'), db.raw('SUM(amount) as total'))
+      .groupByRaw('DATE(created_at)')
+      .orderBy('date', 'asc');
+
+    // Fill missing days with 0
+    const result: { date: string; total: number }[] = [];
+    for (let i = days - 1; i >= 0; i--) {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      const key = d.toISOString().slice(0, 10);
+      const found = rows.find((r: { date: string; total: string }) => String(r.date).slice(0, 10) === key);
+      result.push({ date: key, total: found ? Number(found.total) : 0 });
+    }
+    res.json(result);
+  } catch (err) { next(err); }
+}
+
+
 export async function recentEarnings(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     const earnings = await db('earnings')

@@ -4,7 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import api from '../services/api';
 import { WithdrawalStatus, WithdrawalChannel } from '../types';
 
-type Tab = 'stats' | 'users' | 'withdrawals' | 'logs';
+type Tab = 'stats' | 'users' | 'withdrawals' | 'tasks' | 'logs';
 
 interface PlatformStats {
   users: number;
@@ -39,6 +39,15 @@ interface AdminWithdrawal {
   user_id: number;
   user_name: string;
   user_email: string;
+}
+
+interface AdminTask {
+  id: number;
+  title: string;
+  description: string;
+  category: string;
+  payout: number | string;
+  is_active: boolean;
 }
 
 interface AuditLog {
@@ -79,6 +88,13 @@ export default function Admin() {
   const [wFilter, setWFilter] = useState('');
   const [wLoading, setWLoading] = useState(false);
 
+  // Tasks
+  const [tasks, setTasks] = useState<AdminTask[]>([]);
+  const [taskLoading, setTaskLoading] = useState(false);
+  const [taskForm, setTaskForm] = useState({ title: '', description: '', category: 'survey', payout: '' });
+  const [taskError, setTaskError] = useState('');
+  const [editingTask, setEditingTask] = useState<AdminTask | null>(null);
+
   // Audit logs
   const [logs, setLogs] = useState<AuditLog[]>([]);
   const [logPage, setLogPage] = useState(1);
@@ -117,6 +133,14 @@ export default function Admin() {
     } finally { setWLoading(false); }
   }, []);
 
+  const loadTasks = useCallback(async () => {
+    setTaskLoading(true);
+    try {
+      const res = await api.get<AdminTask[]>('/admin/tasks');
+      setTasks(res.data);
+    } finally { setTaskLoading(false); }
+  }, []);
+
   const loadLogs = useCallback(async (page: number) => {
     setLogLoading(true);
     try {
@@ -130,8 +154,9 @@ export default function Admin() {
     if (tab === 'stats' && !stats) loadStats();
     if (tab === 'users') loadUsers(userPage, userSearch);
     if (tab === 'withdrawals') loadWithdrawals(wPage, wFilter);
+    if (tab === 'tasks') loadTasks();
     if (tab === 'logs') loadLogs(logPage);
-  }, [tab, userPage, wPage, wFilter, logPage, stats, loadStats, loadUsers, loadWithdrawals, loadLogs]);
+  }, [tab, userPage, wPage, wFilter, logPage, stats, loadStats, loadUsers, loadWithdrawals, loadTasks, loadLogs]);
 
   const toggleActive = async (userId: number) => {
     await api.patch(`/admin/users/${userId}/toggle-active`);
@@ -157,7 +182,7 @@ export default function Admin() {
     <div style={{ maxWidth: 1100, margin: '2rem auto', padding: '0 1rem' }}>
       <h2>Admin Panel</h2>
       <div style={{ display: 'flex', gap: 8, marginBottom: '1.5rem', flexWrap: 'wrap' }}>
-        {(['stats', 'users', 'withdrawals', 'logs'] as Tab[]).map(t => (
+        {(['stats', 'users', 'withdrawals', 'tasks', 'logs'] as Tab[]).map(t => (
           <button key={t} style={tabStyle(t)} onClick={() => setTab(t)}>
             {t.charAt(0).toUpperCase() + t.slice(1)}
           </button>
@@ -321,6 +346,85 @@ export default function Admin() {
             <span style={{ fontSize: 13 }}>Page {wPage} of {wPages}</span>
             <button className="btn-outline" disabled={wPage >= wPages} onClick={() => setWPage(p => p + 1)}>Next</button>
           </div>
+        </div>
+      )}
+
+      {/* ── Tasks ── */}
+      {tab === 'tasks' && (
+        <div>
+          <div className="card" style={{ marginBottom: '1.5rem' }}>
+            <h3 style={{ marginBottom: '1rem' }}>{editingTask ? 'Edit Task' : 'Add New Task'}</h3>
+            <form onSubmit={async (e) => {
+              e.preventDefault(); setTaskError('');
+              try {
+                if (editingTask) {
+                  await api.patch(`/admin/tasks/${editingTask.id}`, { ...taskForm, payout: Number(taskForm.payout) });
+                  setEditingTask(null);
+                } else {
+                  await api.post('/admin/tasks', { ...taskForm, payout: Number(taskForm.payout) });
+                }
+                setTaskForm({ title: '', description: '', category: 'survey', payout: '' });
+                loadTasks();
+              } catch (err: unknown) {
+                setTaskError((err as { response?: { data?: { message?: string } } }).response?.data?.message ?? 'Failed.');
+              }
+            }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
+                <div className="form-group" style={{ margin: 0 }}>
+                  <label>Title</label>
+                  <input value={taskForm.title} onChange={e => setTaskForm(p => ({ ...p, title: e.target.value }))} required maxLength={120} />
+                </div>
+                <div className="form-group" style={{ margin: 0 }}>
+                  <label>Category</label>
+                  <select value={taskForm.category} onChange={e => setTaskForm(p => ({ ...p, category: e.target.value }))} style={{ padding: '8px 12px', borderRadius: 6, border: '1px solid var(--dark-border)', background: 'var(--dark-bg)', color: 'var(--text)', width: '100%' }}>
+                    {['survey', 'app_install', 'video', 'microjob', 'game'].map(c => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                </div>
+              </div>
+              <div className="form-group">
+                <label>Description</label>
+                <input value={taskForm.description} onChange={e => setTaskForm(p => ({ ...p, description: e.target.value }))} required maxLength={300} />
+              </div>
+              <div className="form-group">
+                <label>Payout (₱)</label>
+                <input type="number" value={taskForm.payout} onChange={e => setTaskForm(p => ({ ...p, payout: e.target.value }))} required min={1} max={500} step={0.01} />
+              </div>
+              {taskError && <p className="error-msg">{taskError}</p>}
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button className="btn-primary" type="submit">{editingTask ? 'Save Changes' : 'Add Task'}</button>
+                {editingTask && <button type="button" className="btn-outline" onClick={() => { setEditingTask(null); setTaskForm({ title: '', description: '', category: 'survey', payout: '' }); }}>Cancel</button>}
+              </div>
+            </form>
+          </div>
+
+          {taskLoading ? <p>Loading...</p> : (
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+                <thead>
+                  <tr style={{ borderBottom: '2px solid #e5e7eb', background: '#f9fafb' }}>
+                    {['ID', 'Title', 'Category', 'Payout', 'Active', 'Actions'].map(h => (
+                      <th key={h} style={{ padding: '8px 10px', textAlign: 'left', whiteSpace: 'nowrap' }}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {tasks.map(t => (
+                    <tr key={t.id} style={{ borderBottom: '1px solid #f3f4f6', opacity: t.is_active ? 1 : 0.5 }}>
+                      <td style={{ padding: '8px 10px' }}>{t.id}</td>
+                      <td style={{ padding: '8px 10px', maxWidth: 200 }}>{t.title}</td>
+                      <td style={{ padding: '8px 10px' }}>{t.category}</td>
+                      <td style={{ padding: '8px 10px' }}>₱{fmt(t.payout)}</td>
+                      <td style={{ padding: '8px 10px', color: t.is_active ? 'green' : '#dc2626' }}>{t.is_active ? 'Yes' : 'No'}</td>
+                      <td style={{ padding: '8px 10px', display: 'flex', gap: 6 }}>
+                        <button className="btn-outline" style={{ fontSize: 12, padding: '4px 10px' }} onClick={() => { setEditingTask(t); setTaskForm({ title: t.title, description: t.description, category: t.category, payout: String(t.payout) }); }}>Edit</button>
+                        <button className="btn-outline" style={{ fontSize: 12, padding: '4px 10px', borderColor: t.is_active ? '#dc2626' : 'green', color: t.is_active ? '#dc2626' : 'green' }} onClick={async () => { await api.patch(`/admin/tasks/${t.id}`, { is_active: !t.is_active }); loadTasks(); }}>{t.is_active ? 'Disable' : 'Enable'}</button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       )}
 

@@ -1,24 +1,33 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useToast } from '../context/ToastContext';
 import EarningsCard from '../components/dashboard/EarningsCard';
 import SpinWheel from '../components/dashboard/SpinWheel';
+import EarningsChart from '../components/dashboard/EarningsChart';
+import { SkeletonStat, SkeletonRow } from '../components/ui/Skeleton';
 import api from '../services/api';
 import { UserStats, Earning } from '../types';
 import styles from './Dashboard.module.css';
 
 export default function Dashboard() {
   const { user } = useAuth();
+  const { showToast } = useToast();
   const [stats, setStats] = useState<UserStats | null>(null);
   const [recentEarnings, setRecentEarnings] = useState<Earning[]>([]);
+  const [loadingStats, setLoadingStats] = useState(true);
+  const [loadingEarnings, setLoadingEarnings] = useState(true);
 
   const loadStats = (): void => {
-    api.get<UserStats>('/auth/me/stats').then((res) => setStats(res.data)).catch(() => {});
+    api.get<UserStats>('/auth/me/stats').then((res) => setStats(res.data)).catch(() => {}).finally(() => setLoadingStats(false));
   };
 
   useEffect(() => {
     loadStats();
-    api.get<Earning[]>('/tasks/earnings/recent').then((res) => setRecentEarnings(res.data)).catch(() => {});
+    api.get<Earning[]>('/tasks/earnings/recent')
+      .then((res) => setRecentEarnings(res.data))
+      .catch(() => {})
+      .finally(() => setLoadingEarnings(false));
   }, []);
 
   return (
@@ -34,10 +43,16 @@ export default function Dashboard() {
       </div>
 
       <div className="grid-4" style={{ marginBottom: '1.5rem' }}>
-        <EarningsCard label="Balance" amount={stats?.balance} />
-        <EarningsCard label="Today" amount={stats?.today} />
-        <EarningsCard label="This Week" amount={stats?.week} />
-        <EarningsCard label="All Time" amount={stats?.total} />
+        {loadingStats ? (
+          Array.from({ length: 4 }).map((_, i) => <SkeletonStat key={i} />)
+        ) : (
+          <>
+            <EarningsCard label="Balance" amount={stats?.balance} />
+            <EarningsCard label="Today" amount={stats?.today} />
+            <EarningsCard label="This Week" amount={stats?.week} />
+            <EarningsCard label="All Time" amount={stats?.total} />
+          </>
+        )}
       </div>
 
       <div className={styles.mainGrid}>
@@ -46,7 +61,9 @@ export default function Dashboard() {
             <h3>Recent Earnings</h3>
             <Link to="/tasks">Browse tasks →</Link>
           </div>
-          {recentEarnings.length === 0 ? (
+          {loadingEarnings ? (
+            Array.from({ length: 3 }).map((_, i) => <SkeletonRow key={i} />)
+          ) : recentEarnings.length === 0 ? (
             <div className="card" style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)' }}>
               No earnings yet. <Link to="/tasks">Complete your first task!</Link>
             </div>
@@ -59,8 +76,9 @@ export default function Dashboard() {
               <span className="badge badge-green">+₱{e.amount}</span>
             </div>
           ))}
+          <EarningsChart />
         </div>
-        <SpinWheel onWin={loadStats} />
+        <SpinWheel onWin={() => { loadStats(); showToast('🎉 Spin reward added to your balance!', 'success'); }} />
       </div>
     </div>
   );

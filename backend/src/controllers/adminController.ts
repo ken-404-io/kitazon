@@ -152,6 +152,75 @@ export async function updateWithdrawalStatus(req: Request, res: Response, next: 
   } catch (err) { next(err); }
 }
 
+// ─── Task management ──────────────────────────────────────────────────────────
+const VALID_TASK_CATEGORIES = ['survey', 'app_install', 'video', 'microjob', 'game'] as const;
+type TaskCategory = typeof VALID_TASK_CATEGORIES[number];
+
+export async function listTasks(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const tasks = await db('tasks').orderBy('created_at', 'desc');
+    res.json(tasks);
+  } catch (err) { next(err); }
+}
+
+export async function createTask(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const { title, description, category, payout } = req.body as {
+      title: string; description: string; category: string; payout: string | number;
+    };
+    if (!title?.trim() || !description?.trim()) {
+      res.status(400).json({ message: 'Title and description are required.' }); return;
+    }
+    if (!VALID_TASK_CATEGORIES.includes(category as TaskCategory)) {
+      res.status(400).json({ message: 'Invalid category.' }); return;
+    }
+    const parsedPayout = parseFloat(String(payout));
+    if (isNaN(parsedPayout) || parsedPayout < 1 || parsedPayout > 500) {
+      res.status(400).json({ message: 'Payout must be between ₱1 and ₱500.' }); return;
+    }
+
+    const [task] = await db('tasks').insert({
+      title: title.trim(), description: description.trim(),
+      category, payout: parsedPayout, is_active: true,
+    }).returning('*');
+
+    await logAudit(req.user!.id, 'admin_create_task', req, { metadata: { task_id: task.id } });
+    res.status(201).json(task);
+  } catch (err) { next(err); }
+}
+
+export async function updateTask(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const taskId = Number(req.params.id);
+    const { title, description, category, payout, is_active } = req.body as {
+      title?: string; description?: string; category?: string; payout?: string | number; is_active?: boolean;
+    };
+
+    const task = await db('tasks').where({ id: taskId }).first();
+    if (!task) { res.status(404).json({ message: 'Task not found.' }); return; }
+
+    const updates: Record<string, unknown> = {};
+    if (title !== undefined) updates.title = title.trim();
+    if (description !== undefined) updates.description = description.trim();
+    if (category !== undefined) {
+      if (!VALID_TASK_CATEGORIES.includes(category as TaskCategory)) {
+        res.status(400).json({ message: 'Invalid category.' }); return;
+      }
+      updates.category = category;
+    }
+    if (payout !== undefined) {
+      const p = parseFloat(String(payout));
+      if (isNaN(p) || p < 1 || p > 500) { res.status(400).json({ message: 'Payout must be between ₱1 and ₱500.' }); return; }
+      updates.payout = p;
+    }
+    if (is_active !== undefined) updates.is_active = Boolean(is_active);
+
+    const [updated] = await db('tasks').where({ id: taskId }).update(updates).returning('*');
+    await logAudit(req.user!.id, 'admin_update_task', req, { metadata: { task_id: taskId } });
+    res.json(updated);
+  } catch (err) { next(err); }
+}
+
 // ─── Audit logs ───────────────────────────────────────────────────────────────
 export async function listAuditLogs(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {

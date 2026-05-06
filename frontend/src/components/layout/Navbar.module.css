@@ -7,7 +7,7 @@
   border-bottom: 1px solid var(--dark-border);
   position: sticky;
   top: 0;
-  z-index: 100;
+  z-index: 200;
 }
 
 .brand {
@@ -33,7 +33,73 @@
   color: var(--text);
 }
 
-@media (max-width: 640px) {
-  .navbar { padding: 0.75rem 1rem; }
-  .links { gap: 0.6rem; font-size: 0.8rem; }
+/* ─── Hamburger ─────────────────────────────────── */
+.hamburger {
+  display: none;
+  flex-direction: column;
+  justify-content: center;
+  gap: 5px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px;
+  z-index: 201;
+}
+
+.bar {
+  display: block;
+  width: 24px;
+  height: 2px;
+  background: var(--text);
+  border-radius: 2px;
+  transition: transform 0.25s, opacity 0.25s;
+}
+
+.barTop  { transform: translateY(7px) rotate(45deg); }
+.barMid  { opacity: 0; }
+.barBot  { transform: translateY(-7px) rotate(-45deg); }
+
+/* ─── Overlay ───────────────────────────────────── */
+.overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.5);
+  z-index: 199;
+}
+
+/* ─── Mobile ────────────────────────────────────── */
+@media (max-width: 768px) {
+  .hamburger { display: flex; }
+
+  .links {
+    position: fixed;
+    top: 0;
+    right: -100%;
+    height: 100dvh;
+    width: 260px;
+    background: var(--dark-card);
+    border-left: 1px solid var(--dark-border);
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0;
+    padding: 5rem 1.5rem 2rem;
+    transition: right 0.28s ease;
+    z-index: 200;
+    overflow-y: auto;
+  }
+
+  .linksOpen { right: 0; }
+
+  .links a,
+  .links button {
+    width: 100%;
+    padding: 0.75rem 0;
+    border-bottom: 1px solid var(--dark-border);
+    font-size: 1rem;
+  }
+
+  .links button { text-align: left; }
+
+  .overlay { display: block; }
 }

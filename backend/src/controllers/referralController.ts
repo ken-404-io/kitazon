@@ -2,6 +2,28 @@ import { Request, Response, NextFunction } from 'express';
 import db from '../../config/database';
 import { DbUser } from '../types';
 
+export async function leaderboard(_req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const rows = await db('referrals as r')
+      .join('users as u', 'r.referrer_id', 'u.id')
+      .select(
+        'u.name',
+        db.raw('COUNT(r.id) as referral_count'),
+        db.raw('SUM(r.commission_earned) as total_earned')
+      )
+      .groupBy('r.referrer_id', 'u.name')
+      .orderBy('total_earned', 'desc')
+      .limit(20);
+
+    res.json(rows.map((r: { name: string; referral_count: string; total_earned: string }, i: number) => ({
+      rank: i + 1,
+      name: r.name,
+      referral_count: Number(r.referral_count),
+      total_earned: Number(r.total_earned ?? 0),
+    })));
+  } catch (err) { next(err); }
+}
+
 export async function get(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     const user = await db<DbUser>('users').where({ id: req.user!.id }).first();
