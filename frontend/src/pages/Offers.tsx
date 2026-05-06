@@ -19,7 +19,7 @@ const NETWORKS: Record<Network, NetworkConfig> = {
     description: 'Surveys, app installs, and trial offers',
     color: '#f59e0b',
     envKey: 'REACT_APP_CPALEAD_PUB_ID',
-    getUrl: (uid) => `https://cpalead.com/dashboard/reports/offerwall/?id=${process.env.REACT_APP_CPALEAD_PUB_ID}&format=iframe&user_id=${uid}`,
+    getUrl: (uid) => `https://www.zwidgetymz56r.xyz/list/${process.env.REACT_APP_CPALEAD_PUB_ID}?subid=${uid}`,
   },
   lootably: {
     name: 'Lootably',
