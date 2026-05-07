@@ -48,7 +48,7 @@ export default function Login() {
   return (
     <div className={styles.page}>
       <div className={styles.card}>
-        <h2>Welcome back 👋</h2>
+        <h2>Welcome back</h2>
         <p className={styles.sub}>Login to your Kitazon account</p>
         <form onSubmit={submit} autoComplete="on">
           <div className="form-group">
