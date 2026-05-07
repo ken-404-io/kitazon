@@ -6,7 +6,6 @@
 
 :root {
   --primary: #f97316;
-  --primary-dark: #ea6c0a;
   --gold: #f97316;
   --gold-dark: #ea6c0a;
   --green: #10b981;
@@ -15,7 +14,17 @@
   --red: #ef4444;
   --radius: 16px;
 
-  /* Light theme (default) */
+  /* Dark theme (default) */
+  --bg: #0f1117;
+  --dark: #0f1117;
+  --dark-card: #1a1d27;
+  --dark-border: rgba(255,255,255,0.08);
+  --text: #e8e8e8;
+  --text-muted: #9ca3af;
+  --shadow: 0 2px 12px rgba(0,0,0,0.3);
+}
+
+[data-theme="light"] {
   --bg: #f5f7fa;
   --dark: #f5f7fa;
   --dark-card: #ffffff;
@@ -23,16 +32,6 @@
   --text: #111827;
   --text-muted: #6b7280;
   --shadow: 0 2px 12px rgba(0,0,0,0.07);
-}
-
-[data-theme="dark"] {
-  --bg: #111827;
-  --dark: #111827;
-  --dark-card: #1f2937;
-  --dark-border: #374151;
-  --text: #f9fafb;
-  --text-muted: #9ca3af;
-  --shadow: 0 2px 12px rgba(0,0,0,0.3);
 }
 
 body {
@@ -58,7 +57,7 @@ button:hover { opacity: 0.9; }
 button:active { transform: scale(0.97); }
 
 .btn-primary { background: var(--primary); color: #fff; }
-.btn-outline { background: transparent; border: 1.5px solid var(--primary); color: var(--primary); }
+.btn-outline  { background: transparent; border: 1.5px solid var(--primary); color: var(--primary); }
 
 .card {
   background: var(--dark-card);
@@ -121,12 +120,9 @@ label {
 
 .grid-2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem; }
 .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; }
-.grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; }
+.grid-4 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem; }
 
-@media (max-width: 768px) {
-  .grid-2, .grid-3, .grid-4 { grid-template-columns: 1fr; }
-}
-
-@media (min-width: 481px) and (max-width: 768px) {
-  .grid-3, .grid-4 { grid-template-columns: repeat(2, 1fr); }
+@media (min-width: 769px) {
+  .grid-4 { grid-template-columns: repeat(4, 1fr); }
+  .grid-3 { grid-template-columns: repeat(3, 1fr); }
 }
