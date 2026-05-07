@@ -24,7 +24,8 @@
     "nodemailer": "^8.0.7",
     "otpauth": "^9.5.1",
     "pg": "^8.12.0",
-    "qrcode": "^1.5.4"
+    "qrcode": "^1.5.4",
+    "resend": "^6.12.3"
   },
   "devDependencies": {
     "@types/bcryptjs": "^2.4.6",
