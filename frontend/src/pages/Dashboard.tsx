@@ -24,9 +24,7 @@ export default function Dashboard() {
     api.get<UserStats>('/auth/me/stats').then((res) => setStats(res.data)).catch(() => {}).finally(() => setLoadingStats(false));
   };
 
-  useEffect(() => {
-    loadStats();
-  }, []);
+  useEffect(() => { loadStats(); }, []);
 
   useEffect(() => {
     setLoadingEarnings(true);
@@ -38,56 +36,65 @@ export default function Dashboard() {
 
   return (
     <div className="page-container">
-      <div className={styles.header}>
-        <div>
-          <h1>Hi, {user?.name?.split(' ')[0]} 👋</h1>
-          <p className={styles.sub}>Here's your earnings overview</p>
+
+      {/* Hero banner */}
+      <div className={styles.hero}>
+        <div className={styles.heroLeft}>
+          <h1 className={styles.heroTitle}>Hi, {user?.name?.split(' ')[0]} 👋</h1>
+          <p className={styles.heroSub}>Here's your earnings overview</p>
+          <Link to="/withdraw">
+            <button className="btn-primary" style={{ marginTop: '1rem', borderRadius: 12 }}>
+              Withdraw ₱{Number(stats?.balance ?? 0).toFixed(2)} →
+            </button>
+          </Link>
         </div>
-        <Link to="/withdraw">
-          <button className="btn-primary">Withdraw ₱{Number(stats?.balance ?? 0).toFixed(2)}</button>
-        </Link>
+        <div className={styles.heroEmoji}>💰</div>
       </div>
 
-      <div className="grid-4" style={{ marginBottom: '1.5rem' }}>
+      {/* Stats */}
+      <div className="grid-4" style={{ marginBottom: '1.25rem' }}>
         {loadingStats ? (
           Array.from({ length: 4 }).map((_, i) => <SkeletonStat key={i} />)
         ) : (
           <>
-            <EarningsCard label="Balance" amount={stats?.balance} />
-            <EarningsCard label="Today" amount={stats?.today} />
-            <EarningsCard label="This Week" amount={stats?.week} />
-            <EarningsCard label="All Time" amount={stats?.total} />
+            <EarningsCard label="Balance"   amount={stats?.balance} color="var(--primary)" icon="💳" iconBg="rgba(249,115,22,0.12)" />
+            <EarningsCard label="Today"     amount={stats?.today}   color="var(--green)"   icon="📅" iconBg="rgba(16,185,129,0.12)" />
+            <EarningsCard label="This Week" amount={stats?.week}    color="var(--blue)"    icon="📊" iconBg="rgba(59,130,246,0.12)" />
+            <EarningsCard label="All Time"  amount={stats?.total}   color="var(--purple)"  icon="🏆" iconBg="rgba(139,92,246,0.12)" />
           </>
         )}
       </div>
 
-      {/* Bonus & Guide quick access */}
-      <div className="grid-2" style={{ marginBottom: '1.5rem' }}>
+      {/* Bonus & Guide */}
+      <div className="grid-2" style={{ marginBottom: '1.25rem' }}>
         <Link to="/bonus" style={{ textDecoration: 'none' }}>
-          <div className="card" style={{ background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.25)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 14 }}>
-            <span style={{ fontSize: 32 }}>🎁</span>
+          <div className={styles.promoCard} style={{ background: 'linear-gradient(135deg, #fff7ed, #ffedd5)', border: '1px solid rgba(249,115,22,0.2)' }}>
+            <span style={{ fontSize: 36 }}>🎁</span>
             <div>
-              <div style={{ fontWeight: 700, color: 'var(--gold)' }}>Claim Bonus ₱20</div>
+              <div style={{ fontWeight: 700, color: 'var(--primary)', fontSize: 15 }}>Claim Bonus ₱20</div>
               <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>Complete one offer to unlock</div>
             </div>
+            <span style={{ marginLeft: 'auto', color: 'var(--primary)', fontSize: 18 }}>→</span>
           </div>
         </Link>
         <Link to="/guide" style={{ textDecoration: 'none' }}>
-          <div className="card" style={{ background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.25)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 14 }}>
-            <span style={{ fontSize: 32 }}>📖</span>
+          <div className={styles.promoCard} style={{ background: 'linear-gradient(135deg, #f0fdf4, #dcfce7)', border: '1px solid rgba(16,185,129,0.2)' }}>
+            <span style={{ fontSize: 36 }}>📖</span>
             <div>
-              <div style={{ fontWeight: 700, color: '#10b981' }}>Free Earning Guide</div>
+              <div style={{ fontWeight: 700, color: 'var(--green)', fontSize: 15 }}>Free Earning Guide</div>
               <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>Unlock tips to earn faster</div>
             </div>
+            <span style={{ marginLeft: 'auto', color: 'var(--green)', fontSize: 18 }}>→</span>
           </div>
         </Link>
       </div>
 
+      {/* Recent Earnings + Spin */}
       <div className={styles.mainGrid}>
         <div>
           <div className={styles.sectionHeader}>
             <h3>Recent Earnings</h3>
-            <Link to="/tasks">Browse tasks →</Link>
+            <Link to="/tasks" style={{ fontSize: 13, color: 'var(--primary)' }}>Browse tasks →</Link>
           </div>
           {loadingEarnings ? (
             Array.from({ length: 3 }).map((_, i) => <SkeletonRow key={i} />)
@@ -97,7 +104,10 @@ export default function Dashboard() {
             </div>
           ) : recentEarnings.map((e) => (
             <div key={e.id} className={`card ${styles.earningRow}`}>
-              <div>
+              <div className={styles.earningIcon}>
+                {e.type === 'spin' ? '🎰' : e.type === 'referral_commission' ? '👥' : e.type === 'affiliate_offer' ? '📱' : '✅'}
+              </div>
+              <div style={{ flex: 1 }}>
                 <p className={styles.earningTitle}>{e.task_title}</p>
                 <p className={styles.earningTime}>{new Date(e.created_at).toLocaleString('en-PH')}</p>
               </div>
@@ -114,6 +124,18 @@ export default function Dashboard() {
           <EarningsChart />
         </div>
         <SpinWheel onWin={() => { loadStats(); showToast('🎉 Spin reward added to your balance!', 'success'); }} />
+      </div>
+
+      {/* Footer nudge */}
+      <div className="card" style={{ marginTop: '1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'linear-gradient(135deg, #f0fdf4, #dcfce7)', border: '1px solid rgba(16,185,129,0.15)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <span style={{ fontSize: 28 }}>🛡️</span>
+          <div>
+            <div style={{ fontWeight: 700, fontSize: 14 }}>Keep going!</div>
+            <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>Complete tasks and spin daily to earn more.</div>
+          </div>
+        </div>
+        <span style={{ fontSize: 32 }}>🎯</span>
       </div>
     </div>
   );

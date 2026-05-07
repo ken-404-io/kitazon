@@ -1,14 +1,50 @@
-.header {
+.hero {
   display: flex;
+  align-items: center;
   justify-content: space-between;
-  align-items: flex-start;
-  margin-bottom: 1.5rem;
-  flex-wrap: wrap;
-  gap: 1rem;
+  background: linear-gradient(135deg, #fff7ed, #ffedd5);
+  border: 1px solid rgba(249,115,22,0.15);
+  border-radius: 20px;
+  padding: 1.5rem 1.75rem;
+  margin-bottom: 1.25rem;
+  overflow: hidden;
 }
 
-.header h1 { font-size: 1.8rem; }
-.sub { color: var(--text-muted); font-size: 0.9rem; }
+.heroLeft { flex: 1; }
+
+.heroTitle {
+  font-size: 1.6rem;
+  font-weight: 800;
+  color: var(--text);
+}
+
+.heroSub {
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  margin-top: 2px;
+}
+
+.heroEmoji {
+  font-size: 64px;
+  line-height: 1;
+  flex-shrink: 0;
+  margin-left: 1rem;
+}
+
+.promoCard {
+  border-radius: 16px;
+  padding: 1rem 1.1rem;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  cursor: pointer;
+  transition: transform 0.15s, box-shadow 0.15s;
+}
+
+.promoCard:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(0,0,0,0.08);
+}
 
 .mainGrid {
   display: grid;
@@ -25,14 +61,29 @@
 
 .earningRow {
   display: flex;
-  justify-content: space-between;
   align-items: center;
+  gap: 12px;
   margin-bottom: 0.5rem;
 }
 
+.earningIcon {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  background: rgba(249,115,22,0.1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  flex-shrink: 0;
+}
+
 .earningTitle { font-size: 0.9rem; font-weight: 600; }
-.earningTime { font-size: 0.75rem; color: var(--text-muted); }
+.earningTime  { font-size: 0.75rem; color: var(--text-muted); }
 
 @media (max-width: 768px) {
+  .hero { padding: 1.25rem; }
+  .heroTitle { font-size: 1.3rem; }
+  .heroEmoji { font-size: 48px; }
   .mainGrid { grid-template-columns: 1fr; }
 }

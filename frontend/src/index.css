@@ -5,37 +5,44 @@
 }
 
 :root {
-  --gold: #f59e0b;
-  --gold-dark: #d97706;
+  --primary: #f97316;
+  --primary-dark: #ea6c0a;
+  --gold: #f97316;
+  --gold-dark: #ea6c0a;
+  --green: #10b981;
+  --blue: #3b82f6;
+  --purple: #8b5cf6;
+  --red: #ef4444;
+  --radius: 16px;
+
+  /* Light theme (default) */
+  --bg: #f5f7fa;
+  --dark: #f5f7fa;
+  --dark-card: #ffffff;
+  --dark-border: #e8eaed;
+  --text: #111827;
+  --text-muted: #6b7280;
+  --shadow: 0 2px 12px rgba(0,0,0,0.07);
+}
+
+[data-theme="dark"] {
+  --bg: #111827;
   --dark: #111827;
   --dark-card: #1f2937;
   --dark-border: #374151;
   --text: #f9fafb;
   --text-muted: #9ca3af;
-  --green: #10b981;
-  --red: #ef4444;
-  --radius: 12px;
-}
-
-[data-theme="light"] {
-  --dark: #f3f4f6;
-  --dark-card: #ffffff;
-  --dark-border: #e5e7eb;
-  --text: #111827;
-  --text-muted: #6b7280;
+  --shadow: 0 2px 12px rgba(0,0,0,0.3);
 }
 
 body {
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  background-color: var(--dark);
+  background-color: var(--bg);
   color: var(--text);
   line-height: 1.6;
 }
 
-a {
-  color: var(--gold);
-  text-decoration: none;
-}
+a { color: var(--primary); text-decoration: none; }
 
 button {
   cursor: pointer;
@@ -47,29 +54,17 @@ button {
   transition: opacity 0.2s, transform 0.1s;
 }
 
-button:hover {
-  opacity: 0.9;
-}
+button:hover { opacity: 0.9; }
+button:active { transform: scale(0.97); }
 
-button:active {
-  transform: scale(0.97);
-}
-
-.btn-primary {
-  background: var(--gold);
-  color: #000;
-}
-
-.btn-outline {
-  background: transparent;
-  border: 1.5px solid var(--gold);
-  color: var(--gold);
-}
+.btn-primary { background: var(--primary); color: #fff; }
+.btn-outline { background: transparent; border: 1.5px solid var(--primary); color: var(--primary); }
 
 .card {
   background: var(--dark-card);
-  border: 1px solid var(--dark-border);
   border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  border: 1px solid var(--dark-border);
   padding: 1.25rem;
 }
 
@@ -81,14 +76,14 @@ button:active {
   font-weight: 600;
 }
 
-.badge-green { background: rgba(16, 185, 129, 0.15); color: var(--green); }
-.badge-gold { background: rgba(245, 158, 11, 0.15); color: var(--gold); }
-.badge-red { background: rgba(239, 68, 68, 0.15); color: var(--red); }
+.badge-green { background: rgba(16,185,129,0.12); color: var(--green); }
+.badge-gold  { background: rgba(249,115,22,0.12); color: var(--primary); }
+.badge-red   { background: rgba(239,68,68,0.12);  color: var(--red); }
 
 input, select, textarea {
-  background: var(--dark);
+  background: var(--bg);
   border: 1.5px solid var(--dark-border);
-  border-radius: 8px;
+  border-radius: 10px;
   color: var(--text);
   font-size: 0.95rem;
   padding: 0.65rem 0.9rem;
@@ -97,9 +92,7 @@ input, select, textarea {
   transition: border-color 0.2s;
 }
 
-input:focus, select:focus, textarea:focus {
-  border-color: var(--gold);
-}
+input:focus, select:focus, textarea:focus { border-color: var(--primary); }
 
 label {
   display: block;
@@ -108,9 +101,7 @@ label {
   margin-bottom: 0.4rem;
 }
 
-.form-group {
-  margin-bottom: 1rem;
-}
+.form-group { margin-bottom: 1rem; }
 
 .error-msg {
   color: var(--red);
@@ -121,7 +112,7 @@ label {
 .page-container {
   max-width: 1200px;
   margin: 0 auto;
-  padding: 2rem 1rem 6rem; /* 6rem bottom = space for mobile bottom nav */
+  padding: 1.5rem 1rem 6rem;
 }
 
 @media (min-width: 769px) {
