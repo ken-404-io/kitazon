@@ -43,7 +43,7 @@ export interface DbTask {
 }
 
 export type WithdrawalStatus = 'pending' | 'processing' | 'completed' | 'failed';
-export type WithdrawalChannel = 'gcash' | 'maya' | 'gotyme' | 'bpi' | 'bdo' | 'unionbank' | 'coins' | 'usdt';
+export type WithdrawalChannel = 'gcash' | 'maya' | 'gotyme' | 'coins' | 'usdt' | 'paypal';
 
 export interface DbWithdrawal {
   id: number;

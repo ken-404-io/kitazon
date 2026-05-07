@@ -5,8 +5,8 @@ import { createOtp, verifyOtp } from '../services/otp';
 import { sendWithdrawalOtp, sendWithdrawalConfirmation } from '../services/email';
 import { logAudit } from '../services/audit';
 
-const VALID_CHANNELS: WithdrawalChannel[] = ['gcash', 'maya', 'gotyme', 'bpi', 'bdo', 'unionbank', 'coins', 'usdt'];
-const ACCOUNT_PATTERN = /^[a-zA-Z0-9\-\s]{5,50}$/;
+const VALID_CHANNELS: WithdrawalChannel[] = ['gcash', 'maya', 'gotyme', 'coins', 'usdt', 'paypal'];
+const ACCOUNT_PATTERN = /^[a-zA-Z0-9@.\-\s]{5,60}$/;
 const ACCOUNT_CHANGE_COOLDOWN_MS = 48 * 60 * 60 * 1000;
 
 function maskAccount(account: string): string {

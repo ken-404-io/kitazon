@@ -28,7 +28,7 @@ export interface Earning {
 }
 
 export type WithdrawalStatus = 'pending' | 'processing' | 'completed' | 'failed';
-export type WithdrawalChannel = 'gcash' | 'maya' | 'gotyme' | 'bpi' | 'bdo' | 'unionbank' | 'coins' | 'usdt';
+export type WithdrawalChannel = 'gcash' | 'maya' | 'gotyme' | 'coins' | 'usdt' | 'paypal';
 
 export interface Withdrawal {
   id: number;
