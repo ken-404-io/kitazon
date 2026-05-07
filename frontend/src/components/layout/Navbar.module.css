@@ -67,11 +67,14 @@
   background: var(--primary-subtle);
   border: 1px solid var(--primary-border);
   border-radius: 20px;
-  padding: 0.3rem 0.75rem;
-  font-size: 0.85rem;
+  padding: 0.3rem 0.65rem;
+  font-size: clamp(0.75rem, 3vw, 0.85rem);
   font-weight: 700;
   color: var(--primary);
   white-space: nowrap;
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .balanceCurrency {
@@ -204,11 +207,12 @@
   gap: 3px;
   text-decoration: none;
   color: var(--text-muted);
-  font-size: 10px;
+  font-size: clamp(9px, 2.5vw, 10px);
   font-weight: 500;
   transition: color 0.15s;
-  padding: 6px 2px;
+  padding: 6px 1px;
   position: relative;
+  min-width: 0;
 }
 
 .navTab:hover {
