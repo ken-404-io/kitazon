@@ -116,7 +116,7 @@ export default function AccountSettings() {
   const resendVerification = async () => {
     setVerifyLoading(true);
     try {
-      const res = await api.post('/auth/resend-verification');
+      const res = await api.post('/auth/resend-verification', {});
       setVerifyMsg(res.data.message);
       await refreshUser();
     } catch (err: unknown) {
