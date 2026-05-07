@@ -45,7 +45,7 @@ export default function TaskRow({ task, onComplete }: Props) {
     if (done || loading) return;
     setLoading(true); setErr('');
     try {
-      await api.post(`/tasks/${task.id}/complete`);
+      await api.post(`/tasks/${task.id}/complete`, {});
       setDone(true);
       onComplete?.(Number(task.payout));
     } catch (error: unknown) {
