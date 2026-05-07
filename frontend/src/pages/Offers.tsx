@@ -56,7 +56,7 @@ export default function Offers() {
           src={CPALEAD_URL(user?.id ?? 0)}
           style={{ flex: 1, width: '100%', border: 'none', display: 'block' }}
           title="CPAlead Offerwall"
-          sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-top-navigation"
+          sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-top-navigation allow-modals"
         />
       ) : (
         <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)' }}>
