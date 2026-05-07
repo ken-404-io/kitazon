@@ -5,14 +5,12 @@ import { CreditCardIcon, BuildingIcon, CoinsIcon, DollarIcon } from '../ui/Icons
 import styles from './PayoutFeed.module.css';
 
 const CHANNEL_ICONS: Record<WithdrawalChannel, React.ReactNode> = {
-  gcash:     <CreditCardIcon />,
-  maya:      <CreditCardIcon />,
-  bpi:       <BuildingIcon />,
-  bdo:       <BuildingIcon />,
-  unionbank: <BuildingIcon />,
-  gotyme:    <CreditCardIcon />,
-  coins:     <CoinsIcon />,
-  usdt:      <DollarIcon />,
+  gcash:  <CreditCardIcon />,
+  maya:   <CreditCardIcon />,
+  gotyme: <CreditCardIcon />,
+  coins:  <CoinsIcon />,
+  usdt:   <DollarIcon />,
+  paypal: <DollarIcon />,
 };
 
 export default function PayoutFeed() {

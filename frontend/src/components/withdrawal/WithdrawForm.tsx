@@ -6,14 +6,12 @@ import OtpModal from './OtpModal';
 import styles from './WithdrawForm.module.css';
 
 const CHANNELS: { value: WithdrawalChannel; label: string }[] = [
-  { value: 'gcash', label: 'GCash (1 hour)' },
-  { value: 'maya', label: 'Maya (1 hour)' },
-  { value: 'gotyme', label: 'GoTyme (1-24 hours)' },
-  { value: 'bpi', label: 'BPI (1-24 hours)' },
-  { value: 'bdo', label: 'BDO (1-24 hours)' },
-  { value: 'unionbank', label: 'UnionBank (1-24 hours)' },
-  { value: 'coins', label: 'Coins.ph (1-24 hours)' },
-  { value: 'usdt', label: 'USDT (1-24 hours)' },
+  { value: 'gcash',  label: 'GCash (~1 hour)'         },
+  { value: 'maya',   label: 'Maya (~1 hour)'          },
+  { value: 'gotyme', label: 'GoTyme (1-24 hours)'     },
+  { value: 'coins',  label: 'Coins.ph (1-24 hours)'   },
+  { value: 'usdt',   label: 'USDT TRC-20 (1-24 hours)'},
+  { value: 'paypal', label: 'PayPal (1-24 hours)'     },
 ];
 
 const INSTANT_CHANNELS: WithdrawalChannel[] = ['gcash', 'maya'];

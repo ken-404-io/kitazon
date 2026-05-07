@@ -16,15 +16,13 @@ const AlertIcon = () => <svg {...sz} width={16} height={16}><circle cx="12" cy="
 const CheckIcon = () => <svg {...sz} width={14} height={14}><polyline points="20 6 9 17 4 12"/></svg>;
 
 /* ─── config ─────────────────────────────────────────────────────────────────── */
-const CHANNELS: { value: WithdrawalChannel; label: string; sub: string }[] = [
-  { value: 'gcash',     label: 'GCash',     sub: '~1 hour'   },
-  { value: 'maya',      label: 'Maya',      sub: '~1 hour'   },
-  { value: 'gotyme',    label: 'GoTyme',    sub: '1–24 hrs'  },
-  { value: 'bpi',       label: 'BPI',       sub: '1–24 hrs'  },
-  { value: 'bdo',       label: 'BDO',       sub: '1–24 hrs'  },
-  { value: 'unionbank', label: 'UnionBank', sub: '1–24 hrs'  },
-  { value: 'coins',     label: 'Coins.ph',  sub: '1–24 hrs'  },
-  { value: 'usdt',      label: 'USDT',      sub: '1–24 hrs'  },
+const CHANNELS: { value: WithdrawalChannel; label: string; sub: string; placeholder: string; inputLabel: string }[] = [
+  { value: 'gcash',  label: 'GCash',    sub: '~1 hour',  placeholder: '09XXXXXXXXX',            inputLabel: 'GCash Mobile Number'    },
+  { value: 'maya',   label: 'Maya',     sub: '~1 hour',  placeholder: '09XXXXXXXXX',            inputLabel: 'Maya Mobile Number'     },
+  { value: 'gotyme', label: 'GoTyme',   sub: '1–24 hrs', placeholder: '09XXXXXXXXX',            inputLabel: 'GoTyme Mobile Number'   },
+  { value: 'coins',  label: 'Coins.ph', sub: '1–24 hrs', placeholder: '09XXXXXXXXX or email',   inputLabel: 'Coins.ph Account'       },
+  { value: 'usdt',   label: 'USDT',     sub: '1–24 hrs', placeholder: 'TRC-20 wallet address',  inputLabel: 'USDT Wallet (TRC-20)'   },
+  { value: 'paypal', label: 'PayPal',   sub: '1–24 hrs', placeholder: 'yourname@email.com',     inputLabel: 'PayPal Email Address'   },
 ];
 
 const PRESETS = [50, 100, 200, 500, 1000, 2000];
@@ -252,7 +250,7 @@ export default function Withdraw() {
                     key={c.value}
                     type="button"
                     className={`${styles.channelChip} ${channel === c.value ? styles.channelChipActive : ''}`}
-                    onClick={() => setChannel(c.value)}
+                    onClick={() => { setChannel(c.value); setAccount(''); }}
                   >
                     <span className={`${styles.channelDot} ${channel === c.value ? styles.channelDotFilled : ''}`} />
                     <span>
@@ -266,12 +264,13 @@ export default function Withdraw() {
 
             {/* Account number */}
             <div className={styles.sectionCard}>
-              <h4>Account / Wallet Number</h4>
+              <h4>{CHANNELS.find(c => c.value === channel)?.inputLabel ?? 'Account / Wallet'}</h4>
               <input
-                type="text"
+                type={channel === 'paypal' ? 'email' : 'text'}
+                inputMode={['gcash','maya','gotyme','coins'].includes(channel) ? 'numeric' : 'text'}
                 value={account}
                 onChange={e => setAccount(e.target.value)}
-                placeholder={channel === 'usdt' ? 'TRC-20 wallet address' : '09XXXXXXXXX or account number'}
+                placeholder={CHANNELS.find(c => c.value === channel)?.placeholder ?? ''}
                 maxLength={60}
                 autoComplete="off"
                 required
