@@ -1,0 +1,242 @@
+.page { max-width: 480px; margin: 0 auto; }
+
+/* ── Page header ───────────────────────────────────────────────────────────── */
+.pageHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 1.25rem;
+}
+
+.pageTitle { font-size: clamp(1.5rem, 6vw, 2rem); font-weight: 900; line-height: 1.1; }
+.pageSub   { font-size: clamp(0.8rem, 3vw, 0.9rem); color: var(--text-muted); margin-top: 3px; }
+
+.bellBtn {
+  width: 40px; height: 40px;
+  border-radius: 50%;
+  background: var(--dark-card);
+  border: 1px solid var(--dark-border);
+  display: flex; align-items: center; justify-content: center;
+  color: var(--text-muted);
+  cursor: pointer;
+  flex-shrink: 0;
+  padding: 0;
+}
+.bellBtn:hover { opacity: 1; color: var(--text); }
+
+/* ── Profile card ──────────────────────────────────────────────────────────── */
+.profileCard {
+  background: var(--dark-card);
+  border: 1px solid var(--dark-border);
+  border-radius: 20px;
+  padding: 1.25rem;
+  margin-bottom: 1rem;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.profileCard:hover { background: var(--primary-subtle); }
+
+.avatar {
+  width: 56px; height: 56px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1.4rem; font-weight: 800; color: #fff;
+  flex-shrink: 0;
+}
+
+.profileInfo { flex: 1; min-width: 0; }
+.profileName { font-size: 1rem; font-weight: 700; }
+.profileHandle { font-size: 0.82rem; color: var(--text-muted); margin-top: 2px; }
+
+.unverifiedBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 6px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  border: 1.5px solid var(--primary);
+  color: var(--primary);
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.profileBalance { text-align: right; flex-shrink: 0; }
+.balanceLabel { font-size: 0.75rem; color: var(--text-muted); }
+.balanceAmt { font-size: 1.1rem; font-weight: 800; color: var(--primary); }
+
+.profileChevron { color: var(--text-muted); flex-shrink: 0; }
+
+/* ── Alert banner ──────────────────────────────────────────────────────────── */
+.alertBanner {
+  background: var(--bonus-bg);
+  border: 1px solid var(--bonus-border);
+  border-radius: 16px;
+  padding: 1rem 1.1rem;
+  margin-bottom: 1rem;
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+}
+
+.alertIcon {
+  width: 42px; height: 42px;
+  border-radius: 12px;
+  background: var(--primary-subtle);
+  border: 1px solid var(--primary-border);
+  display: flex; align-items: center; justify-content: center;
+  color: var(--primary);
+  flex-shrink: 0;
+}
+
+.alertText { flex: 1; min-width: 0; }
+.alertTitle { font-size: 0.9rem; font-weight: 700; margin-bottom: 2px; }
+.alertSub   { font-size: 0.78rem; color: var(--text-muted); line-height: 1.4; }
+
+.resendBtn {
+  background: var(--primary);
+  color: #fff;
+  border: none;
+  border-radius: 10px;
+  padding: 0.45rem 0.9rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+/* ── Section ───────────────────────────────────────────────────────────────── */
+.sectionLabel {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin: 1.25rem 0 0.5rem 0.25rem;
+}
+
+.settingsCard {
+  background: var(--dark-card);
+  border: 1px solid var(--dark-border);
+  border-radius: 20px;
+  overflow: hidden;
+}
+
+.settingRow {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  padding: 0.9rem 1.1rem;
+  cursor: pointer;
+  transition: background 0.12s;
+  border-bottom: 1px solid var(--dark-border);
+  text-decoration: none;
+  color: var(--text);
+}
+.settingRow:last-child { border-bottom: none; }
+.settingRow:hover { background: rgba(255,255,255,0.03); }
+
+.settingIcon {
+  width: 36px; height: 36px;
+  border-radius: 10px;
+  background: var(--primary-subtle);
+  display: flex; align-items: center; justify-content: center;
+  color: var(--primary);
+  flex-shrink: 0;
+}
+.settingIconRed {
+  background: var(--red-subtle);
+  color: var(--red);
+}
+
+.settingLabel { flex: 1; font-size: 0.92rem; font-weight: 500; }
+.settingLabelRed { color: var(--red); }
+
+.settingValue { font-size: 0.85rem; color: var(--primary); font-weight: 600; margin-right: 4px; }
+.settingValueMuted { color: var(--text-muted); }
+
+.chevron { color: var(--text-muted); display: flex; align-items: center; }
+
+/* ── Sub-view header ───────────────────────────────────────────────────────── */
+.subHeader {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 1.5rem;
+}
+
+.backBtn {
+  width: 38px; height: 38px;
+  border-radius: 12px;
+  background: var(--dark-card);
+  border: 1px solid var(--dark-border);
+  display: flex; align-items: center; justify-content: center;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 0;
+  flex-shrink: 0;
+}
+.backBtn:hover { opacity: 1; color: var(--primary); }
+
+.subTitle { font-size: 1.1rem; font-weight: 800; }
+
+/* ── Forms ─────────────────────────────────────────────────────────────────── */
+.formCard {
+  background: var(--dark-card);
+  border: 1px solid var(--dark-border);
+  border-radius: 20px;
+  padding: 1.25rem;
+}
+
+.successMsg { color: var(--primary-amber); font-size: 0.85rem; margin-top: 0.5rem; }
+
+/* ── Login history table ───────────────────────────────────────────────────── */
+.historyItem {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.75rem 0;
+  border-bottom: 1px solid var(--dark-border);
+  gap: 0.75rem;
+}
+.historyItem:last-child { border-bottom: none; }
+
+.historyLeft { flex: 1; min-width: 0; }
+.historyTime { font-size: 0.8rem; color: var(--text-muted); }
+.historyDevice { font-size: 0.78rem; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.historyIp { font-size: 0.82rem; font-weight: 600; }
+.statusOk  { color: var(--primary-amber); }
+.statusFail{ color: var(--red); }
+
+/* ── 2FA ───────────────────────────────────────────────────────────────────── */
+.qrWrap { display: flex; flex-direction: column; align-items: center; gap: 1rem; margin: 1rem 0; }
+.qrImg  { border-radius: 12px; }
+.secretKey { font-size: 0.75rem; color: var(--text-muted); word-break: break-all; text-align: center; }
+.codeRow { display: flex; gap: 0.75rem; }
+
+/* ── Delete danger zone ────────────────────────────────────────────────────── */
+.dangerCard {
+  background: var(--dark-card);
+  border: 1px solid var(--red-subtle);
+  border-radius: 20px;
+  padding: 1.25rem;
+}
+
+/* ── Placeholder ───────────────────────────────────────────────────────────── */
+.placeholder {
+  text-align: center;
+  padding: 3rem 1rem;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}
+
+@media (max-width: 380px) {
+  .avatar { width: 48px; height: 48px; font-size: 1.1rem; }
+  .profileCard { padding: 1rem; gap: 0.75rem; }
+  .settingRow  { padding: 0.8rem 0.9rem; }
+  .alertBanner { padding: 0.85rem; }
+}
