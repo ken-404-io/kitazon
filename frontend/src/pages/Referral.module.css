@@ -10,11 +10,12 @@
   justify-content: space-between;
   align-items: center;
   margin-bottom: 0.5rem;
+  gap: 0.5rem;
 }
 
-.name { font-size: 0.9rem; font-weight: 600; }
-.time { font-size: 0.75rem; color: var(--text-muted); }
+.name { font-size: clamp(0.82rem, 3vw, 0.9rem); font-weight: 600; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.time { font-size: 0.75rem; color: var(--text-muted); flex-shrink: 0; }
 
 @media (max-width: 768px) {
-  .layout { grid-template-columns: 1fr; }
+  .layout { grid-template-columns: 1fr; gap: 1rem; }
 }
