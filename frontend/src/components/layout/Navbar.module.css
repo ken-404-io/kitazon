@@ -8,6 +8,7 @@
   height: 56px;
   background: var(--dark-card);
   border-bottom: 1px solid var(--dark-border);
+  box-shadow: 0 1px 8px rgba(0,0,0,0.06);
   position: sticky;
   top: 0;
   z-index: 200;
@@ -215,7 +216,7 @@
 }
 
 .navTabActive {
-  color: var(--gold);
+  color: var(--primary);
 }
 
 .navTabIcon {
