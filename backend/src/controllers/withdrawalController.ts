@@ -7,7 +7,7 @@ import { logAudit } from '../services/audit';
 
 const VALID_CHANNELS: WithdrawalChannel[] = ['gcash', 'maya', 'gotyme', 'coins', 'usdt', 'paypal'];
 const ACCOUNT_PATTERN = /^[a-zA-Z0-9@.\-\s]{5,60}$/;
-const ACCOUNT_CHANGE_COOLDOWN_MS = 48 * 60 * 60 * 1000;
+
 
 function maskAccount(account: string): string {
   if (account.length <= 4) return '****';
@@ -105,16 +105,6 @@ export async function create(req: Request, res: Response, next: NextFunction): P
       return;
     }
 
-    // Account number change cooldown (48h)
-    if (user.last_withdrawal_account && user.last_withdrawal_account !== account_number) {
-      const changedAt = user.last_withdrawal_account_changed_at;
-      if (changedAt && Date.now() - new Date(changedAt).getTime() < ACCOUNT_CHANGE_COOLDOWN_MS) {
-        const hoursLeft = Math.ceil((ACCOUNT_CHANGE_COOLDOWN_MS - (Date.now() - new Date(changedAt).getTime())) / 3_600_000);
-        res.status(400).json({ message: `Account number was recently changed. Please wait ${hoursLeft} more hour(s).` });
-        return;
-      }
-    }
-
     // Suspicious activity detection
     const { flags, isSuspicious } = await detectSuspicious(user.id, parsed, user);
 
@@ -131,7 +121,6 @@ export async function create(req: Request, res: Response, next: NextFunction): P
     if (netAmount <= 0) { res.status(400).json({ message: 'Amount too low after fee deduction.' }); return; }
 
     let insufficientBalance = false;
-    const accountChanged = user.last_withdrawal_account !== account_number;
 
     await db.transaction(async (trx) => {
       const updated = await trx('users')
@@ -144,13 +133,6 @@ export async function create(req: Request, res: Response, next: NextFunction): P
         user_id: req.user!.id, amount: parsed, fee, net_amount: netAmount,
         channel, account_number, status: 'pending',
       });
-
-      if (accountChanged) {
-        await trx('users').where({ id: req.user!.id }).update({
-          last_withdrawal_account: account_number,
-          last_withdrawal_account_changed_at: new Date(),
-        });
-      }
     });
 
     if (insufficientBalance) { res.status(400).json({ message: 'Insufficient balance.' }); return; }
