@@ -69,10 +69,10 @@ export default function Dashboard() {
           Array.from({ length: 4 }).map((_, i) => <SkeletonStat key={i} />)
         ) : (
           <>
-            <EarningsCard label="Balance"   amount={stats?.balance} color="var(--primary)" icon={<CreditCardIcon />} iconBg="var(--primary-subtle)" />
-            <EarningsCard label="Today"     amount={stats?.today}   color="var(--green)"   icon={<CalendarIcon />}  iconBg="var(--green-subtle)" />
-            <EarningsCard label="This Week" amount={stats?.week}    color="var(--blue)"    icon={<BarChartIcon />}  iconBg="var(--blue-subtle)" />
-            <EarningsCard label="All Time"  amount={stats?.total}   color="var(--purple)"  icon={<TrophyIcon />}    iconBg="var(--purple-subtle)" />
+            <EarningsCard label="Balance"   amount={stats?.balance} color="var(--primary)"       icon={<CreditCardIcon />} iconBg="var(--primary-subtle)" />
+            <EarningsCard label="Today"     amount={stats?.today}   color="var(--primary-amber)" icon={<CalendarIcon />}  iconBg="var(--amber-subtle)" />
+            <EarningsCard label="This Week" amount={stats?.week}    color="var(--primary)"       icon={<BarChartIcon />}  iconBg="var(--primary-subtle)" />
+            <EarningsCard label="All Time"  amount={stats?.total}   color="var(--primary-dark)"  icon={<TrophyIcon />}    iconBg="var(--deep-subtle)" />
           </>
         )}
       </div>
