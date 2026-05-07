@@ -8,16 +8,13 @@ const VALID_CATEGORIES = ['survey', 'app_install', 'video', 'microjob', 'game'] 
 
 export async function list(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const query = db<DbTask>('tasks').where({ is_active: true }).orderBy('payout', 'desc');
-    const { category } = req.query;
-    if (category) {
-      if (!VALID_CATEGORIES.includes(category as typeof VALID_CATEGORIES[number])) {
-        res.status(400).json({ message: 'Invalid category.' });
-        return;
-      }
-      query.where({ category });
-    }
-    res.json(await query);
+    const tasks = await db<DbTask>('tasks').where({ is_active: true }).orderBy('payout', 'desc');
+    const completedIds = await db('earnings')
+      .where({ user_id: req.user!.id, type: 'task' })
+      .whereNotNull('task_id')
+      .pluck('task_id');
+    const completedSet = new Set(completedIds.map(Number));
+    res.json(tasks.map(t => ({ ...t, is_completed: completedSet.has(t.id) })));
   } catch (err) { next(err); }
 }
 
