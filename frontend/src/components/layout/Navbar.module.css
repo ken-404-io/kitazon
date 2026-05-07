@@ -48,8 +48,8 @@
 }
 
 .activeLink {
-  color: var(--gold) !important;
-  background: rgba(245,158,11,0.1) !important;
+  color: var(--primary) !important;
+  background: var(--primary-subtle) !important;
 }
 
 /* ─── Right Controls ─────────────────────────────────────────────────────── */
@@ -64,13 +64,13 @@
   display: flex;
   align-items: center;
   gap: 2px;
-  background: rgba(245,158,11,0.12);
-  border: 1px solid rgba(245,158,11,0.25);
+  background: var(--primary-subtle);
+  border: 1px solid var(--primary-border);
   border-radius: 20px;
   padding: 0.3rem 0.75rem;
   font-size: 0.85rem;
   font-weight: 700;
-  color: var(--gold);
+  color: var(--primary);
   white-space: nowrap;
 }
 

@@ -2,8 +2,8 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  background: linear-gradient(135deg, #fff7ed, #ffedd5);
-  border: 1px solid rgba(249,115,22,0.15);
+  background: var(--hero-bg);
+  border: 1px solid var(--hero-border);
   border-radius: 20px;
   padding: 1.5rem 1.75rem;
   margin-bottom: 1.25rem;
