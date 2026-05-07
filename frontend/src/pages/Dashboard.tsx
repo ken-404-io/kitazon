@@ -68,7 +68,7 @@ export default function Dashboard() {
       {/* Bonus & Guide */}
       <div className="grid-2" style={{ marginBottom: '1.25rem' }}>
         <Link to="/bonus" style={{ textDecoration: 'none' }}>
-          <div className={styles.promoCard} style={{ background: 'linear-gradient(135deg, #fff7ed, #ffedd5)', border: '1px solid rgba(249,115,22,0.2)' }}>
+          <div className={styles.promoCard} style={{ background: 'var(--bonus-bg)', border: '1px solid var(--bonus-border)' }}>
             <span style={{ fontSize: 36 }}>🎁</span>
             <div>
               <div style={{ fontWeight: 700, color: 'var(--primary)', fontSize: 15 }}>Claim Bonus ₱20</div>
@@ -78,7 +78,7 @@ export default function Dashboard() {
           </div>
         </Link>
         <Link to="/guide" style={{ textDecoration: 'none' }}>
-          <div className={styles.promoCard} style={{ background: 'linear-gradient(135deg, #f0fdf4, #dcfce7)', border: '1px solid rgba(16,185,129,0.2)' }}>
+          <div className={styles.promoCard} style={{ background: 'var(--guide-bg)', border: '1px solid var(--guide-border)' }}>
             <span style={{ fontSize: 36 }}>📖</span>
             <div>
               <div style={{ fontWeight: 700, color: 'var(--green)', fontSize: 15 }}>Free Earning Guide</div>
@@ -127,7 +127,7 @@ export default function Dashboard() {
       </div>
 
       {/* Footer nudge */}
-      <div className="card" style={{ marginTop: '1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'linear-gradient(135deg, #f0fdf4, #dcfce7)', border: '1px solid rgba(16,185,129,0.15)' }}>
+      <div className="card" style={{ marginTop: '1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'var(--nudge-bg)', border: '1px solid var(--nudge-border)' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <span style={{ fontSize: 28 }}>🛡️</span>
           <div>
