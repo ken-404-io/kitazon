@@ -25,8 +25,6 @@ export interface DbUser {
   email_verification_expires: Date | null;
   last_login_at: Date | null;
   last_login_ip: string | null;
-  last_withdrawal_account: string | null;
-  last_withdrawal_account_changed_at: Date | null;
   totp_secret: string | null;
   totp_enabled: boolean;
   created_at: Date;
