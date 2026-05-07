@@ -52,7 +52,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logout = async (): Promise<void> => {
     try {
-      if (getToken()) await api.post('/auth/logout');
+      if (getToken()) await api.post('/auth/logout', {});
     } catch {
       // Best-effort
     } finally {
