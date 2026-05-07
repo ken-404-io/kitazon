@@ -15,6 +15,8 @@ export interface Task {
   category: 'survey' | 'app_install' | 'video' | 'microjob' | 'game';
   payout: number | string;
   is_active: boolean;
+  is_completed?: boolean;
+  created_at?: string;
 }
 
 export interface Earning {
