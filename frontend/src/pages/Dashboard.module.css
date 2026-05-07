@@ -24,11 +24,21 @@
   margin-top: 2px;
 }
 
-.heroEmoji {
-  font-size: 64px;
-  line-height: 1;
+.heroIcon {
+  color: var(--primary);
+  opacity: 0.6;
   flex-shrink: 0;
   margin-left: 1rem;
+}
+
+.promoIcon {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
 }
 
 .promoCard {
@@ -84,6 +94,6 @@
 @media (max-width: 768px) {
   .hero { padding: 1.25rem; }
   .heroTitle { font-size: 1.3rem; }
-  .heroEmoji { font-size: 48px; }
+  .heroIcon { opacity: 0.5; }
   .mainGrid { grid-template-columns: 1fr; }
 }

@@ -6,9 +6,21 @@ import EarningsCard from '../components/dashboard/EarningsCard';
 import SpinWheel from '../components/dashboard/SpinWheel';
 import EarningsChart from '../components/dashboard/EarningsChart';
 import { SkeletonStat, SkeletonRow } from '../components/ui/Skeleton';
+import {
+  CreditCardIcon, CalendarIcon, BarChartIcon, TrophyIcon,
+  GiftIcon, BookIcon, DiceIcon, UsersIcon, SmartphoneIcon,
+  CheckCircleIcon, ShieldCheckIcon, TargetIcon, WalletBigIcon,
+} from '../components/ui/Icons';
 import api from '../services/api';
 import { UserStats, Earning } from '../types';
 import styles from './Dashboard.module.css';
+
+function earningIcon(type: string) {
+  if (type === 'spin')               return <DiceIcon />;
+  if (type === 'referral_commission') return <UsersIcon />;
+  if (type === 'affiliate_offer')     return <SmartphoneIcon />;
+  return <CheckCircleIcon />;
+}
 
 export default function Dashboard() {
   const { user } = useAuth();
@@ -40,7 +52,7 @@ export default function Dashboard() {
       {/* Hero banner */}
       <div className={styles.hero}>
         <div className={styles.heroLeft}>
-          <h1 className={styles.heroTitle}>Hi, {user?.name?.split(' ')[0]} 👋</h1>
+          <h1 className={styles.heroTitle}>Hi, {user?.name?.split(' ')[0]}</h1>
           <p className={styles.heroSub}>Here's your earnings overview</p>
           <Link to="/withdraw">
             <button className="btn-primary" style={{ marginTop: '1rem', borderRadius: 12 }}>
@@ -48,7 +60,7 @@ export default function Dashboard() {
             </button>
           </Link>
         </div>
-        <div className={styles.heroEmoji}>💰</div>
+        <div className={styles.heroIcon}><WalletBigIcon /></div>
       </div>
 
       {/* Stats */}
@@ -57,10 +69,10 @@ export default function Dashboard() {
           Array.from({ length: 4 }).map((_, i) => <SkeletonStat key={i} />)
         ) : (
           <>
-            <EarningsCard label="Balance"   amount={stats?.balance} color="var(--primary)" icon="💳" iconBg="rgba(249,115,22,0.12)" />
-            <EarningsCard label="Today"     amount={stats?.today}   color="var(--green)"   icon="📅" iconBg="rgba(16,185,129,0.12)" />
-            <EarningsCard label="This Week" amount={stats?.week}    color="var(--blue)"    icon="📊" iconBg="rgba(59,130,246,0.12)" />
-            <EarningsCard label="All Time"  amount={stats?.total}   color="var(--purple)"  icon="🏆" iconBg="rgba(139,92,246,0.12)" />
+            <EarningsCard label="Balance"   amount={stats?.balance} color="var(--primary)" icon={<CreditCardIcon />} iconBg="var(--primary-subtle)" />
+            <EarningsCard label="Today"     amount={stats?.today}   color="var(--green)"   icon={<CalendarIcon />}  iconBg="var(--green-subtle)" />
+            <EarningsCard label="This Week" amount={stats?.week}    color="var(--blue)"    icon={<BarChartIcon />}  iconBg="var(--blue-subtle)" />
+            <EarningsCard label="All Time"  amount={stats?.total}   color="var(--purple)"  icon={<TrophyIcon />}    iconBg="var(--purple-subtle)" />
           </>
         )}
       </div>
@@ -69,22 +81,22 @@ export default function Dashboard() {
       <div className="grid-2" style={{ marginBottom: '1.25rem' }}>
         <Link to="/bonus" style={{ textDecoration: 'none' }}>
           <div className={styles.promoCard} style={{ background: 'var(--bonus-bg)', border: '1px solid var(--bonus-border)' }}>
-            <span style={{ fontSize: 36 }}>🎁</span>
+            <div className={styles.promoIcon} style={{ background: 'var(--primary-subtle)', color: 'var(--primary)' }}><GiftIcon /></div>
             <div>
               <div style={{ fontWeight: 700, color: 'var(--primary)', fontSize: 15 }}>Claim Bonus ₱20</div>
               <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>Complete one offer to unlock</div>
             </div>
-            <span style={{ marginLeft: 'auto', color: 'var(--primary)', fontSize: 18 }}>→</span>
+            <span style={{ marginLeft: 'auto', color: 'var(--primary)', fontSize: 18, fontWeight: 700 }}>→</span>
           </div>
         </Link>
         <Link to="/guide" style={{ textDecoration: 'none' }}>
           <div className={styles.promoCard} style={{ background: 'var(--guide-bg)', border: '1px solid var(--guide-border)' }}>
-            <span style={{ fontSize: 36 }}>📖</span>
+            <div className={styles.promoIcon} style={{ background: 'var(--green-subtle)', color: 'var(--green)' }}><BookIcon /></div>
             <div>
               <div style={{ fontWeight: 700, color: 'var(--green)', fontSize: 15 }}>Free Earning Guide</div>
               <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>Unlock tips to earn faster</div>
             </div>
-            <span style={{ marginLeft: 'auto', color: 'var(--green)', fontSize: 18 }}>→</span>
+            <span style={{ marginLeft: 'auto', color: 'var(--green)', fontSize: 18, fontWeight: 700 }}>→</span>
           </div>
         </Link>
       </div>
@@ -104,9 +116,7 @@ export default function Dashboard() {
             </div>
           ) : recentEarnings.map((e) => (
             <div key={e.id} className={`card ${styles.earningRow}`}>
-              <div className={styles.earningIcon}>
-                {e.type === 'spin' ? '🎰' : e.type === 'referral_commission' ? '👥' : e.type === 'affiliate_offer' ? '📱' : '✅'}
-              </div>
+              <div className={styles.earningIcon} style={{ color: 'var(--primary)' }}>{earningIcon(e.type)}</div>
               <div style={{ flex: 1 }}>
                 <p className={styles.earningTitle}>{e.task_title}</p>
                 <p className={styles.earningTime}>{new Date(e.created_at).toLocaleString('en-PH')}</p>
@@ -123,19 +133,19 @@ export default function Dashboard() {
           )}
           <EarningsChart />
         </div>
-        <SpinWheel onWin={() => { loadStats(); showToast('🎉 Spin reward added to your balance!', 'success'); }} />
+        <SpinWheel onWin={() => { loadStats(); showToast('Spin reward added to your balance!', 'success'); }} />
       </div>
 
       {/* Footer nudge */}
       <div className="card" style={{ marginTop: '1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'var(--nudge-bg)', border: '1px solid var(--nudge-border)' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <span style={{ fontSize: 28 }}>🛡️</span>
+          <div style={{ color: 'var(--green)' }}><ShieldCheckIcon /></div>
           <div>
             <div style={{ fontWeight: 700, fontSize: 14 }}>Keep going!</div>
             <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>Complete tasks and spin daily to earn more.</div>
           </div>
         </div>
-        <span style={{ fontSize: 32 }}>🎯</span>
+        <div style={{ color: 'var(--primary)' }}><TargetIcon /></div>
       </div>
     </div>
   );
