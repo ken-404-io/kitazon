@@ -1,7 +1,8 @@
 import { Request, Response, NextFunction } from 'express';
+import crypto from 'crypto';
 import db from '../../config/database';
-import { DbUser, WithdrawalChannel } from '../types';
-import { createOtp, verifyOtp } from '../services/otp';
+import { DbUser, DbOtpToken, WithdrawalChannel } from '../types';
+import { createOtp } from '../services/otp';
 import { sendWithdrawalOtp } from '../services/email';
 import { logAudit } from '../services/audit';
 
@@ -116,10 +117,17 @@ export async function create(req: Request, res: Response, next: NextFunction): P
     let insufficientBalance = false;
     let otpInvalid = false;
 
+    const otpHash = crypto.createHash('sha256').update(otp.trim()).digest('hex');
+
     await db.transaction(async (trx) => {
-      // Verify and consume OTP inside transaction — rolls back if anything below fails
-      const otpValid = await verifyOtp(user.id, otp.trim(), 'withdrawal_otp');
-      if (!otpValid) { otpInvalid = true; return; }
+      // Inline OTP verification using trx — avoids acquiring a second DB connection
+      const otpRecord = await trx<DbOtpToken>('otp_tokens')
+        .where({ user_id: user.id, token_hash: otpHash, purpose: 'withdrawal_otp' })
+        .whereNull('used_at')
+        .where('expires_at', '>', new Date())
+        .first();
+      if (!otpRecord) { otpInvalid = true; return; }
+      await trx('otp_tokens').where({ id: otpRecord.id }).update({ used_at: new Date() });
 
       const updated = await trx('users')
         .where({ id: req.user!.id })
