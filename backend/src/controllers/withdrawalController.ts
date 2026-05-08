@@ -99,6 +99,16 @@ export async function create(req: Request, res: Response, next: NextFunction): P
       return;
     }
 
+    // Block if user already has a pending or processing withdrawal
+    const hasPending = await db('withdrawals')
+      .where({ user_id: req.user!.id })
+      .whereIn('status', ['pending', 'processing'])
+      .first();
+    if (hasPending) {
+      res.status(400).json({ message: 'You have a withdrawal in progress. Wait for it to be processed before submitting another.' });
+      return;
+    }
+
     // Suspicious activity detection
     const { flags, isSuspicious } = await detectSuspicious(user.id, parsed, user);
 

@@ -54,6 +54,7 @@ const safeUser = (u: DbUser) => ({
   email_verified: u.email_verified,
   is_admin: u.is_admin ?? false,
   totp_enabled: u.totp_enabled ?? false,
+  last_login_at: u.last_login_at ?? null,
 });
 
 // ─── Token blacklist (access tokens; in-memory, clears hourly) ───────────────
