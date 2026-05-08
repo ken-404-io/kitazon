@@ -42,3 +42,11 @@ export const withdrawalLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
 });
+
+export const otpLimiter = rateLimit({
+  windowMs: 10 * 60 * 1000,
+  max: 3,
+  handler: json429('Too many OTP requests. Please wait 10 minutes.'),
+  standardHeaders: true,
+  legacyHeaders: false,
+});

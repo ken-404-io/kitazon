@@ -86,3 +86,49 @@ export async function sendPasswordResetEmail(to: string, name: string, token: st
     ${p('This link expires in <strong style="color:#e8e8e8;">30 minutes</strong>. If you didn\'t request a reset, you can safely ignore this email.')}
   `));
 }
+
+export async function sendPasswordChangedEmail(to: string, name: string): Promise<void> {
+  const resetLink = `${BASE}/forgot-password`;
+  await send(to, 'Your Kitazon password was changed', layout('Password Changed', `
+    ${h2('Password changed')}
+    ${p(`Hi ${name.split(' ')[0]}, your Kitazon account password was just changed successfully.`)}
+    ${p('All your active sessions have been logged out as a security precaution.')}
+    ${p('If you did <strong style="color:#e8e8e8;">not</strong> make this change, your account may be compromised — <a href="${resetLink}" style="color:#f97316;">reset your password immediately</a> and contact support.')}
+  `));
+}
+
+export async function sendLoginAlertEmail(to: string, name: string, ip: string, time: string): Promise<void> {
+  const resetLink = `${BASE}/forgot-password`;
+  await send(to, 'New sign-in to your Kitazon account', layout('New Sign-in Detected', `
+    ${h2('New sign-in detected')}
+    ${p(`Hi ${name.split(' ')[0]}, we noticed a sign-in to your account from a new location.`)}
+    ${table(row('IP Address', ip) + row('Time', time))}
+    ${p('If this was you, no action is needed. If you don\'t recognize this sign-in, <a href="${resetLink}" style="color:#f97316;">reset your password immediately</a>.')}
+  `));
+}
+
+export async function sendSuspiciousWithdrawalEmail(to: string, name: string, amount: number, flags: string[]): Promise<void> {
+  const resetLink = `${BASE}/forgot-password`;
+  await send(to, 'Suspicious withdrawal detected on your Kitazon account', layout('Suspicious Activity', `
+    ${h2('Unusual withdrawal activity')}
+    ${p(`Hi ${name.split(' ')[0]}, we detected unusual activity on a withdrawal request of <strong style="color:#f97316;">₱${amount.toFixed(2)}</strong> from your account.`)}
+    ${table(row('Flags', flags.join(', ')))}
+    ${p('The withdrawal is being held for manual review. If this was you, no action is needed and you\'ll be notified once it\'s processed.')}
+    ${p('If this was <strong style="color:#e8e8e8;">not</strong> you, <a href="${resetLink}" style="color:#f97316;">change your password immediately</a> and contact support.')}
+  `));
+}
+
+export async function sendWithdrawalSubmittedEmail(to: string, name: string, amount: number, channel: string, netAmount: number, fee: number): Promise<void> {
+  await send(to, 'Kitazon Withdrawal Submitted', layout('Withdrawal Submitted', `
+    ${h2('Withdrawal request received')}
+    ${p(`Hi ${name.split(' ')[0]}, your withdrawal request has been submitted and is now being processed.`)}
+    ${table(
+      row('Amount', `₱${amount.toFixed(2)}`) +
+      row('Fee', fee > 0 ? `₱${fee.toFixed(2)}` : 'None') +
+      row('You receive', `₱${netAmount.toFixed(2)}`) +
+      row('Channel', channel.toUpperCase())
+    )}
+    ${p('Processing takes 1–24 hours depending on your payment channel.')}
+    ${p('If you did <strong style="color:#e8e8e8;">not</strong> request this withdrawal, contact support immediately.')}
+  `));
+}

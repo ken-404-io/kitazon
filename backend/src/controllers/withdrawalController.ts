@@ -3,7 +3,7 @@ import crypto from 'crypto';
 import db from '../../config/database';
 import { DbUser, DbOtpToken, WithdrawalChannel } from '../types';
 import { createOtp } from '../services/otp';
-import { sendWithdrawalOtp } from '../services/email';
+import { sendWithdrawalOtp, sendWithdrawalSubmittedEmail, sendSuspiciousWithdrawalEmail } from '../services/email';
 import { logAudit } from '../services/audit';
 
 const VALID_CHANNELS: WithdrawalChannel[] = ['gcash', 'maya', 'gotyme', 'coins', 'usdt', 'paypal'];
@@ -148,6 +148,9 @@ export async function create(req: Request, res: Response, next: NextFunction): P
       amount: parsed,
       metadata: { channel, isSuspicious, flags },
     });
+
+    sendWithdrawalSubmittedEmail(user.email, user.name, parsed, channel, netAmount, fee).catch(() => {});
+    if (isSuspicious) sendSuspiciousWithdrawalEmail(user.email, user.name, parsed, flags).catch(() => {});
 
     res.status(201).json({
       message: 'Withdrawal submitted successfully.',
