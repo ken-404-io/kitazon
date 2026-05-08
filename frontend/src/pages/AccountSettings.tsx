@@ -69,7 +69,7 @@ export default function AccountSettings() {
   const [totpCode, setTotpCode]     = useState('');
   const [totpMsg, setTotpMsg]       = useState('');
   const [totpLoading, setTotpLoading] = useState(false);
-  const [totpEnabled, setTotpEnabled] = useState(false);
+  const [totpEnabled, setTotpEnabled] = useState(user?.totp_enabled ?? false);
 
   useEffect(() => {
     api.get<{ balance: number }>('/auth/me/stats').then(r => setBalance(r.data.balance ?? 0)).catch(() => {});

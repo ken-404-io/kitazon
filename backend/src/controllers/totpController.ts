@@ -63,8 +63,11 @@ export async function disableTotp(req: Request, res: Response, next: NextFunctio
     const delta = totp.validate({ token: code.trim(), window: 1 });
     if (delta === null) { res.status(400).json({ message: 'Invalid code.' }); return; }
 
-    await db('users').where({ id: user.id }).update({ totp_secret: null, totp_enabled: false });
-    res.json({ message: '2FA disabled.' });
+    await db.transaction(async (trx) => {
+      await trx('users').where({ id: user.id }).update({ totp_secret: null, totp_enabled: false });
+      await trx('refresh_tokens').where({ user_id: user.id }).whereNull('revoked_at').update({ revoked_at: new Date() });
+    });
+    res.json({ message: '2FA disabled. All sessions have been logged out as a security precaution.' });
   } catch (err) { next(err); }
 }
 

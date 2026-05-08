@@ -6,6 +6,7 @@ export interface User {
   referral_code: string;
   email_verified: boolean;
   is_admin?: boolean;
+  totp_enabled?: boolean;
 }
 
 export interface Task {
