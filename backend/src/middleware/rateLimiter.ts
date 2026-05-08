@@ -50,3 +50,11 @@ export const otpLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
 });
+
+export const resendLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 3,
+  handler: json429('Too many verification emails requested. Please wait an hour.'),
+  standardHeaders: true,
+  legacyHeaders: false,
+});
