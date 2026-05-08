@@ -1,0 +1,105 @@
+.header { text-align: center; margin-bottom: 2rem; }
+.header h1 { font-size: 1.8rem; margin-bottom: 0.4rem; }
+.sub { color: var(--text-muted); font-size: 0.9rem; }
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 1rem;
+  max-width: 900px;
+  margin: 0 auto 1.5rem;
+}
+
+.card {
+  background: var(--dark-card);
+  border: 1.5px solid var(--dark-border);
+  border-radius: 20px;
+  padding: 1.25rem;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  transition: border-color 0.15s;
+}
+.cardCurrent {
+  border-color: var(--plan-color, var(--primary));
+}
+
+.currentBadge {
+  position: absolute;
+  top: -11px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--dark-card);
+  border: 1.5px solid var(--plan-color, var(--primary));
+  color: var(--plan-color, var(--primary));
+  font-size: 0.7rem;
+  font-weight: 700;
+  padding: 2px 10px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+.cardTop {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+.planEmoji { font-size: 2rem; line-height: 1; }
+.planName  { font-size: 1.1rem; font-weight: 800; margin-bottom: 2px; }
+.planPrice { font-size: 0.82rem; color: var(--text-muted); }
+
+.limitLine { display: flex; align-items: baseline; gap: 4px; }
+.limitAmt  { font-size: 1.6rem; font-weight: 900; }
+.limitLabel{ font-size: 0.8rem; color: var(--text-muted); }
+
+.featureList {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  flex: 1;
+}
+.featureList li { font-size: 0.83rem; color: var(--text-muted); display: flex; gap: 6px; }
+.featureList li span { flex-shrink: 0; font-weight: 700; }
+
+.upgradeBtn {
+  display: block;
+  text-align: center;
+  padding: 0.75rem;
+  border-radius: 12px;
+  font-weight: 700;
+  font-size: 0.88rem;
+  color: #fff;
+  background: var(--primary);
+  text-decoration: none;
+  transition: opacity 0.15s;
+  margin-top: auto;
+}
+.upgradeBtn:hover { opacity: 0.85; }
+
+.currentBtn {
+  text-align: center;
+  padding: 0.75rem;
+  border-radius: 12px;
+  font-weight: 700;
+  font-size: 0.88rem;
+  color: var(--text-muted);
+  border: 1.5px solid var(--dark-border);
+  background: transparent;
+}
+
+.note {
+  text-align: center;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  max-width: 480px;
+  margin: 0 auto;
+  line-height: 1.6;
+}
+
+@media (max-width: 520px) {
+  .grid { grid-template-columns: 1fr; }
+}
