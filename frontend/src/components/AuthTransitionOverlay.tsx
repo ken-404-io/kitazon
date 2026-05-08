@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import styles from './AuthTransitionOverlay.module.css';
 
@@ -6,23 +6,29 @@ export default function AuthTransitionOverlay() {
   const { authTransition } = useAuth();
   const [show, setShow]     = useState(false);
   const [fading, setFading] = useState(false);
+  // Ref tracks whether the overlay is currently mounted so the idle-branch
+  // inside the effect doesn't need `show` as a dependency.
+  const mountedRef = useRef(false);
 
   useEffect(() => {
     if (authTransition !== 'idle') {
+      mountedRef.current = true;
       setFading(false);
       setShow(true);
-    } else if (show) {
+    } else if (mountedRef.current) {
       setFading(true);
-      const t = setTimeout(() => setShow(false), 480);
+      const t = setTimeout(() => {
+        mountedRef.current = false;
+        setShow(false);
+      }, 480);
       return () => clearTimeout(t);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [authTransition]);
 
   if (!show) return null;
 
   const label = authTransition === 'signing-out' ? 'Signing out…' : 'Signing in…';
-  const sub   = authTransition === 'signing-out' ? 'See you soon'  : 'Welcome back';
+  const sub   = authTransition === 'signing-out' ? 'See you soon' : 'Welcome back';
 
   return (
     <div className={`${styles.overlay} ${fading ? styles.fadeOut : styles.fadeIn}`}>
