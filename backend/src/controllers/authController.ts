@@ -212,6 +212,8 @@ export async function login(req: Request, res: Response, next: NextFunction): Pr
 
     const user = await db<DbUser>('users').where({ email: normalizedEmail }).first();
     if (!user) {
+      // Constant-time dummy compare to prevent user-enumeration via timing
+      await bcrypt.compare(password, '$2b$12$invalidhashXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX');
       await logLoginEvent(0, false, req);
       res.status(401).json({ message: 'Invalid email or password.' });
       return;

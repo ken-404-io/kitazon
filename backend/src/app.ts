@@ -41,9 +41,16 @@ const app = express();
 // Trust proxy in dev so express-rate-limit can read X-Forwarded-For correctly
 app.set('trust proxy', 1);
 
-// ─── Request ID for traceability ─────────────────────────────────────────────
-app.use((_req, res, next) => {
-  res.setHeader('X-Request-ID', crypto.randomUUID());
+// ─── Request ID + structured access log ──────────────────────────────────────
+app.use((req, res, next) => {
+  const id = crypto.randomUUID();
+  const start = Date.now();
+  res.setHeader('X-Request-ID', id);
+  res.on('finish', () => {
+    const ip = (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() ?? req.ip ?? '-';
+    const ms = Date.now() - start;
+    console.log(`[${new Date().toISOString()}] ${req.method} ${req.path} ${res.statusCode} ${ms}ms ip=${ip} rid=${id}`);
+  });
   next();
 });
 
@@ -69,9 +76,11 @@ app.use(helmet({
   permittedCrossDomainPolicies: { permittedPolicies: 'none' },
 }));
 
-// ─── Permissions-Policy header ────────────────────────────────────────────────
+// ─── API-specific headers ────────────────────────────────────────────────────
 app.use((_req, res, next) => {
   res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=(), payment=()');
+  res.setHeader('X-Robots-Tag', 'noindex, nofollow');          // keep API out of search indexes
+  res.setHeader('Cross-Origin-Resource-Policy', 'same-origin');
   next();
 });
 
@@ -84,7 +93,25 @@ app.use(cors({
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
   allowedHeaders: ['Content-Type', 'Authorization'],
   credentials: true,
+  maxAge: 86400, // cache preflight for 24 h
 }));
+
+// ─── DNS-rebinding / Host header guard ───────────────────────────────────────
+const ALLOWED_HOSTS = new Set([
+  new URL(FRONTEND_URL).hostname,
+  'api.kitazon.com',
+  'localhost',
+  '127.0.0.1',
+].filter(Boolean));
+
+app.use((req: Request, res: Response, next: NextFunction): void => {
+  const host = (req.headers.host ?? '').split(':')[0];
+  if (!ALLOWED_HOSTS.has(host)) {
+    res.status(400).json({ message: 'Invalid host.' });
+    return;
+  }
+  next();
+});
 
 // ─── Body / cookie parsing ────────────────────────────────────────────────────
 app.use(cookieParser());
@@ -118,6 +145,13 @@ app.use('/api/account', accountRoutes);
 app.use('/api/admin', authLimiter, adminRoutes);
 app.use('/api/totp', totpRoutes);
 app.use('/api/affiliate', affiliateRoutes);
+
+// ─── security.txt (RFC 9116) ──────────────────────────────────────────────────
+app.get('/.well-known/security.txt', (_req, res) => {
+  res.type('text/plain').send(
+    `Contact: mailto:security@kitazon.com\nExpires: ${new Date(Date.now() + 365 * 24 * 3600 * 1000).toISOString()}\nPreferred-Languages: en\n`
+  );
+});
 
 // ─── 404 catch-all ────────────────────────────────────────────────────────────
 app.use((_req, res) => res.status(404).json({ message: 'Not found.' }));

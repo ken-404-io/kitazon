@@ -62,6 +62,9 @@ export default function AccountSettings() {
   const [history, setHistory]         = useState<LoginEvent[] | null>(null);
   const [historyLoading, setHistoryLoading] = useState(false);
 
+  const [sessionMsg, setSessionMsg]   = useState('');
+  const [sessionLoad, setSessionLoad] = useState(false);
+
   const [verifyMsg, setVerifyMsg]     = useState('');
   const [verifyLoading, setVerifyLoading] = useState(false);
 
@@ -247,12 +250,33 @@ export default function AccountSettings() {
     </div>
   );
 
-  /* ── Devices view ─────────────────────────────────────────────────────────── */
+  /* ── Devices / Sessions view ─────────────────────────────────────────────── */
   if (view === 'devices') return (
     <div className="page-container">
-      <SubView title="Devices">
+      <SubView title="Active Sessions">
         <div className={styles.formCard}>
-          <p className={styles.placeholder}>Device management coming soon.</p>
+          <p style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: '1rem', lineHeight: 1.5 }}>
+            Signed in on this device. You can sign out all <strong style={{ color: 'var(--text)' }}>other</strong> devices if you think your account has been compromised.
+          </p>
+          {sessionMsg && (
+            <p style={{ fontSize: 13, color: sessionMsg.includes('other') ? '#22c55e' : 'var(--red)', marginBottom: '0.75rem' }}>{sessionMsg}</p>
+          )}
+          <button
+            className="btn-outline"
+            style={{ width: '100%', borderColor: 'var(--red)', color: 'var(--red)' }}
+            disabled={sessionLoad}
+            onClick={async () => {
+              setSessionLoad(true); setSessionMsg('');
+              try {
+                const r = await api.post<{ revoked: number }>('/account/revoke-sessions', {});
+                setSessionMsg(`Done — ${r.data.revoked} other session${r.data.revoked !== 1 ? 's' : ''} signed out.`);
+              } catch {
+                setSessionMsg('Failed. Please try again.');
+              } finally { setSessionLoad(false); }
+            }}
+          >
+            {sessionLoad ? 'Revoking…' : 'Sign Out All Other Devices'}
+          </button>
         </div>
       </SubView>
     </div>
