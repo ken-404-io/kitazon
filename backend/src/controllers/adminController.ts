@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import db from '../../config/database';
 import { DbUser, DbWithdrawal, WithdrawalStatus } from '../types';
 import { logAudit } from '../services/audit';
+import { sendWithdrawalStatusEmail } from '../services/email';
 
 const VALID_STATUSES: WithdrawalStatus[] = ['pending', 'processing', 'completed', 'failed'];
 
@@ -141,8 +142,16 @@ export async function updateWithdrawalStatus(req: Request, res: Response, next: 
       metadata: { withdrawal_id: withdrawalId, prev_status: prevStatus, new_status: status },
     });
 
-    // Send email notification (fire-and-forget)
-
+    // Notify user when withdrawal is completed or failed (fire-and-forget)
+    if (status === 'completed' || status === 'failed') {
+      const owner = await db<DbUser>('users').where({ id: withdrawal.user_id }).select('email', 'name').first();
+      if (owner) {
+        sendWithdrawalStatusEmail(
+          owner.email, owner.name, status,
+          Number(withdrawal.amount), withdrawal.channel, Number(withdrawal.net_amount)
+        ).catch(() => {});
+      }
+    }
 
     res.json({ message: 'Withdrawal status updated.', status });
   } catch (err) { next(err); }

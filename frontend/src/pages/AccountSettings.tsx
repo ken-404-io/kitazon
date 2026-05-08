@@ -3,6 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import api from '../services/api';
 import { isStrongPassword } from '../utils/sanitize';
+import PasswordStrength from '../components/ui/PasswordStrength';
 import styles from './AccountSettings.module.css';
 
 /* ─── local icons ─────────────────────────────────────────────────────────── */
@@ -151,6 +152,7 @@ export default function AccountSettings() {
             <div className="form-group">
               <label>New Password</label>
               <input type="password" value={pwForm.next} onChange={e => setPwForm(p => ({ ...p, next: e.target.value }))} required maxLength={128} autoComplete="new-password" />
+              <PasswordStrength password={pwForm.next} />
             </div>
             {pwError && <p className="error-msg">{pwError}</p>}
             {pwSuccess && <p className={styles.successMsg}>{pwSuccess}</p>}
@@ -345,6 +347,16 @@ export default function AccountSettings() {
   const emailVerified = user?.email_verified;
   const twoFaStatus   = totpEnabled ? 'Enabled' : 'Disabled';
 
+  // Security score: 1 pt per completed item (max 3 shown)
+  const secItems = [
+    { label: 'Email verified',          done: !!emailVerified },
+    { label: '2FA enabled',             done: totpEnabled },
+    { label: 'Account active',          done: true },
+  ];
+  const secScore = secItems.filter(i => i.done).length;
+  const secColor = secScore === 3 ? '#22c55e' : secScore === 2 ? '#f97316' : '#ef4444';
+  const secLabel = secScore === 3 ? 'Strong' : secScore === 2 ? 'Good' : 'Needs improvement';
+
   return (
     <div className="page-container">
       <div className={styles.page}>
@@ -390,6 +402,29 @@ export default function AccountSettings() {
               {verifyLoading ? 'Sending…' : 'Resend Verification'}
             </button>
           </div>
+        )}
+
+        {/* Security score card */}
+        <div className={styles.secScoreCard}>
+          <div className={styles.secScoreLeft}>
+            <p className={styles.secScoreTitle}>Security Score</p>
+            <p className={styles.secScoreLabel} style={{ color: secColor }}>{secLabel}</p>
+          </div>
+          <div className={styles.secScoreBars}>
+            {secItems.map(item => (
+              <div key={item.label} className={styles.secScoreRow}>
+                <span style={{ color: item.done ? '#22c55e' : 'var(--text-muted)', fontSize: 12 }}>{item.done ? '✓' : '○'}</span>
+                <span style={{ fontSize: 12, color: item.done ? 'var(--text)' : 'var(--text-muted)' }}>{item.label}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Last login */}
+        {user?.last_login_at && (
+          <p className={styles.lastLogin}>
+            Last sign-in: {new Date(user.last_login_at).toLocaleString('en-PH', { dateStyle: 'medium', timeStyle: 'short' })}
+          </p>
         )}
 
         {/* Security section */}

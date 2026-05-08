@@ -3,6 +3,7 @@ import { Link, useSearchParams } from 'react-router-dom';
 import HCaptcha from '@hcaptcha/react-hcaptcha';
 import { useAuth } from '../context/AuthContext';
 import { sanitizeInput, sanitizeEmail, isValidEmail, isStrongPassword } from '../utils/sanitize';
+import PasswordStrength from '../components/ui/PasswordStrength';
 import styles from './Auth.module.css';
 
 const HCAPTCHA_SITE_KEY = process.env.REACT_APP_HCAPTCHA_SITE_KEY ?? '';
@@ -72,6 +73,7 @@ export default function Register() {
           <div className="form-group">
             <label>Password (min 8 chars, letters + numbers)</label>
             <input type="password" value={form.password} onChange={set('password')} required autoComplete="new-password" maxLength={128} />
+            <PasswordStrength password={form.password} />
           </div>
           <div className="form-group">
             <label>Referral Code (optional)</label>

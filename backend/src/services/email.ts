@@ -118,6 +118,32 @@ export async function sendSuspiciousWithdrawalEmail(to: string, name: string, am
   `));
 }
 
+export async function sendWithdrawalStatusEmail(to: string, name: string, status: 'completed' | 'failed', amount: number, channel: string, netAmount: number): Promise<void> {
+  const isCompleted = status === 'completed';
+  const subject = isCompleted ? 'Your Kitazon withdrawal is complete!' : 'Kitazon withdrawal could not be processed';
+  const title   = isCompleted ? 'Withdrawal Complete' : 'Withdrawal Failed';
+  const icon    = isCompleted ? '✅' : '❌';
+  const color   = isCompleted ? '#22c55e' : '#ef4444';
+  const supportLink = `${BASE}/account`;
+  await send(to, subject, layout(title, `
+    ${h2(`${icon} ${isCompleted ? 'Your withdrawal was processed!' : 'Withdrawal could not be processed'}`)}
+    ${p(`Hi ${name.split(' ')[0]}, ${isCompleted
+      ? `your withdrawal of <strong style="color:#f97316;">₱${amount.toFixed(2)}</strong> has been successfully processed.`
+      : `we were unable to process your withdrawal of <strong style="color:#f97316;">₱${amount.toFixed(2)}</strong>. Your balance has been refunded.`
+    }`)}
+    ${table(
+      row('Amount', `₱${amount.toFixed(2)}`) +
+      row('You received', `₱${netAmount.toFixed(2)}`) +
+      row('Channel', channel.toUpperCase()) +
+      row('Status', `<span style="color:${color};font-weight:800;">${status.toUpperCase()}</span>`)
+    )}
+    ${isCompleted
+      ? p('Thank you for using Kitazon. Keep earning!')
+      : p(`Your balance has been restored. If you have questions, <a href="${supportLink}" style="color:#f97316;">contact support</a>.`)
+    }
+  `));
+}
+
 export async function sendWithdrawalSubmittedEmail(to: string, name: string, amount: number, channel: string, netAmount: number, fee: number): Promise<void> {
   await send(to, 'Kitazon Withdrawal Submitted', layout('Withdrawal Submitted', `
     ${h2('Withdrawal request received')}

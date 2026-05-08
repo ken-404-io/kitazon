@@ -7,6 +7,7 @@ export interface User {
   email_verified: boolean;
   is_admin?: boolean;
   totp_enabled?: boolean;
+  last_login_at?: string | null;
 }
 
 export interface Task {
