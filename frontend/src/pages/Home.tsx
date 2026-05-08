@@ -1,4 +1,7 @@
-import { Link } from 'react-router-dom';
+import { useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { GoogleLogin } from '@react-oauth/google';
+import { useAuth } from '../context/AuthContext';
 import PayoutFeed from '../components/payout/PayoutFeed';
 import { SurveyIcon, PhoneIcon, PlayIcon, BriefcaseIcon, GamepadIcon, UsersIcon, ZapIcon, ClockIcon, ShieldIcon, MapPinIcon } from '../components/ui/Icons';
 import styles from './Home.module.css';
@@ -20,22 +23,59 @@ const WHY_ITEMS = [
 ];
 
 export default function Home() {
+  const { user, loginWithGoogle } = useAuth();
+  const navigate = useNavigate();
+  const [googleErr, setGoogleErr] = useState('');
+
   return (
     <main>
       <section className={styles.hero}>
         <h1>Earn Real Money Online</h1>
-        <p className={styles.tagline}>Complete simple tasks and get paid — directly to GCash, Maya, and major PH banks.</p>
+        <p className={styles.tagline}>Complete simple tasks and get paid — directly to your PayPal account.</p>
         <div className={styles.heroBadges}>
-          <span className="badge badge-gold">Min ₱50 Withdrawal</span>
-          <span className="badge badge-green">Cashout in 1 Hour</span>
+          <span className="badge badge-gold">Min ₱5 Withdrawal</span>
+          <span className="badge badge-green">Cashout via PayPal</span>
           <span className="badge badge-gold">₱15 – ₱500 per Task</span>
         </div>
+
+        {!user && (
+          <div className={styles.heroGoogle}>
+            <GoogleLogin
+              onSuccess={async (cred) => {
+                setGoogleErr('');
+                try {
+                  await loginWithGoogle(cred.credential ?? '');
+                  navigate('/dashboard');
+                } catch {
+                  setGoogleErr('Google sign-in failed. Please try again.');
+                }
+              }}
+              onError={() => setGoogleErr('Google sign-in failed. Please try again.')}
+              theme="filled_black"
+              shape="pill"
+              size="large"
+              text="continue_with"
+              width="280"
+            />
+            {googleErr && <p className={styles.googleErr}>{googleErr}</p>}
+            <p className={styles.orDivider}>— or —</p>
+          </div>
+        )}
+
         <div className={styles.heroCta}>
-          <Link to="/register">
-            <button className="btn-primary" style={{ fontSize: '1.05rem', padding: '0.8rem 2rem' }}>
-              Join Free — Start Earning
-            </button>
-          </Link>
+          {user ? (
+            <Link to="/dashboard">
+              <button className="btn-primary" style={{ fontSize: '1.05rem', padding: '0.8rem 2rem' }}>
+                Go to Dashboard →
+              </button>
+            </Link>
+          ) : (
+            <Link to="/register">
+              <button className="btn-primary" style={{ fontSize: '1.05rem', padding: '0.8rem 2rem' }}>
+                Join Free — Start Earning
+              </button>
+            </Link>
+          )}
           <Link to="/payout-proof" className={styles.proofLink}>See Real Payout Proof →</Link>
         </div>
       </section>
