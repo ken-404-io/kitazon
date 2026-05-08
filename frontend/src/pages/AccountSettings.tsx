@@ -4,6 +4,7 @@ import { useTheme } from '../context/ThemeContext';
 import api from '../services/api';
 import { isStrongPassword, validateName, validatePasswordField } from '../utils/sanitize';
 import PasswordStrength from '../components/ui/PasswordStrength';
+import PasswordInput from '../components/ui/PasswordInput';
 import styles from './AccountSettings.module.css';
 
 /* ─── local icons ─────────────────────────────────────────────────────────── */
@@ -210,12 +211,11 @@ export default function AccountSettings() {
           <form onSubmit={changePassword} noValidate>
             <div className="form-group">
               <label>Current Password</label>
-              <input
-                type="password"
+              <PasswordInput
                 value={pwForm.current}
                 onChange={e => setPwForm(p => ({ ...p, current: e.target.value }))}
                 onBlur={pwBlur('current')}
-                className={pwTouched.current ? (pwCurrentErr ? 'field-invalid' : 'field-valid') : ''}
+                inputClass={pwTouched.current ? (pwCurrentErr ? 'field-invalid' : 'field-valid') : ''}
                 required
                 maxLength={128}
                 autoComplete="current-password"
@@ -224,12 +224,11 @@ export default function AccountSettings() {
             </div>
             <div className="form-group">
               <label>New Password</label>
-              <input
-                type="password"
+              <PasswordInput
                 value={pwForm.next}
                 onChange={e => setPwForm(p => ({ ...p, next: e.target.value }))}
                 onBlur={pwBlur('next')}
-                className={pwTouched.next ? (pwNextErr ? 'field-invalid' : 'field-valid') : ''}
+                inputClass={pwTouched.next ? (pwNextErr ? 'field-invalid' : 'field-valid') : ''}
                 required
                 maxLength={128}
                 autoComplete="new-password"

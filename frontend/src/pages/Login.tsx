@@ -1,14 +1,16 @@
 import { useState, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import HCaptcha from '@hcaptcha/react-hcaptcha';
+import { GoogleLogin } from '@react-oauth/google';
 import { useAuth } from '../context/AuthContext';
 import { sanitizeEmail, isValidEmail, validateEmailField } from '../utils/sanitize';
+import PasswordInput from '../components/ui/PasswordInput';
 import styles from './Auth.module.css';
 
 const HCAPTCHA_SITE_KEY = process.env.REACT_APP_HCAPTCHA_SITE_KEY ?? '';
 
 export default function Login() {
-  const { login } = useAuth();
+  const { login, loginWithGoogle } = useAuth();
   const [form, setForm]           = useState({ email: '', password: '' });
   const [touched, setTouched]     = useState({ email: false, password: false, totp: false });
   const [totpCode, setTotpCode]   = useState('');
@@ -23,7 +25,9 @@ export default function Login() {
 
   const emailErr    = touched.email    ? validateEmailField(form.email) : null;
   const passwordErr = touched.password ? (!form.password ? 'Password is required.' : null) : null;
-  const totpErr     = touched.totp && requiresTotp ? (!totpCode ? '6-digit code is required.' : (!/^\d{6}$/.test(totpCode) ? 'Code must be exactly 6 digits.' : null)) : null;
+  const totpErr     = touched.totp && requiresTotp
+    ? (!totpCode ? '6-digit code is required.' : (!/^\d{6}$/.test(totpCode) ? 'Code must be exactly 6 digits.' : null))
+    : null;
 
   const submit = async (e: React.FormEvent): Promise<void> => {
     e.preventDefault();
@@ -56,6 +60,27 @@ export default function Login() {
       <div className={styles.card}>
         <h2>Welcome back</h2>
         <p className={styles.sub}>Login to your Kitazon account</p>
+
+        {/* Google Sign-In */}
+        <div className={styles.googleWrap}>
+          <GoogleLogin
+            onSuccess={async cred => {
+              if (!cred.credential) return;
+              try { await loginWithGoogle(cred.credential); }
+              catch (err: unknown) {
+                setError((err as { response?: { data?: { message?: string } } }).response?.data?.message ?? 'Google sign-in failed.');
+              }
+            }}
+            onError={() => setError('Google sign-in failed.')}
+            width="100%"
+            theme="filled_black"
+            shape="rectangular"
+            text="signin_with"
+          />
+        </div>
+
+        <div className={styles.divider}><span>or</span></div>
+
         <form onSubmit={submit} autoComplete="on" noValidate>
           <div className="form-group">
             <label>Email</label>
@@ -74,12 +99,11 @@ export default function Login() {
           </div>
           <div className="form-group">
             <label>Password</label>
-            <input
-              type="password"
+            <PasswordInput
               value={form.password}
               onChange={set('password')}
               onBlur={blur('password')}
-              className={touched.password ? (passwordErr ? 'field-invalid' : 'field-valid') : ''}
+              inputClass={touched.password ? (passwordErr ? 'field-invalid' : 'field-valid') : ''}
               required
               autoComplete="current-password"
               maxLength={128}

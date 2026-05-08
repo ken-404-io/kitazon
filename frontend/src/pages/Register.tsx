@@ -1,11 +1,13 @@
 import { useState, useRef } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import HCaptcha from '@hcaptcha/react-hcaptcha';
+import { GoogleLogin } from '@react-oauth/google';
 import { useAuth } from '../context/AuthContext';
 import {
   sanitizeInput, sanitizeEmail, isStrongPassword,
   validateName, validateEmailField, validatePasswordField,
 } from '../utils/sanitize';
+import PasswordInput from '../components/ui/PasswordInput';
 import PasswordStrength from '../components/ui/PasswordStrength';
 import styles from './Auth.module.css';
 
@@ -16,7 +18,7 @@ interface FormState {
 }
 
 export default function Register() {
-  const { register } = useAuth();
+  const { register, loginWithGoogle } = useAuth();
   const [params] = useSearchParams();
   const [form, setForm] = useState<FormState>({
     name: '', email: '', password: '', referral_code: params.get('ref') ?? '',
@@ -38,17 +40,16 @@ export default function Register() {
     e.preventDefault();
     setError('');
 
-    const name  = sanitizeInput(form.name);
-    const email = sanitizeEmail(form.email);
+    const name          = sanitizeInput(form.name);
+    const email         = sanitizeEmail(form.email);
     const referral_code = sanitizeInput(form.referral_code);
 
-    if (!name)                            { setTouched(p => ({ ...p, name: true })); return; }
-    if (!email || !(validateEmailField(email) === null)) {
-      setTouched(p => ({ ...p, email: true }));
-      if (validateEmailField(email)) return;
-    }
+    setTouched({ name: true, email: true, password: true });
+
+    if (validateName(name)) return;
+    if (validateEmailField(email)) return;
     const pwError = isStrongPassword(form.password);
-    if (pwError) { setTouched(p => ({ ...p, password: true })); return; }
+    if (pwError) return;
 
     setLoading(true);
     try {
@@ -72,6 +73,27 @@ export default function Register() {
       <div className={styles.card}>
         <h2>Join Kitazon</h2>
         <p className={styles.sub}>Free signup · Start earning today</p>
+
+        {/* Google Sign-Up */}
+        <div className={styles.googleWrap}>
+          <GoogleLogin
+            onSuccess={async cred => {
+              if (!cred.credential) return;
+              try { await loginWithGoogle(cred.credential); }
+              catch (err: unknown) {
+                setError((err as { response?: { data?: { message?: string } } }).response?.data?.message ?? 'Google sign-in failed.');
+              }
+            }}
+            onError={() => setError('Google sign-in failed.')}
+            width="100%"
+            theme="filled_black"
+            shape="rectangular"
+            text="signup_with"
+          />
+        </div>
+
+        <div className={styles.divider}><span>or</span></div>
+
         <form onSubmit={submit} autoComplete="on" noValidate>
           <div className="form-group">
             <label>Full Name</label>
@@ -104,12 +126,11 @@ export default function Register() {
           </div>
           <div className="form-group">
             <label>Password (min 8 chars, letters + numbers)</label>
-            <input
-              type="password"
+            <PasswordInput
               value={form.password}
               onChange={set('password')}
               onBlur={blur('password')}
-              className={touched.password ? (passwordErr ? 'field-invalid' : 'field-valid') : ''}
+              inputClass={touched.password ? (passwordErr ? 'field-invalid' : 'field-valid') : ''}
               required
               autoComplete="new-password"
               maxLength={128}

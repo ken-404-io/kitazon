@@ -3,6 +3,7 @@ import { useSearchParams, Link, useNavigate } from 'react-router-dom';
 import api from '../services/api';
 import { validatePasswordField, validateConfirmPassword } from '../utils/sanitize';
 import PasswordStrength from '../components/ui/PasswordStrength';
+import PasswordInput from '../components/ui/PasswordInput';
 import styles from './Auth.module.css';
 
 export default function ResetPassword() {
@@ -49,12 +50,11 @@ export default function ResetPassword() {
           <form onSubmit={submit} autoComplete="off" noValidate>
             <div className="form-group">
               <label>New Password</label>
-              <input
-                type="password"
+              <PasswordInput
                 value={password}
                 onChange={e => setPassword(e.target.value)}
                 onBlur={blur('password')}
-                className={touched.password ? (passwordErr ? 'field-invalid' : 'field-valid') : ''}
+                inputClass={touched.password ? (passwordErr ? 'field-invalid' : 'field-valid') : ''}
                 required
                 autoFocus
                 autoComplete="new-password"
@@ -65,12 +65,11 @@ export default function ResetPassword() {
             </div>
             <div className="form-group">
               <label>Confirm Password</label>
-              <input
-                type="password"
+              <PasswordInput
                 value={confirm}
                 onChange={e => setConfirm(e.target.value)}
                 onBlur={blur('confirm')}
-                className={touched.confirm ? (confirmErr ? 'field-invalid' : (confirm ? 'field-valid' : '')) : ''}
+                inputClass={touched.confirm ? (confirmErr ? 'field-invalid' : (confirm ? 'field-valid' : '')) : ''}
                 required
                 autoComplete="new-password"
                 maxLength={128}
