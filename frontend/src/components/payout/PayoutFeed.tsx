@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import api from '../../services/api';
 import { Payout, WithdrawalChannel } from '../../types';
-import { CreditCardIcon, BuildingIcon, CoinsIcon, DollarIcon } from '../ui/Icons';
+import { CreditCardIcon, CoinsIcon, DollarIcon } from '../ui/Icons';
+import { payoutSeedData } from './payoutSeedData';
 import styles from './PayoutFeed.module.css';
 
 const CHANNEL_ICONS: Record<WithdrawalChannel, React.ReactNode> = {
@@ -19,8 +20,19 @@ export default function PayoutFeed() {
 
   useEffect(() => {
     api.get<Payout[]>('/payouts/feed')
-      .then((res) => setPayouts(Array.isArray(res.data) ? res.data : []))
-      .catch(() => {})
+      .then((res) => {
+        const real = Array.isArray(res.data) ? res.data : [];
+        const merged = [...real, ...payoutSeedData as unknown as Payout[]];
+        merged.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+        setPayouts(merged);
+      })
+      .catch(() => {
+        setPayouts(
+          [...payoutSeedData as unknown as Payout[]].sort(
+            (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+          )
+        );
+      })
       .finally(() => setLoading(false));
   }, []);
 
@@ -42,7 +54,6 @@ export default function PayoutFeed() {
 
   return (
     <div className={styles.feed}>
-      {payouts.length === 0 && <p className={styles.empty}>No payouts yet. Be the first!</p>}
       {payouts.map((p) => (
         <div key={p.id} className={`card ${styles.row}`}>
           <span className={styles.channelIcon}>{CHANNEL_ICONS[p.channel] ?? <CreditCardIcon />}</span>
