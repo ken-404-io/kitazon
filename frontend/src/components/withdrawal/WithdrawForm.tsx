@@ -1,24 +1,11 @@
 import { useState } from 'react';
 import api from '../../services/api';
-import { WithdrawalChannel } from '../../types';
 import { sanitizeInput } from '../../utils/sanitize';
 import OtpModal from './OtpModal';
 import styles from './WithdrawForm.module.css';
 
-const CHANNELS: { value: WithdrawalChannel; label: string }[] = [
-  { value: 'gcash',  label: 'GCash (~1 hour)'         },
-  { value: 'maya',   label: 'Maya (~1 hour)'          },
-  { value: 'gotyme', label: 'GoTyme (1-24 hours)'     },
-  { value: 'coins',  label: 'Coins.ph (1-24 hours)'   },
-  { value: 'usdt',   label: 'USDT TRC-20 (1-24 hours)'},
-  { value: 'paypal', label: 'PayPal (1-24 hours)'     },
-];
-
-const INSTANT_CHANNELS: WithdrawalChannel[] = ['gcash', 'maya'];
-
 interface FormState {
   amount: string;
-  channel: WithdrawalChannel;
   account_number: string;
 }
 
@@ -30,22 +17,22 @@ interface Props {
 
 export default function WithdrawForm({ balance, emailVerified = true, onSuccess }: Props) {
   const numBalance = Number(balance ?? 0);
-  const [form, setForm] = useState<FormState>({ amount: '', channel: 'gcash', account_number: '' });
+  const [form, setForm] = useState<FormState>({ amount: '', account_number: '' });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [showOtp, setShowOtp] = useState(false);
   const [otpError, setOtpError] = useState('');
 
-  const set = (field: keyof FormState) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
+  const set = (field: keyof FormState) => (e: React.ChangeEvent<HTMLInputElement>) =>
     setForm((f) => ({ ...f, [field]: e.target.value }));
 
   const requestOtp = async (e: React.FormEvent): Promise<void> => {
     e.preventDefault();
     setError(''); setSuccess('');
     const account_number = sanitizeInput(form.account_number);
-    if (!account_number) return setError('Account/wallet number is required.');
-    if (parseFloat(form.amount) < 50) return setError('Minimum withdrawal is ₱50.');
+    if (!account_number) return setError('PayPal email address is required.');
+    if (parseFloat(form.amount) < 5) return setError('Minimum withdrawal is ₱5.');
     if (parseFloat(form.amount) > numBalance) return setError('Insufficient balance.');
     setLoading(true);
     try {
@@ -61,10 +48,9 @@ export default function WithdrawForm({ balance, emailVerified = true, onSuccess 
     setOtpError('');
     const account_number = sanitizeInput(form.account_number);
     try {
-      await api.post('/withdrawals', { ...form, account_number, otp });
-      const eta = INSTANT_CHANNELS.includes(form.channel) ? '1 hour' : '24 hours';
-      setSuccess(`Withdrawal of ₱${form.amount} submitted! Processing within ${eta}.`);
-      setForm((f) => ({ ...f, amount: '', account_number: '' }));
+      await api.post('/withdrawals', { amount: form.amount, channel: 'paypal', account_number, otp });
+      setSuccess(`Withdrawal of ₱${form.amount} submitted! Processing within 24 hours.`);
+      setForm({ amount: '', account_number: '' });
       setShowOtp(false);
       onSuccess?.(parseFloat(form.amount));
     } catch (err: unknown) {
@@ -88,18 +74,12 @@ export default function WithdrawForm({ balance, emailVerified = true, onSuccess 
         <h3>Request Withdrawal</h3>
         <p className={styles.balance}>Available: <strong>₱{numBalance.toFixed(2)}</strong></p>
         <div className="form-group">
-          <label>Amount (min ₱50)</label>
-          <input type="number" min="50" max="50000" value={form.amount} onChange={set('amount')} required />
+          <label>Amount</label>
+          <input type="number" min="5" max="50000" value={form.amount} onChange={set('amount')} required />
         </div>
         <div className="form-group">
-          <label>Payment Channel</label>
-          <select value={form.channel} onChange={set('channel')}>
-            {CHANNELS.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
-          </select>
-        </div>
-        <div className="form-group">
-          <label>Account / Wallet Number</label>
-          <input type="text" value={form.account_number} onChange={set('account_number')} required placeholder="09XXXXXXXXX or account number" maxLength={50} autoComplete="off" />
+          <label>PayPal Email Address</label>
+          <input type="email" value={form.account_number} onChange={set('account_number')} required placeholder="yourname@email.com" maxLength={80} autoComplete="email" />
         </div>
         {error && <p className="error-msg">{error}</p>}
         {success && <p className={styles.success}>{success}</p>}

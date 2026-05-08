@@ -6,7 +6,7 @@ import { createOtp } from '../services/otp';
 import { sendWithdrawalOtp, sendWithdrawalSubmittedEmail, sendSuspiciousWithdrawalEmail } from '../services/email';
 import { logAudit } from '../services/audit';
 
-const VALID_CHANNELS: WithdrawalChannel[] = ['gcash', 'maya', 'gotyme', 'coins', 'usdt', 'paypal'];
+const VALID_CHANNELS: WithdrawalChannel[] = ['paypal'];
 const ACCOUNT_PATTERN = /^[a-zA-Z0-9@.\-\s]{5,60}$/;
 
 

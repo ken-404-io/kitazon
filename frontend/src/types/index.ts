@@ -1,3 +1,5 @@
+export type UserPlan = 'free' | 'silver' | 'gold' | 'diamond';
+
 export interface User {
   id: number;
   name: string;
@@ -8,6 +10,7 @@ export interface User {
   is_admin?: boolean;
   totp_enabled?: boolean;
   last_login_at?: string | null;
+  plan?: UserPlan;
 }
 
 export interface Task {
@@ -30,7 +33,7 @@ export interface Earning {
 }
 
 export type WithdrawalStatus = 'pending' | 'processing' | 'completed' | 'failed';
-export type WithdrawalChannel = 'gcash' | 'maya' | 'gotyme' | 'coins' | 'usdt' | 'paypal';
+export type WithdrawalChannel = 'paypal';
 
 export interface Withdrawal {
   id: number;

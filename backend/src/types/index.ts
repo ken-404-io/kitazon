@@ -27,6 +27,7 @@ export interface DbUser {
   last_login_ip: string | null;
   totp_secret: string | null;
   totp_enabled: boolean;
+  plan: UserPlan;
   created_at: Date;
   updated_at: Date;
 }
@@ -41,7 +42,8 @@ export interface DbTask {
 }
 
 export type WithdrawalStatus = 'pending' | 'processing' | 'completed' | 'failed';
-export type WithdrawalChannel = 'gcash' | 'maya' | 'gotyme' | 'coins' | 'usdt' | 'paypal';
+export type WithdrawalChannel = 'paypal';
+export type UserPlan = 'free' | 'silver' | 'gold' | 'diamond';
 
 export interface DbWithdrawal {
   id: number;

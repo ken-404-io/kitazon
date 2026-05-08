@@ -117,6 +117,7 @@ export async function googleAuth(req: Request, res: Response, next: NextFunction
         is_admin:       user.is_admin ?? false,
         totp_enabled:   user.totp_enabled ?? false,
         last_login_at:  user.last_login_at ?? null,
+        plan:           user.plan ?? 'free',
       },
     });
   } catch (err) { next(err); }
