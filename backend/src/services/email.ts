@@ -77,41 +77,6 @@ export async function sendWithdrawalOtp(to: string, name: string, code: string, 
   `));
 }
 
-export async function sendLoginAlert(to: string, name: string, ip: string, userAgent: string): Promise<void> {
-  await send(to, 'New login to your Kitazon account', layout('Login Alert', `
-    ${h2('New login detected')}
-    ${p(`Hi ${name.split(' ')[0]}, we noticed a new login to your Kitazon account.`)}
-    ${table(
-      row('IP Address', ip) +
-      row('Device', userAgent.slice(0, 80) + (userAgent.length > 80 ? '…' : '')) +
-      row('Time', new Date().toUTCString())
-    )}
-    ${p('If this was you, no action is needed. If not, <strong style="color:#f97316;">change your password immediately</strong>.')}
-  `));
-}
-
-export async function sendPasswordChangedEmail(to: string, name: string): Promise<void> {
-  await send(to, 'Your Kitazon password was changed', layout('Password Changed', `
-    ${h2('Password updated')}
-    ${p(`Hi ${name.split(' ')[0]}, your Kitazon account password was successfully changed.`)}
-    ${p('If you made this change, no further action is needed. If you did <strong style="color:#ef4444;">not</strong> make this change, contact support immediately.')}
-    <div style="text-align:center;margin:20px 0;">${btn(`${BASE}/account`, 'Review Account')}</div>
-  `));
-}
-
-export async function sendWithdrawalConfirmation(to: string, name: string, amount: number, channel: string): Promise<void> {
-  await send(to, 'Kitazon Withdrawal Submitted', layout('Withdrawal Submitted', `
-    ${h2('Withdrawal submitted ✓')}
-    ${p(`Hi ${name.split(' ')[0]}, your withdrawal request has been received and is pending review.`)}
-    ${table(
-      row('Amount', `₱${amount.toFixed(2)}`) +
-      row('Channel', channel.toUpperCase()) +
-      row('Status', 'Pending')
-    )}
-    ${p('GCash & Maya are processed within <strong style="color:#e8e8e8;">1 hour</strong>. Bank transfers within <strong style="color:#e8e8e8;">24 hours</strong>.')}
-  `));
-}
-
 export async function sendPasswordResetEmail(to: string, name: string, token: string): Promise<void> {
   const link = `${BASE}/reset-password?token=${token}`;
   await send(to, 'Reset your Kitazon password', layout('Reset Password', `
@@ -119,31 +84,5 @@ export async function sendPasswordResetEmail(to: string, name: string, token: st
     ${p(`Hi ${name.split(' ')[0]}, we received a request to reset your Kitazon password.`)}
     <div style="text-align:center;margin:24px 0;">${btn(link, 'Reset My Password')}</div>
     ${p('This link expires in <strong style="color:#e8e8e8;">30 minutes</strong>. If you didn\'t request a reset, you can safely ignore this email.')}
-  `));
-}
-
-export async function sendWithdrawalStatusEmail(to: string, name: string, amount: number, channel: string, status: string): Promise<void> {
-  const statusMsg: Record<string, string> = {
-    processing: 'Your withdrawal is being processed and will arrive soon.',
-    completed:  'Your withdrawal has been completed! Funds have been sent to your account.',
-    failed:     'Your withdrawal could not be processed. Your balance has been refunded. Please contact support if you need help.',
-  };
-  const statusColor: Record<string, string> = {
-    processing: '#f97316',
-    completed:  '#22c55e',
-    failed:     '#ef4444',
-  };
-  const label  = status.charAt(0).toUpperCase() + status.slice(1);
-  const msg    = statusMsg[status] ?? `Your withdrawal status has been updated to: ${status}.`;
-  const color  = statusColor[status] ?? '#f97316';
-  await send(to, `Kitazon Withdrawal ${label}`, layout(`Withdrawal ${label}`, `
-    ${h2(`Withdrawal ${label.toLowerCase()}`)}
-    ${p(`Hi ${name.split(' ')[0]}, ${msg}`)}
-    ${table(
-      row('Amount',  `₱${amount.toFixed(2)}`) +
-      row('Channel', channel.toUpperCase()) +
-      row('Status',  `<span style="color:${color};font-weight:800;">${label.toUpperCase()}</span>`)
-    )}
-    <div style="text-align:center;margin:20px 0;">${btn(`${BASE}/withdraw`, 'View Wallet')}</div>
   `));
 }

@@ -2,7 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import bcrypt from 'bcryptjs';
 import db from '../../config/database';
 import { DbUser, DbLoginEvent } from '../types';
-import { sendPasswordChangedEmail } from '../services/email';
+
 import { logAudit } from '../services/audit';
 
 export async function changePassword(req: Request, res: Response, next: NextFunction): Promise<void> {
@@ -39,7 +39,6 @@ export async function changePassword(req: Request, res: Response, next: NextFunc
     await db('refresh_tokens').where({ user_id: user.id }).whereNull('revoked_at').update({ revoked_at: new Date() });
 
     await logAudit(user.id, 'password_change', req);
-    await sendPasswordChangedEmail(user.email, user.name).catch(() => {});
 
     res.json({ message: 'Password changed successfully. Please log in again on all devices.' });
   } catch (err) { next(err); }

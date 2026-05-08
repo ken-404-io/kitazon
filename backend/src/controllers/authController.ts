@@ -4,7 +4,7 @@ import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
 import db from '../../config/database';
 import { DbUser, DbRefreshToken, AuthPayload } from '../types';
-import { sendVerificationEmail, sendLoginAlert, sendPasswordChangedEmail, sendPasswordResetEmail } from '../services/email';
+import { sendVerificationEmail, sendPasswordResetEmail } from '../services/email';
 import { createOtp, verifyOtp } from '../services/otp';
 import { logAudit, logLoginEvent } from '../services/audit';
 import { verifyTotpLogin } from './totpController';
@@ -252,9 +252,6 @@ export async function login(req: Request, res: Response, next: NextFunction): Pr
     const ip = (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() ?? req.ip ?? null;
     await db('users').where({ id: user.id }).update({ last_login_at: new Date(), last_login_ip: ip });
 
-    // Send login alert email (fire-and-forget)
-    sendLoginAlert(user.email, user.name, ip ?? 'unknown', req.headers['user-agent'] ?? 'unknown').catch(() => {});
-
     const [accessToken, refreshToken] = await Promise.all([
       Promise.resolve(signAccess(user)),
       createRefreshToken(user.id),
@@ -416,7 +413,6 @@ export async function resetPassword(req: Request, res: Response, next: NextFunct
       await trx('refresh_tokens').where({ user_id: user.id }).update({ revoked_at: new Date() });
     });
 
-    sendPasswordChangedEmail(user.email, user.name).catch(() => {});
     res.json({ message: 'Password reset successfully. Please log in with your new password.' });
   } catch (err) { next(err); }
 }
