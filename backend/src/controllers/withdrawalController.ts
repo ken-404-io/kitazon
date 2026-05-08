@@ -2,7 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import db from '../../config/database';
 import { DbUser, WithdrawalChannel } from '../types';
 import { createOtp, verifyOtp } from '../services/otp';
-import { sendWithdrawalOtp, sendWithdrawalConfirmation } from '../services/email';
+import { sendWithdrawalOtp } from '../services/email';
 import { logAudit } from '../services/audit';
 
 const VALID_CHANNELS: WithdrawalChannel[] = ['gcash', 'maya', 'gotyme', 'coins', 'usdt', 'paypal'];
@@ -140,9 +140,6 @@ export async function create(req: Request, res: Response, next: NextFunction): P
       amount: parsed,
       metadata: { channel, isSuspicious, flags },
     });
-
-    // Send confirmation email (fire-and-forget)
-    sendWithdrawalConfirmation(user.email, user.name, netAmount, channel).catch(() => {});
 
     res.status(201).json({
       message: 'Withdrawal submitted successfully.',
