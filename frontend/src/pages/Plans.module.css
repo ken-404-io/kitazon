@@ -66,19 +66,35 @@
 .featureList li span { flex-shrink: 0; font-weight: 700; }
 
 .upgradeBtn {
-  display: block;
-  text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  width: 100%;
   padding: 0.75rem;
   border-radius: 12px;
   font-weight: 700;
-  font-size: 0.88rem;
+  font-size: 0.85rem;
   color: #fff;
   background: var(--primary);
-  text-decoration: none;
+  border: none;
+  cursor: pointer;
   transition: opacity 0.15s;
   margin-top: auto;
 }
-.upgradeBtn:hover { opacity: 0.85; }
+.upgradeBtn:hover:not(:disabled) { opacity: 0.85; }
+.upgradeBtn:disabled { opacity: 0.6; cursor: not-allowed; }
+
+.btnSpinner {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(255,255,255,0.3);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
 
 .currentBtn {
   text-align: center;
