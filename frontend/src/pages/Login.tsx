@@ -72,7 +72,7 @@ export default function Login() {
               }
             }}
             onError={() => setError('Google sign-in failed.')}
-            width="100%"
+            width="300"
             theme="filled_black"
             shape="rectangular"
             text="signin_with"
