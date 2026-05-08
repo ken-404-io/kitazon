@@ -53,37 +53,41 @@ const safeUser = (u: DbUser) => ({
   referral_code: u.referral_code,
   email_verified: u.email_verified,
   is_admin: u.is_admin ?? false,
+  totp_enabled: u.totp_enabled ?? false,
 });
 
 // ─── Token blacklist (access tokens; in-memory, clears hourly) ───────────────
 export const tokenBlacklist = new Set<string>();
 setInterval(() => { tokenBlacklist.clear(); }, 60 * 60 * 1000);
 
-// ─── Account lockout ─────────────────────────────────────────────────────────
-interface LockoutEntry { attempts: number; lockedUntil: Date | null; }
-const loginAttempts = new Map<string, LockoutEntry>();
+// ─── Account lockout (DB-backed — survives restarts) ─────────────────────────
 const MAX_ATTEMPTS = 5;
-const LOCKOUT_MS = 15 * 60 * 1000;
+const LOCKOUT_MS   = 15 * 60 * 1000;
 
-function checkLockout(key: string, res: Response): boolean {
-  const entry = loginAttempts.get(key);
-  if (entry?.lockedUntil && entry.lockedUntil > new Date()) {
-    const mins = Math.ceil((entry.lockedUntil.getTime() - Date.now()) / 60000);
-    res.status(429).json({ message: `Account locked. Try again in ${mins} minute(s).` });
-    return true;
+async function isDbLocked(userId: number): Promise<boolean> {
+  const since = new Date(Date.now() - LOCKOUT_MS);
+  const [row] = await db('login_events')
+    .where({ user_id: userId, success: false })
+    .where('created_at', '>', since)
+    .count('id as cnt');
+  return Number(row.cnt) >= MAX_ATTEMPTS;
+}
+
+// ─── Session cap ──────────────────────────────────────────────────────────────
+const MAX_SESSIONS = 5;
+
+async function enforceSessions(userId: number): Promise<void> {
+  // Revoke oldest sessions beyond the cap (keep newest MAX_SESSIONS - 1 to leave room for the new one)
+  const active = await db('refresh_tokens')
+    .where({ user_id: userId })
+    .whereNull('revoked_at')
+    .where('expires_at', '>', new Date())
+    .orderBy('created_at', 'asc')
+    .select('id');
+  if (active.length >= MAX_SESSIONS) {
+    const toRevoke = active.slice(0, active.length - MAX_SESSIONS + 1).map((r: { id: number }) => r.id);
+    await db('refresh_tokens').whereIn('id', toRevoke).update({ revoked_at: new Date() });
   }
-  return false;
-}
-
-function recordFailure(key: string): void {
-  const entry = loginAttempts.get(key) ?? { attempts: 0, lockedUntil: null };
-  entry.attempts += 1;
-  entry.lockedUntil = entry.attempts >= MAX_ATTEMPTS ? new Date(Date.now() + LOCKOUT_MS) : null;
-  loginAttempts.set(key, entry);
-}
-
-function clearAttempts(key: string): void {
-  loginAttempts.delete(key);
 }
 
 // ─── Validation helpers ───────────────────────────────────────────────────────
@@ -205,12 +209,9 @@ export async function login(req: Request, res: Response, next: NextFunction): Pr
     if (password.length > MAX_PASSWORD_LENGTH) { res.status(400).json({ message: 'Invalid credentials.' }); return; }
 
     const normalizedEmail = email.toLowerCase();
-    const lockKey = `login:${normalizedEmail}`;
-    if (checkLockout(lockKey, res)) return;
 
     const user = await db<DbUser>('users').where({ email: normalizedEmail }).first();
     if (!user) {
-      recordFailure(lockKey);
       await logLoginEvent(0, false, req);
       res.status(401).json({ message: 'Invalid email or password.' });
       return;
@@ -220,13 +221,17 @@ export async function login(req: Request, res: Response, next: NextFunction): Pr
       return;
     }
 
+    // DB-backed lockout: count recent failures from login_events
+    if (await isDbLocked(user.id)) {
+      res.status(429).json({ message: 'Account locked for 15 minutes due to too many failed attempts.' });
+      return;
+    }
+
     const valid = await bcrypt.compare(password, user.password_hash);
     if (!valid) {
-      recordFailure(lockKey);
       await logLoginEvent(user.id, false, req);
-      const entry = loginAttempts.get(lockKey);
-      const isLocked = entry?.lockedUntil && entry.lockedUntil > new Date();
-      res.status(401).json({ message: isLocked ? 'Account locked for 15 minutes due to too many failed attempts.' : 'Invalid email or password.' });
+      const stillLocked = await isDbLocked(user.id);
+      res.status(401).json({ message: stillLocked ? 'Account locked for 15 minutes due to too many failed attempts.' : 'Invalid email or password.' });
       return;
     }
 
@@ -238,13 +243,12 @@ export async function login(req: Request, res: Response, next: NextFunction): Pr
       }
       const totpOk = await verifyTotpLogin(user.id, totp_code);
       if (!totpOk) {
-        recordFailure(lockKey);
+        await logLoginEvent(user.id, false, req);
         res.status(401).json({ message: 'Invalid 2FA code.' });
         return;
       }
     }
 
-    clearAttempts(lockKey);
     await logLoginEvent(user.id, true, req);
     await logAudit(user.id, 'login', req);
 
@@ -255,11 +259,15 @@ export async function login(req: Request, res: Response, next: NextFunction): Pr
     }
     await db('users').where({ id: user.id }).update({ last_login_at: new Date(), last_login_ip: ip });
 
+    // Enforce concurrent session cap before issuing new token
+    await enforceSessions(user.id);
+
     const [accessToken, refreshToken] = await Promise.all([
       Promise.resolve(signAccess(user)),
       createRefreshToken(user.id),
     ]);
     setRefreshCookie(res, refreshToken);
+    res.set('Cache-Control', 'no-store');
     res.json({ token: accessToken, user: safeUser(user) });
   } catch (err) { next(err); }
 }
@@ -270,11 +278,21 @@ export async function refresh(req: Request, res: Response, next: NextFunction): 
     if (!raw) { res.status(401).json({ message: 'No refresh token.' }); return; }
 
     const tokenHash = crypto.createHash('sha256').update(raw).digest('hex');
-    const record = await db<DbRefreshToken>('refresh_tokens')
+
+    // Check if this token exists at all (including revoked)
+    const anyRecord = await db<DbRefreshToken>('refresh_tokens')
       .where({ token_hash: tokenHash })
-      .whereNull('revoked_at')
-      .where('expires_at', '>', new Date())
       .first();
+
+    if (anyRecord?.revoked_at) {
+      // Token was already revoked — possible theft. Revoke ALL sessions for this user.
+      await db('refresh_tokens').where({ user_id: anyRecord.user_id }).update({ revoked_at: new Date() });
+      clearRefreshCookie(res);
+      res.status(401).json({ message: 'Session invalidated due to suspicious activity. Please log in again.' });
+      return;
+    }
+
+    const record = anyRecord && !anyRecord.revoked_at && anyRecord.expires_at > new Date() ? anyRecord : null;
 
     if (!record) {
       clearRefreshCookie(res);
@@ -294,6 +312,7 @@ export async function refresh(req: Request, res: Response, next: NextFunction): 
     const newRefreshToken = await createRefreshToken(user.id);
 
     setRefreshCookie(res, newRefreshToken);
+    res.set('Cache-Control', 'no-store');
     res.json({ token: signAccess(user), user: safeUser(user) });
   } catch (err) { next(err); }
 }

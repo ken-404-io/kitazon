@@ -106,6 +106,7 @@ app.use((req: Request, res: Response, next: NextFunction): void => {
 // ─── Global middleware ────────────────────────────────────────────────────────
 app.use(sanitize);
 app.use(generalLimiter);
+app.use((_req, res, next) => { res.set('Cache-Control', 'no-store'); next(); });
 
 // ─── Routes ───────────────────────────────────────────────────────────────────
 app.use('/api/auth', authRoutes);
