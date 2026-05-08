@@ -4,7 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import EarningsChart from '../components/dashboard/EarningsChart';
 import api from '../services/api';
-import { sanitizeInput } from '../utils/sanitize';
+import { sanitizeInput, validatePhoneNumber, isValidEmail } from '../utils/sanitize';
 import { UserStats, Withdrawal, WithdrawalChannel, WithdrawalStatus } from '../types';
 import styles from './Withdraw.module.css';
 
@@ -52,6 +52,27 @@ export default function Withdraw() {
   const [otp,       setOtp]       = useState('');
   const [otpErr,    setOtpErr]    = useState('');
   const [otpLoad,   setOtpLoad]   = useState(false);
+  const [acctTouched, setAcctTouched] = useState(false);
+  const [amtTouched,  setAmtTouched]  = useState(false);
+
+  const validateAccount = (val: string): string | null => {
+    const v = val.trim();
+    if (!v) return 'Account / wallet number is required.';
+    if (['gcash', 'maya', 'gotyme'].includes(channel)) return validatePhoneNumber(v);
+    if (channel === 'coins') {
+      if (!/^(09\d{9}|[^\s@]+@[^\s@]+\.[^\s@]+)$/.test(v)) return 'Enter a valid Coins.ph number or email.';
+    }
+    if (channel === 'paypal') {
+      if (!isValidEmail(v)) return 'Enter a valid PayPal email address.';
+    }
+    if (channel === 'usdt') {
+      if (!/^T[A-Za-z0-9]{33}$/.test(v)) return 'Enter a valid TRC-20 wallet address.';
+    }
+    return null;
+  };
+
+  const acctErr = acctTouched ? validateAccount(account) : null;
+  const amtErr  = amtTouched  ? (amount < 50 ? 'Minimum withdrawal is ₱50.' : amount > balance ? 'Insufficient balance.' : null) : null;
 
   const loadData = () => {
     api.get<UserStats>('/auth/me/stats').then(r => setStats(r.data)).catch(() => {});
@@ -251,7 +272,7 @@ export default function Withdraw() {
                     key={c.value}
                     type="button"
                     className={`${styles.channelChip} ${channel === c.value ? styles.channelChipActive : ''}`}
-                    onClick={() => { setChannel(c.value); setAccount(''); }}
+                    onClick={() => { setChannel(c.value); setAccount(''); setAcctTouched(false); }}
                   >
                     <span className={`${styles.channelDot} ${channel === c.value ? styles.channelDotFilled : ''}`} />
                     <span>
@@ -270,12 +291,15 @@ export default function Withdraw() {
                 type={channel === 'paypal' ? 'email' : 'text'}
                 inputMode={['gcash','maya','gotyme','coins'].includes(channel) ? 'numeric' : 'text'}
                 value={account}
-                onChange={e => setAccount(e.target.value)}
+                onChange={e => { setAccount(e.target.value); setAcctTouched(false); }}
+                onBlur={() => setAcctTouched(true)}
+                className={acctTouched ? (acctErr ? 'field-invalid' : 'field-valid') : ''}
                 placeholder={CHANNELS.find(c => c.value === channel)?.placeholder ?? ''}
                 maxLength={60}
                 autoComplete="off"
                 required
               />
+              {acctErr && <p className="field-hint hint-invalid">{acctErr}</p>}
             </div>
 
             {/* Amount selection */}
@@ -298,9 +322,12 @@ export default function Withdraw() {
                 min="50"
                 max="50000"
                 value={customAmt}
-                onChange={e => { setCustomAmt(e.target.value); setPreset(null); }}
+                onChange={e => { setCustomAmt(e.target.value); setPreset(null); setAmtTouched(false); }}
+                onBlur={() => setAmtTouched(true)}
+                className={amtTouched && customAmt ? (amtErr ? 'field-invalid' : 'field-valid') : ''}
                 placeholder="Or enter custom amount"
               />
+              {amtErr && <p className="field-hint hint-invalid">{amtErr}</p>}
               <p style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: 8 }}>
                 Zero fee on first ₱500/month · ₱5 flat fee after
               </p>
@@ -330,13 +357,13 @@ export default function Withdraw() {
             <div className="form-group">
               <label>OTP Code</label>
               <input
-                className={styles.otpInput}
+                className={`${styles.otpInput} ${otp.length === 6 ? 'field-valid' : otp.length > 0 ? 'field-invalid' : ''}`}
                 type="text"
                 inputMode="numeric"
                 maxLength={6}
                 placeholder="······"
                 value={otp}
-                onChange={e => setOtp(e.target.value)}
+                onChange={e => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
                 autoFocus
               />
             </div>

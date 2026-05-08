@@ -160,6 +160,24 @@ input, select, textarea {
 
 input:focus, select:focus, textarea:focus { border-color: var(--primary); }
 
+input.field-valid   { border-color: #22c55e !important; }
+input.field-invalid { border-color: var(--red) !important; }
+
+.field-hint {
+  font-size: 0.78rem;
+  margin-top: 3px;
+}
+.field-hint.hint-valid   { color: #22c55e; }
+.field-hint.hint-invalid { color: var(--red); }
+
+@keyframes auth-spin {
+  to { transform: rotate(360deg); }
+}
+@keyframes auth-slide-up {
+  from { opacity: 0; transform: translateY(16px) scale(0.97); }
+  to   { opacity: 1; transform: translateY(0)    scale(1); }
+}
+
 label {
   display: block;
   font-size: 0.85rem;

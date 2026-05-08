@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import api from '../services/api';
-import { isStrongPassword } from '../utils/sanitize';
+import { isStrongPassword, validateName, validatePasswordField } from '../utils/sanitize';
 import PasswordStrength from '../components/ui/PasswordStrength';
 import styles from './AccountSettings.module.css';
 
@@ -50,10 +50,15 @@ export default function AccountSettings() {
   const [view, setView] = useState<View>('main');
   const [balance, setBalance] = useState<number>(0);
 
-  const [pwForm, setPwForm]     = useState({ current: '', next: '' });
-  const [pwError, setPwError]   = useState('');
+  const [pwForm, setPwForm]       = useState({ current: '', next: '' });
+  const [pwTouched, setPwTouched] = useState({ current: false, next: false });
+  const [pwError, setPwError]     = useState('');
   const [pwSuccess, setPwSuccess] = useState('');
   const [pwLoading, setPwLoading] = useState(false);
+
+  const pwBlur = (f: keyof typeof pwTouched) => () => setPwTouched(p => ({ ...p, [f]: true }));
+  const pwCurrentErr = pwTouched.current ? (!pwForm.current ? 'Current password is required.' : null) : null;
+  const pwNextErr    = pwTouched.next    ? validatePasswordField(pwForm.next) : null;
 
   const [deletePassword, setDeletePassword] = useState('');
   const [deleteError, setDeleteError]       = useState('');
@@ -63,10 +68,13 @@ export default function AccountSettings() {
   const [history, setHistory]         = useState<LoginEvent[] | null>(null);
   const [historyLoading, setHistoryLoading] = useState(false);
 
-  const [profileName, setProfileName]   = useState(user?.name ?? '');
-  const [profileError, setProfileError] = useState('');
-  const [profileMsg, setProfileMsg]     = useState('');
-  const [profileLoad, setProfileLoad]   = useState(false);
+  const [profileName, setProfileName]     = useState(user?.name ?? '');
+  const [profileTouched, setProfileTouched] = useState(false);
+  const [profileError, setProfileError]   = useState('');
+  const [profileMsg, setProfileMsg]       = useState('');
+  const [profileLoad, setProfileLoad]     = useState(false);
+
+  const profileNameErr = profileTouched ? validateName(profileName) : null;
 
   const [sessionMsg, setSessionMsg]   = useState('');
   const [sessionLoad, setSessionLoad] = useState(false);
@@ -167,18 +175,21 @@ export default function AccountSettings() {
     <div className="page-container">
       <SubView title="Edit Profile">
         <div className={styles.formCard}>
-          <form onSubmit={saveProfile}>
+          <form onSubmit={saveProfile} noValidate>
             <div className="form-group">
               <label>Display Name</label>
               <input
                 type="text"
                 value={profileName}
                 onChange={e => setProfileName(e.target.value)}
+                onBlur={() => setProfileTouched(true)}
+                className={profileTouched ? (profileNameErr ? 'field-invalid' : 'field-valid') : ''}
                 required
                 minLength={2}
                 maxLength={100}
                 autoComplete="name"
               />
+              {profileNameErr && <p className="field-hint hint-invalid">{profileNameErr}</p>}
             </div>
             {profileError && <p className="error-msg">{profileError}</p>}
             {profileMsg && <p className={styles.successMsg}>{profileMsg}</p>}
@@ -196,15 +207,35 @@ export default function AccountSettings() {
     <div className="page-container">
       <SubView title="Change Password">
         <div className={styles.formCard}>
-          <form onSubmit={changePassword}>
+          <form onSubmit={changePassword} noValidate>
             <div className="form-group">
               <label>Current Password</label>
-              <input type="password" value={pwForm.current} onChange={e => setPwForm(p => ({ ...p, current: e.target.value }))} required maxLength={128} autoComplete="current-password" />
+              <input
+                type="password"
+                value={pwForm.current}
+                onChange={e => setPwForm(p => ({ ...p, current: e.target.value }))}
+                onBlur={pwBlur('current')}
+                className={pwTouched.current ? (pwCurrentErr ? 'field-invalid' : 'field-valid') : ''}
+                required
+                maxLength={128}
+                autoComplete="current-password"
+              />
+              {pwCurrentErr && <p className="field-hint hint-invalid">{pwCurrentErr}</p>}
             </div>
             <div className="form-group">
               <label>New Password</label>
-              <input type="password" value={pwForm.next} onChange={e => setPwForm(p => ({ ...p, next: e.target.value }))} required maxLength={128} autoComplete="new-password" />
+              <input
+                type="password"
+                value={pwForm.next}
+                onChange={e => setPwForm(p => ({ ...p, next: e.target.value }))}
+                onBlur={pwBlur('next')}
+                className={pwTouched.next ? (pwNextErr ? 'field-invalid' : 'field-valid') : ''}
+                required
+                maxLength={128}
+                autoComplete="new-password"
+              />
               <PasswordStrength password={pwForm.next} />
+              {pwNextErr && <p className="field-hint hint-invalid">{pwNextErr}</p>}
             </div>
             {pwError && <p className="error-msg">{pwError}</p>}
             {pwSuccess && <p className={styles.successMsg}>{pwSuccess}</p>}
