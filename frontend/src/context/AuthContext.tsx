@@ -9,6 +9,7 @@ interface AuthContextValue {
   loading: boolean;
   authTransition: 'idle' | 'signing-in' | 'signing-out';
   login: (email: string, password: string, captchaToken?: string, totpCode?: string) => Promise<void>;
+  loginWithGoogle: (idToken: string) => Promise<void>;
   register: (data: RegisterData) => Promise<void>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
@@ -48,7 +49,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setToken(res.data.token);
       setUser(res.data.user);
       // Keep overlay visible briefly so it covers the route change
-      await new Promise(r => setTimeout(r, 700));
+      await new Promise<void>(resolve => setTimeout(resolve, 700));
+    } finally {
+      setAuthTransition('idle');
+    }
+  };
+
+  const loginWithGoogle = async (idToken: string): Promise<void> => {
+    setAuthTransition('signing-in');
+    try {
+      const res = await api.post<{ token: string; user: User }>('/auth/google', { id_token: idToken });
+      setToken(res.data.token);
+      setUser(res.data.user);
+      await new Promise<void>(resolve => setTimeout(resolve, 700));
     } finally {
       setAuthTransition('idle');
     }
@@ -60,7 +73,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const res = await api.post<{ token: string; user: User }>('/auth/register', data);
       setToken(res.data.token);
       setUser(res.data.user);
-      await new Promise(r => setTimeout(r, 700));
+      await new Promise<void>(resolve => setTimeout(resolve, 700));
     } finally {
       setAuthTransition('idle');
     }
@@ -75,7 +88,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } finally {
       setToken(null);
       setUser(null);
-      await new Promise(r => setTimeout(r, 500));
+      await new Promise<void>(resolve => setTimeout(resolve, 500));
       setAuthTransition('idle');
     }
   }, []);
@@ -89,7 +102,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, authTransition, login, register, logout, refreshUser }}>
+    <AuthContext.Provider value={{ user, loading, authTransition, login, loginWithGoogle, register, logout, refreshUser }}>
       {children}
     </AuthContext.Provider>
   );

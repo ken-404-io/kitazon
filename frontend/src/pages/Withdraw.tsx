@@ -55,6 +55,19 @@ export default function Withdraw() {
   const [acctTouched, setAcctTouched] = useState(false);
   const [amtTouched,  setAmtTouched]  = useState(false);
 
+  const loadData = () => {
+    api.get<UserStats>('/auth/me/stats').then(r => setStats(r.data)).catch(() => {});
+    api.get<Withdrawal[]>('/withdrawals').then(r => setHistory(r.data)).catch(() => {});
+  };
+  useEffect(() => { loadData(); }, []);
+
+  const balance    = Number(stats?.balance ?? 0);
+  const todayAmt   = Number(stats?.today   ?? 0);
+  const weekAmt    = Number(stats?.week    ?? 0);
+  const totalAmt   = Number(stats?.total   ?? 0);
+  const amount     = preset ?? (parseFloat(customAmt) || 0);
+  const emailOk    = user?.email_verified ?? false;
+
   const validateAccount = (val: string): string | null => {
     const v = val.trim();
     if (!v) return 'Account / wallet number is required.';
@@ -73,19 +86,6 @@ export default function Withdraw() {
 
   const acctErr = acctTouched ? validateAccount(account) : null;
   const amtErr  = amtTouched  ? (amount < 50 ? 'Minimum withdrawal is ₱50.' : amount > balance ? 'Insufficient balance.' : null) : null;
-
-  const loadData = () => {
-    api.get<UserStats>('/auth/me/stats').then(r => setStats(r.data)).catch(() => {});
-    api.get<Withdrawal[]>('/withdrawals').then(r => setHistory(r.data)).catch(() => {});
-  };
-  useEffect(() => { loadData(); }, []);
-
-  const balance    = Number(stats?.balance ?? 0);
-  const todayAmt   = Number(stats?.today   ?? 0);
-  const weekAmt    = Number(stats?.week    ?? 0);
-  const totalAmt   = Number(stats?.total   ?? 0);
-  const amount     = preset ?? (parseFloat(customAmt) || 0);
-  const emailOk    = user?.email_verified ?? false;
 
   const requestOtp = async (e: React.FormEvent) => {
     e.preventDefault();
