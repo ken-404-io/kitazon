@@ -16,7 +16,7 @@ const EARNING_CATEGORIES = [
 ];
 
 const WHY_ITEMS = [
-  { icon: <ZapIcon />,     label: '₱50 Min Withdraw', desc: 'Lowest threshold so you can verify we pay, fast.' },
+  { icon: <ZapIcon />,     label: '₱5 Min Withdraw', desc: 'Lowest threshold so you can verify we pay, fast.' },
   { icon: <ClockIcon />,   label: '1-Hour Cashout',   desc: 'GCash & Maya payouts processed within 1 hour.' },
   { icon: <ShieldIcon />,  label: 'Secure & Legit',   desc: 'SEC-registered corporation. BSP-compliant operations.' },
   { icon: <MapPinIcon />,  label: 'Built for Filipinos', desc: 'Tagalog UI, local payment rails, local support.' },
