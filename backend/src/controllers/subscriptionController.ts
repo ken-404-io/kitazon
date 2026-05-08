@@ -3,27 +3,38 @@ import db from '../../config/database';
 import { DbUser, UserPlan } from '../types';
 import { logAudit } from '../services/audit';
 
-const PAYPAL_BASE = process.env.PAYPAL_MODE === 'sandbox'
-  ? 'https://api-m.sandbox.paypal.com'
-  : 'https://api-m.paypal.com';
-
 const PLAN_PRICES: Record<Exclude<UserPlan, 'free'>, { amount: string; label: string }> = {
   silver:  { amount: '99.00',  label: 'Kitazon Silver Plan' },
   gold:    { amount: '199.00', label: 'Kitazon Gold Plan' },
   diamond: { amount: '399.00', label: 'Kitazon Diamond Plan' },
 };
 
+function paypalBase(): string {
+  return process.env.PAYPAL_MODE === 'sandbox'
+    ? 'https://api-m.sandbox.paypal.com'
+    : 'https://api-m.paypal.com';
+}
+
 async function getPayPalToken(): Promise<string> {
+  const base  = paypalBase();
   const creds = Buffer.from(
     `${process.env.PAYPAL_CLIENT_ID}:${process.env.PAYPAL_CLIENT_SECRET}`
   ).toString('base64');
 
-  const res = await fetch(`${PAYPAL_BASE}/v1/oauth2/token`, {
+  console.log(`[PayPal] getToken mode=${process.env.PAYPAL_MODE ?? 'production'} base=${base}`);
+
+  const res = await fetch(`${base}/v1/oauth2/token`, {
     method: 'POST',
     headers: { Authorization: `Basic ${creds}`, 'Content-Type': 'application/x-www-form-urlencoded' },
     body: 'grant_type=client_credentials',
   });
-  if (!res.ok) throw new Error('Failed to get PayPal access token');
+
+  if (!res.ok) {
+    const body = await res.text();
+    console.error(`[PayPal] token error ${res.status}:`, body);
+    throw new Error(`PayPal auth failed (${res.status}): ${body}`);
+  }
+
   const data = await res.json() as { access_token: string };
   return data.access_token;
 }
@@ -46,7 +57,7 @@ export async function createOrder(req: Request, res: Response, next: NextFunctio
     const cfg = PLAN_PRICES[plan as Exclude<UserPlan, 'free'>];
     const token = await getPayPalToken();
 
-    const order = await fetch(`${PAYPAL_BASE}/v2/checkout/orders`, {
+    const order = await fetch(`${paypalBase()}/v2/checkout/orders`, {
       method: 'POST',
       headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -84,7 +95,10 @@ export async function createOrder(req: Request, res: Response, next: NextFunctio
     }
 
     res.json({ orderId: orderData.id, approvalUrl: approvalLink.href });
-  } catch (err) { next(err); }
+  } catch (err) {
+    console.error('[PayPal] createOrder error:', err);
+    next(err);
+  }
 }
 
 /* ── POST /api/subscriptions/capture ────────────────────────────────────────── */
@@ -98,7 +112,7 @@ export async function captureOrder(req: Request, res: Response, next: NextFuncti
     }
 
     const token = await getPayPalToken();
-    const capture = await fetch(`${PAYPAL_BASE}/v2/checkout/orders/${orderId}/capture`, {
+    const capture = await fetch(`${paypalBase()}/v2/checkout/orders/${orderId}/capture`, {
       method: 'POST',
       headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
     });
