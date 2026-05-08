@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import api from '../services/api';
 import { Skeleton } from '../components/ui/Skeleton';
 import { TrophyIcon, MedalIcon } from '../components/ui/Icons';
+import { leaderboardSeedData } from './leaderboardSeedData';
 
 interface Leader {
   rank: number;
@@ -18,8 +19,18 @@ export default function Leaderboard() {
 
   useEffect(() => {
     api.get<Leader[]>('/referrals/leaderboard')
-      .then((r) => setLeaders(r.data))
-      .catch(() => {})
+      .then((r) => {
+        const real = Array.isArray(r.data) ? r.data : [];
+        const realNames = new Set(real.map((l) => l.name.toLowerCase()));
+        const filtered = leaderboardSeedData.filter((s) => !realNames.has(s.name.toLowerCase()));
+        const merged = [...real, ...filtered]
+          .sort((a, b) => b.total_earned - a.total_earned)
+          .map((l, i) => ({ ...l, rank: i + 1 }));
+        setLeaders(merged);
+      })
+      .catch(() => {
+        setLeaders(leaderboardSeedData);
+      })
       .finally(() => setLoading(false));
   }, []);
 
@@ -42,10 +53,6 @@ export default function Leaderboard() {
             <Skeleton height={24} width={70} />
           </div>
         ))
-      ) : leaders.length === 0 ? (
-        <div className="card" style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-muted)' }}>
-          No referral data yet. Start referring friends to appear here!
-        </div>
       ) : (
         leaders.map((l) => (
           <div key={l.rank} className="card" style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 8 }}>
