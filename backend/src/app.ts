@@ -3,7 +3,8 @@ import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import cookieParser from 'cookie-parser';
-import { generalLimiter } from './middleware/rateLimiter';
+import crypto from 'crypto';
+import { generalLimiter, authLimiter } from './middleware/rateLimiter';
 import sanitize from './middleware/sanitize';
 import errorHandler from './middleware/errorHandler';
 import authRoutes from './routes/auth';
@@ -40,6 +41,12 @@ const app = express();
 // Trust proxy in dev so express-rate-limit can read X-Forwarded-For correctly
 app.set('trust proxy', 1);
 
+// ─── Request ID for traceability ─────────────────────────────────────────────
+app.use((_req, res, next) => {
+  res.setHeader('X-Request-ID', crypto.randomUUID());
+  next();
+});
+
 // ─── Security headers ─────────────────────────────────────────────────────────
 app.use(helmet({
   crossOriginEmbedderPolicy: false,
@@ -52,11 +59,21 @@ app.use(helmet({
       connectSrc: ["'self'"],
       frameSrc: ["'none'"],
       objectSrc: ["'none'"],
+      baseUri: ["'none'"],
+      formAction: ["'self'"],
       upgradeInsecureRequests: [],
     },
   },
   hsts: { maxAge: 31536000, includeSubDomains: true, preload: true },
+  referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
+  permittedCrossDomainPolicies: { permittedPolicies: 'none' },
 }));
+
+// ─── Permissions-Policy header ────────────────────────────────────────────────
+app.use((_req, res, next) => {
+  res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=(), payment=()');
+  next();
+});
 
 // ─── CORS ─────────────────────────────────────────────────────────────────────
 app.use(cors({
@@ -97,7 +114,7 @@ app.use('/api/withdrawals', withdrawalRoutes);
 app.use('/api/referrals', referralRoutes);
 app.use('/api/payouts', payoutRoutes);
 app.use('/api/account', accountRoutes);
-app.use('/api/admin', adminRoutes);
+app.use('/api/admin', authLimiter, adminRoutes);
 app.use('/api/totp', totpRoutes);
 app.use('/api/affiliate', affiliateRoutes);
 

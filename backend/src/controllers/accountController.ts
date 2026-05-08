@@ -4,6 +4,7 @@ import db from '../../config/database';
 import { DbUser, DbLoginEvent } from '../types';
 
 import { logAudit } from '../services/audit';
+import { sendPasswordChangedEmail } from '../services/email';
 
 export async function changePassword(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
@@ -39,6 +40,7 @@ export async function changePassword(req: Request, res: Response, next: NextFunc
     await db('refresh_tokens').where({ user_id: user.id }).whereNull('revoked_at').update({ revoked_at: new Date() });
 
     await logAudit(user.id, 'password_change', req);
+    sendPasswordChangedEmail(user.email, user.name).catch(() => {});
 
     res.json({ message: 'Password changed successfully. Please log in again on all devices.' });
   } catch (err) { next(err); }

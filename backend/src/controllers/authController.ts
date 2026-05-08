@@ -4,7 +4,7 @@ import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
 import db from '../../config/database';
 import { DbUser, DbRefreshToken, AuthPayload } from '../types';
-import { sendVerificationEmail, sendPasswordResetEmail } from '../services/email';
+import { sendVerificationEmail, sendPasswordResetEmail, sendLoginAlertEmail } from '../services/email';
 import { createOtp, verifyOtp } from '../services/otp';
 import { logAudit, logLoginEvent } from '../services/audit';
 import { verifyTotpLogin } from './totpController';
@@ -248,8 +248,11 @@ export async function login(req: Request, res: Response, next: NextFunction): Pr
     await logLoginEvent(user.id, true, req);
     await logAudit(user.id, 'login', req);
 
-    // Update last login info
+    // Update last login info; alert if signing in from a new IP
     const ip = (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() ?? req.ip ?? null;
+    if (ip && user.last_login_ip && user.last_login_ip !== ip) {
+      sendLoginAlertEmail(user.email, user.name, ip, new Date().toLocaleString('en-PH', { timeZone: 'Asia/Manila' })).catch(() => {});
+    }
     await db('users').where({ id: user.id }).update({ last_login_at: new Date(), last_login_ip: ip });
 
     const [accessToken, refreshToken] = await Promise.all([
