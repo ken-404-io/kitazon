@@ -1,6 +1,7 @@
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
 import api from '../services/api';
 import { getToken, setToken } from '../utils/tokenStore';
+import { useIdleLogout } from '../hooks/useIdleLogout';
 import { User } from '../types';
 
 interface AuthContextValue {
@@ -50,7 +51,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(res.data.user);
   };
 
-  const logout = async (): Promise<void> => {
+  const logout = useCallback(async (): Promise<void> => {
     try {
       if (getToken()) await api.post('/auth/logout', {});
     } catch {
@@ -59,7 +60,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setToken(null);
       setUser(null);
     }
-  };
+  }, []);
+
+  // Auto-logout after 30 minutes of inactivity (only when logged in)
+  useIdleLogout(logout, !!user);
 
   const refreshUser = async (): Promise<void> => {
     const res = await api.get<User>('/auth/me');

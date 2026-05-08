@@ -119,6 +119,13 @@ app.use('/api/admin', authLimiter, adminRoutes);
 app.use('/api/totp', totpRoutes);
 app.use('/api/affiliate', affiliateRoutes);
 
+// ─── security.txt (RFC 9116) ──────────────────────────────────────────────────
+app.get('/.well-known/security.txt', (_req, res) => {
+  res.type('text/plain').send(
+    `Contact: mailto:security@kitazon.com\nExpires: ${new Date(Date.now() + 365 * 24 * 3600 * 1000).toISOString()}\nPreferred-Languages: en\n`
+  );
+});
+
 // ─── 404 catch-all ────────────────────────────────────────────────────────────
 app.use((_req, res) => res.status(404).json({ message: 'Not found.' }));
 app.use(errorHandler);

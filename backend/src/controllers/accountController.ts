@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import bcrypt from 'bcryptjs';
+import crypto from 'crypto';
 import db from '../../config/database';
 import { DbUser, DbLoginEvent } from '../types';
 
@@ -69,10 +70,50 @@ export async function deleteAccount(req: Request, res: Response, next: NextFunct
       email_verified: false,
     });
 
-    // Revoke all sessions
+    // Revoke all sessions and pending OTPs
     await db('refresh_tokens').where({ user_id: user.id }).update({ revoked_at: new Date() });
+    await db('otp_tokens').where({ user_id: user.id }).whereNull('used_at').update({ used_at: new Date() });
 
     res.json({ message: 'Account deleted successfully.' });
+  } catch (err) { next(err); }
+}
+
+export async function activeSessions(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const raw = req.cookies?.refresh_token as string | undefined;
+    const currentHash = raw ? crypto.createHash('sha256').update(raw).digest('hex') : null;
+
+    const sessions = await db('refresh_tokens')
+      .where({ user_id: req.user!.id })
+      .whereNull('revoked_at')
+      .where('expires_at', '>', new Date())
+      .orderBy('created_at', 'desc')
+      .select('id', 'created_at', 'expires_at');
+
+    res.json(sessions.map((s: { id: number; created_at: Date; expires_at: Date }) => ({
+      id: s.id,
+      created_at: s.created_at,
+      expires_at: s.expires_at,
+      is_current: currentHash ? db('refresh_tokens').where({ id: s.id, token_hash: currentHash }).select('id') !== null : false,
+    })));
+  } catch (err) { next(err); }
+}
+
+export async function revokeOtherSessions(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const raw = req.cookies?.refresh_token as string | undefined;
+    const currentHash = raw ? crypto.createHash('sha256').update(raw).digest('hex') : null;
+
+    const query = db('refresh_tokens')
+      .where({ user_id: req.user!.id })
+      .whereNull('revoked_at');
+    if (currentHash) query.whereNot({ token_hash: currentHash });
+
+    const count = await query.clone().count('id as cnt').first();
+    await query.update({ revoked_at: new Date() });
+
+    await logAudit(req.user!.id, 'revoke_other_sessions', req, { metadata: { revoked: Number(count?.cnt ?? 0) } });
+    res.json({ message: 'All other sessions revoked.', revoked: Number(count?.cnt ?? 0) });
   } catch (err) { next(err); }
 }
 
