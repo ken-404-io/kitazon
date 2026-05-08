@@ -1,18 +1,9 @@
 import { useEffect, useState } from 'react';
 import api from '../../services/api';
-import { Payout, WithdrawalChannel } from '../../types';
-import { CreditCardIcon, CoinsIcon, DollarIcon } from '../ui/Icons';
+import { Payout } from '../../types';
+import { DollarIcon } from '../ui/Icons';
 import { payoutSeedData } from './payoutSeedData';
 import styles from './PayoutFeed.module.css';
-
-const CHANNEL_ICONS: Record<WithdrawalChannel, React.ReactNode> = {
-  gcash:  <CreditCardIcon />,
-  maya:   <CreditCardIcon />,
-  gotyme: <CreditCardIcon />,
-  coins:  <CoinsIcon />,
-  usdt:   <DollarIcon />,
-  paypal: <DollarIcon />,
-};
 
 export default function PayoutFeed() {
   const [payouts, setPayouts] = useState<Payout[]>([]);
@@ -56,7 +47,7 @@ export default function PayoutFeed() {
     <div className={styles.feed}>
       {payouts.map((p) => (
         <div key={p.id} className={`card ${styles.row}`}>
-          <span className={styles.channelIcon}>{CHANNEL_ICONS[p.channel] ?? <CreditCardIcon />}</span>
+          <span className={styles.channelIcon}><DollarIcon /></span>
           <div className={styles.info}>
             <p className={styles.name}>{p.masked_name}</p>
             <p className={styles.time}>{new Date(p.created_at).toLocaleString('en-PH')}</p>

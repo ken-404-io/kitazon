@@ -4,8 +4,8 @@ import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import EarningsChart from '../components/dashboard/EarningsChart';
 import api from '../services/api';
-import { sanitizeInput, validatePhoneNumber, isValidEmail } from '../utils/sanitize';
-import { UserStats, Withdrawal, WithdrawalChannel, WithdrawalStatus } from '../types';
+import { sanitizeInput, isValidEmail } from '../utils/sanitize';
+import { UserStats, Withdrawal, WithdrawalStatus, UserPlan } from '../types';
 import styles from './Withdraw.module.css';
 
 /* ─── icons ──────────────────────────────────────────────────────────────────── */
@@ -14,18 +14,15 @@ const BackIcon  = () => <svg {...sz}><polyline points="15 18 9 12 15 6"/></svg>;
 const HistIcon  = () => <svg {...sz} width={16} height={16}><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>;
 const AlertIcon = () => <svg {...sz} width={16} height={16}><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>;
 const CheckIcon = () => <svg {...sz} width={14} height={14}><polyline points="20 6 9 17 4 12"/></svg>;
+const LockIcon  = () => <svg {...sz} width={16} height={16}><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>;
 
-/* ─── config ─────────────────────────────────────────────────────────────────── */
-const CHANNELS: { value: WithdrawalChannel; label: string; sub: string; placeholder: string; inputLabel: string }[] = [
-  { value: 'gcash',  label: 'GCash',    sub: '~1 hour',  placeholder: '09XXXXXXXXX',            inputLabel: 'GCash Mobile Number'    },
-  { value: 'maya',   label: 'Maya',     sub: '~1 hour',  placeholder: '09XXXXXXXXX',            inputLabel: 'Maya Mobile Number'     },
-  { value: 'gotyme', label: 'GoTyme',   sub: '1–24 hrs', placeholder: '09XXXXXXXXX',            inputLabel: 'GoTyme Mobile Number'   },
-  { value: 'coins',  label: 'Coins.ph', sub: '1–24 hrs', placeholder: '09XXXXXXXXX or email',   inputLabel: 'Coins.ph Account'       },
-  { value: 'usdt',   label: 'USDT',     sub: '1–24 hrs', placeholder: 'TRC-20 wallet address',  inputLabel: 'USDT Wallet (TRC-20)'   },
-  { value: 'paypal', label: 'PayPal',   sub: '1–24 hrs', placeholder: 'yourname@email.com',     inputLabel: 'PayPal Email Address'   },
-];
-
-const PRESETS = [50, 100, 200, 500, 1000, 2000];
+/* ─── plan config ────────────────────────────────────────────────────────────── */
+const PLAN_CONFIG: Record<UserPlan, { name: string; color: string; dailyLimit: number; badge: string; presets: number[] | null }> = {
+  free:    { name: 'Free',    color: 'var(--text-muted)', badge: '🆓', dailyLimit: 5,   presets: null },
+  silver:  { name: 'Silver',  color: '#9ca3af',           badge: '🥈', dailyLimit: 20,  presets: [5, 10, 15, 20] },
+  gold:    { name: 'Gold',    color: 'var(--gold)',        badge: '🥇', dailyLimit: 50,  presets: [10, 20, 30, 50] },
+  diamond: { name: 'Diamond', color: '#60a5fa',            badge: '💎', dailyLimit: 100, presets: [20, 50, 75, 100] },
+};
 
 const STATUS_COLOR: Record<WithdrawalStatus, string> = {
   pending:    'var(--primary-amber)',
@@ -37,14 +34,12 @@ const STATUS_COLOR: Record<WithdrawalStatus, string> = {
 type View = 'overview' | 'form' | 'history';
 
 export default function Withdraw() {
-  const { user }        = useAuth();
-  const { showToast }   = useToast();
+  const { user }      = useAuth();
+  const { showToast } = useToast();
   const [view,      setView]      = useState<View>('overview');
   const [stats,     setStats]     = useState<UserStats | null>(null);
   const [history,   setHistory]   = useState<Withdrawal[]>([]);
-  const [channel,   setChannel]   = useState<WithdrawalChannel>('gcash');
   const [preset,    setPreset]    = useState<number | null>(null);
-  const [customAmt, setCustomAmt] = useState('');
   const [account,   setAccount]   = useState('');
   const [loading,   setLoading]   = useState(false);
   const [error,     setError]     = useState('');
@@ -53,7 +48,6 @@ export default function Withdraw() {
   const [otpErr,    setOtpErr]    = useState('');
   const [otpLoad,   setOtpLoad]   = useState(false);
   const [acctTouched, setAcctTouched] = useState(false);
-  const [amtTouched,  setAmtTouched]  = useState(false);
 
   const loadData = () => {
     api.get<UserStats>('/auth/me/stats').then(r => setStats(r.data)).catch(() => {});
@@ -61,38 +55,30 @@ export default function Withdraw() {
   };
   useEffect(() => { loadData(); }, []);
 
-  const balance    = Number(stats?.balance ?? 0);
-  const todayAmt   = Number(stats?.today   ?? 0);
-  const weekAmt    = Number(stats?.week    ?? 0);
-  const totalAmt   = Number(stats?.total   ?? 0);
-  const amount     = preset ?? (parseFloat(customAmt) || 0);
-  const emailOk    = user?.email_verified ?? false;
+  const plan        = user?.plan ?? 'free';
+  const planCfg     = PLAN_CONFIG[plan];
+  const balance     = Number(stats?.balance ?? 0);
+  const todayAmt    = Number(stats?.today   ?? 0);
+  const weekAmt     = Number(stats?.week    ?? 0);
+  const totalAmt    = Number(stats?.total   ?? 0);
+  const emailOk     = user?.email_verified ?? false;
+
+  // Free plan: fixed ₱5. VIP plans: chosen preset (default to dailyLimit).
+  const amount = plan === 'free' ? 5 : (preset ?? planCfg.dailyLimit);
 
   const validateAccount = (val: string): string | null => {
-    const v = val.trim();
-    if (!v) return 'Account / wallet number is required.';
-    if (['gcash', 'maya', 'gotyme'].includes(channel)) return validatePhoneNumber(v);
-    if (channel === 'coins') {
-      if (!/^(09\d{9}|[^\s@]+@[^\s@]+\.[^\s@]+)$/.test(v)) return 'Enter a valid Coins.ph number or email.';
-    }
-    if (channel === 'paypal') {
-      if (!isValidEmail(v)) return 'Enter a valid PayPal email address.';
-    }
-    if (channel === 'usdt') {
-      if (!/^T[A-Za-z0-9]{33}$/.test(v)) return 'Enter a valid TRC-20 wallet address.';
-    }
+    if (!val.trim()) return 'PayPal email address is required.';
+    if (!isValidEmail(val.trim())) return 'Enter a valid PayPal email address.';
     return null;
   };
 
   const acctErr = acctTouched ? validateAccount(account) : null;
-  const amtErr  = amtTouched  ? (amount < 50 ? 'Minimum withdrawal is ₱50.' : amount > balance ? 'Insufficient balance.' : null) : null;
 
   const requestOtp = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
-    const acct = sanitizeInput(account);
-    if (!acct)           return setError('Account / wallet number is required.');
-    if (amount < 50)     return setError('Minimum withdrawal is ₱50.');
+    setAcctTouched(true);
+    if (validateAccount(account)) return;
     if (amount > balance) return setError('Insufficient balance.');
     setLoading(true);
     try {
@@ -108,9 +94,9 @@ export default function Withdraw() {
     setOtpErr('');
     setOtpLoad(true);
     try {
-      await api.post('/withdrawals', { amount: String(amount), channel, account_number: sanitizeInput(account), otp });
+      await api.post('/withdrawals', { amount: String(amount), channel: 'paypal', account_number: sanitizeInput(account), otp });
       setShowOtp(false);
-      setPreset(null); setCustomAmt(''); setAccount(''); setOtp('');
+      setPreset(null); setAccount(''); setOtp('');
       setView('overview');
       loadData();
       showToast('Withdrawal submitted successfully!', 'success');
@@ -124,11 +110,18 @@ export default function Withdraw() {
     <div className="page-container">
       <div className={styles.page}>
 
-        {/* Header */}
         <div className={styles.pageHeader}>
           <span style={{ width: 38 }} />
           <span className={styles.pageTitle}>Withdraw Money</span>
           <button className={styles.iconBtn} onClick={() => setView('history')}><HistIcon /></button>
+        </div>
+
+        {/* Plan badge */}
+        <div className={styles.planBadge} style={{ borderColor: planCfg.color }}>
+          <span>{planCfg.badge}</span>
+          <span style={{ fontWeight: 700, color: planCfg.color }}>{planCfg.name} Plan</span>
+          <span style={{ color: 'var(--text-muted)', fontSize: '0.78rem' }}>· ₱{planCfg.dailyLimit}/day limit</span>
+          {plan === 'free' && <Link to="/plans" className={styles.upgradeLink}>Upgrade →</Link>}
         </div>
 
         {/* Hero balance */}
@@ -155,19 +148,16 @@ export default function Withdraw() {
           </div>
         </div>
 
-        {/* Total strip */}
         <div className={styles.totalStrip}>
           Total Lifetime Earnings — <strong>₱{totalAmt.toFixed(2)}</strong>
         </div>
 
-        {/* 7-day chart */}
         <div className={styles.sectionHeader}>
           <span className={styles.sectionTitle}>7 Day Earnings</span>
           <Link to="/dashboard" className={styles.sectionLink}>Revenue Analysis →</Link>
         </div>
         <EarningsChart />
 
-        {/* Recent withdrawals (3 max) */}
         {history.length > 0 && (
           <>
             <div className={styles.sectionHeader} style={{ marginTop: '1.25rem' }}>
@@ -178,7 +168,7 @@ export default function Withdraw() {
               {history.slice(0, 3).map(w => (
                 <div key={w.id} className={styles.historyRow}>
                   <div className={styles.historyLeft}>
-                    <p className={styles.historyChannel}>{w.channel.toUpperCase()}</p>
+                    <p className={styles.historyChannel}>PayPal</p>
                     <p className={styles.historyAccount}>{w.account_number}</p>
                     <p className={styles.historyTime}>{new Date(w.created_at).toLocaleString('en-PH')}</p>
                   </div>
@@ -212,7 +202,7 @@ export default function Withdraw() {
             {history.map(w => (
               <div key={w.id} className={styles.historyRow}>
                 <div className={styles.historyLeft}>
-                  <p className={styles.historyChannel}>{w.channel.toUpperCase()}</p>
+                  <p className={styles.historyChannel}>PayPal</p>
                   <p className={styles.historyAccount}>{w.account_number}</p>
                   <p className={styles.historyTime}>{new Date(w.created_at).toLocaleString('en-PH')}</p>
                 </div>
@@ -234,14 +224,12 @@ export default function Withdraw() {
     <div className="page-container">
       <div className={styles.page}>
 
-        {/* Header */}
         <div className={styles.pageHeader}>
           <button className={styles.iconBtn} onClick={() => setView('overview')}><BackIcon /></button>
           <span className={styles.pageTitle}>Request Withdrawal</span>
           <button className={styles.iconBtn} onClick={() => setView('history')}><HistIcon /></button>
         </div>
 
-        {/* Email not verified banner */}
         {!emailOk && (
           <div className={styles.alertBanner}>
             <AlertIcon />
@@ -249,7 +237,6 @@ export default function Withdraw() {
           </div>
         )}
 
-        {/* Balance + History */}
         <div className={styles.balanceRow}>
           <div className={styles.balanceInfo}>
             <p className={styles.balanceLabel}>Current Balance</p>
@@ -263,40 +250,28 @@ export default function Withdraw() {
         {emailOk ? (
           <form onSubmit={requestOtp}>
 
-            {/* Payment method */}
+            {/* Payment method — PayPal only */}
             <div className={styles.sectionCard}>
               <h4>Payment Method</h4>
-              <div className={styles.channelGrid}>
-                {CHANNELS.map(c => (
-                  <button
-                    key={c.value}
-                    type="button"
-                    className={`${styles.channelChip} ${channel === c.value ? styles.channelChipActive : ''}`}
-                    onClick={() => { setChannel(c.value); setAccount(''); setAcctTouched(false); }}
-                  >
-                    <span className={`${styles.channelDot} ${channel === c.value ? styles.channelDotFilled : ''}`} />
-                    <span>
-                      {c.label}
-                      <span className={styles.channelSub}>{c.sub}</span>
-                    </span>
-                  </button>
-                ))}
+              <div className={styles.paypalBadge}>
+                <span className={styles.channelDotFilled} style={{ width: 10, height: 10, borderRadius: '50%', background: '#003087', display: 'inline-block' }} />
+                <span style={{ fontWeight: 700 }}>PayPal</span>
+                <span className={styles.channelSub} style={{ display: 'inline', marginLeft: 6 }}>1–24 hrs</span>
               </div>
             </div>
 
-            {/* Account number */}
+            {/* PayPal email */}
             <div className={styles.sectionCard}>
-              <h4>{CHANNELS.find(c => c.value === channel)?.inputLabel ?? 'Account / Wallet'}</h4>
+              <h4>PayPal Email Address</h4>
               <input
-                type={channel === 'paypal' ? 'email' : 'text'}
-                inputMode={['gcash','maya','gotyme','coins'].includes(channel) ? 'numeric' : 'text'}
+                type="email"
                 value={account}
                 onChange={e => { setAccount(e.target.value); setAcctTouched(false); }}
                 onBlur={() => setAcctTouched(true)}
                 className={acctTouched ? (acctErr ? 'field-invalid' : 'field-valid') : ''}
-                placeholder={CHANNELS.find(c => c.value === channel)?.placeholder ?? ''}
-                maxLength={60}
-                autoComplete="off"
+                placeholder="yourname@email.com"
+                maxLength={80}
+                autoComplete="email"
                 required
               />
               {acctErr && <p className="field-hint hint-invalid">{acctErr}</p>}
@@ -304,32 +279,44 @@ export default function Withdraw() {
 
             {/* Amount selection */}
             <div className={styles.sectionCard}>
-              <h4>Amount (min ₱50)</h4>
-              <div className={styles.presetGrid}>
-                {PRESETS.map(p => (
-                  <button
-                    key={p}
-                    type="button"
-                    className={`${styles.presetBtn} ${preset === p ? styles.presetBtnActive : ''}`}
-                    onClick={() => { setPreset(p); setCustomAmt(''); }}
-                  >
-                    ₱{p.toLocaleString()}
-                  </button>
-                ))}
-              </div>
-              <input
-                type="number"
-                min="50"
-                max="50000"
-                value={customAmt}
-                onChange={e => { setCustomAmt(e.target.value); setPreset(null); setAmtTouched(false); }}
-                onBlur={() => setAmtTouched(true)}
-                className={amtTouched && customAmt ? (amtErr ? 'field-invalid' : 'field-valid') : ''}
-                placeholder="Or enter custom amount"
-              />
-              {amtErr && <p className="field-hint hint-invalid">{amtErr}</p>}
-              <p style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: 8 }}>
-                Zero fee on first ₱500/month · ₱5 flat fee after
+              <h4>
+                Withdrawal Amount
+                <span style={{ color: planCfg.color, marginLeft: 8, fontWeight: 700, textTransform: 'none', letterSpacing: 0 }}>
+                  {planCfg.badge} {planCfg.name}
+                </span>
+              </h4>
+
+              {plan === 'free' ? (
+                /* Free plan — locked */
+                <div className={styles.lockedAmount}>
+                  <LockIcon />
+                  <div>
+                    <p className={styles.lockedValue}>₱5.00 / day</p>
+                    <p className={styles.lockedNote}>
+                      Free plan is fixed at ₱5/day.{' '}
+                      <Link to="/plans" style={{ color: 'var(--primary)' }}>Upgrade your plan</Link>
+                      {' '}to withdraw more.
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                /* VIP plan — choose from presets */
+                <div className={styles.presetGrid}>
+                  {planCfg.presets!.map(p => (
+                    <button
+                      key={p}
+                      type="button"
+                      className={`${styles.presetBtn} ${amount === p ? styles.presetBtnActive : ''}`}
+                      onClick={() => setPreset(p)}
+                    >
+                      ₱{p}
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              <p style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: 10 }}>
+                Daily limit: ₱{planCfg.dailyLimit} · Zero fee on first ₱500/month · ₱5 flat fee after
               </p>
             </div>
 
@@ -340,7 +327,7 @@ export default function Withdraw() {
               type="submit"
               disabled={loading || !emailOk}
             >
-              {loading ? 'Sending OTP…' : `Fast Cash${amount >= 50 ? ' — ₱' + amount.toLocaleString() : ''}`}
+              {loading ? 'Sending OTP…' : `Fast Cash — ₱${amount}`}
             </button>
 
           </form>
@@ -353,7 +340,7 @@ export default function Withdraw() {
         <div className={styles.modalOverlay} onClick={() => setShowOtp(false)}>
           <div className={styles.modalSheet} onClick={e => e.stopPropagation()}>
             <p className={styles.modalTitle}>Confirm Withdrawal</p>
-            <p className={styles.modalSub}>Enter the 6-digit OTP sent to your email to confirm ₱{amount.toLocaleString()} via {channel.toUpperCase()}.</p>
+            <p className={styles.modalSub}>Enter the 6-digit OTP sent to your email to confirm ₱{amount} via PayPal.</p>
             <div className="form-group">
               <label>OTP Code</label>
               <input
