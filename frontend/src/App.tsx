@@ -29,6 +29,8 @@ import Terms from './pages/Terms';
 import Privacy from './pages/Privacy';
 import Plans from './pages/Plans';
 import AuthCallback from './pages/AuthCallback';
+import PaymentSuccess from './pages/PaymentSuccess';
+import PaymentCancel from './pages/PaymentCancel';
 
 function PrivateRoute({ children }: { children: ReactNode }) {
   const { user, loading } = useAuth();
@@ -74,6 +76,8 @@ export default function App() {
           <Route path="/privacy" element={<Privacy />} />
           <Route path="/plans" element={<PrivateRoute><Plans /></PrivateRoute>} />
           <Route path="/auth/callback" element={<AuthCallback />} />
+          <Route path="/payment/success" element={<PrivateRoute><PaymentSuccess /></PrivateRoute>} />
+          <Route path="/payment/cancel"  element={<PrivateRoute><PaymentCancel /></PrivateRoute>} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
         <Footer />
