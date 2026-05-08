@@ -127,3 +127,15 @@ export async function loginHistory(req: Request, res: Response, next: NextFuncti
     res.json(events);
   } catch (err) { next(err); }
 }
+
+export async function updateProfile(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const { name } = req.body as { name: string };
+    if (!name?.trim() || name.trim().length < 2 || name.trim().length > 100) {
+      res.status(400).json({ message: 'Name must be 2–100 characters.' }); return;
+    }
+    await db('users').where({ id: req.user!.id }).update({ name: name.trim() });
+    await logAudit(req.user!.id, 'profile_update', req);
+    res.json({ message: 'Profile updated.', name: name.trim() });
+  } catch (err) { next(err); }
+}

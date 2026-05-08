@@ -32,7 +32,7 @@ interface LoginEvent {
   user_agent: string | null;
   created_at: string;
 }
-type View = 'main' | 'change-password' | '2fa' | 'login-history' | 'devices' | 'notifications' | 'help' | 'delete';
+type View = 'main' | 'edit-profile' | 'change-password' | '2fa' | 'login-history' | 'devices' | 'notifications' | 'help' | 'delete';
 
 /* ─── helpers ─────────────────────────────────────────────────────────────── */
 function initials(name?: string) {
@@ -62,6 +62,11 @@ export default function AccountSettings() {
 
   const [history, setHistory]         = useState<LoginEvent[] | null>(null);
   const [historyLoading, setHistoryLoading] = useState(false);
+
+  const [profileName, setProfileName]   = useState(user?.name ?? '');
+  const [profileError, setProfileError] = useState('');
+  const [profileMsg, setProfileMsg]     = useState('');
+  const [profileLoad, setProfileLoad]   = useState(false);
 
   const [sessionMsg, setSessionMsg]   = useState('');
   const [sessionLoad, setSessionLoad] = useState(false);
@@ -128,6 +133,24 @@ export default function AccountSettings() {
     } finally { setVerifyLoading(false); }
   };
 
+  const saveProfile = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setProfileError(''); setProfileMsg('');
+    const trimmed = profileName.trim();
+    if (trimmed.length < 2 || trimmed.length > 100) {
+      setProfileError('Name must be 2–100 characters.'); return;
+    }
+    setProfileLoad(true);
+    try {
+      const res = await api.patch<{ name: string }>('/account/profile', { name: trimmed });
+      setProfileMsg('Name updated successfully.');
+      await refreshUser();
+      setProfileName(res.data.name);
+    } catch (err: unknown) {
+      setProfileError((err as { response?: { data?: { message?: string } } }).response?.data?.message ?? 'Failed.');
+    } finally { setProfileLoad(false); }
+  };
+
   /* ── sub-view wrapper ────────────────────────────────────────────────────── */
   const SubView = ({ title, children }: { title: string; children: React.ReactNode }) => (
     <div className={styles.page}>
@@ -136,6 +159,35 @@ export default function AccountSettings() {
         <span className={styles.subTitle}>{title}</span>
       </div>
       {children}
+    </div>
+  );
+
+  /* ── Edit Profile view ───────────────────────────────────────────────────── */
+  if (view === 'edit-profile') return (
+    <div className="page-container">
+      <SubView title="Edit Profile">
+        <div className={styles.formCard}>
+          <form onSubmit={saveProfile}>
+            <div className="form-group">
+              <label>Display Name</label>
+              <input
+                type="text"
+                value={profileName}
+                onChange={e => setProfileName(e.target.value)}
+                required
+                minLength={2}
+                maxLength={100}
+                autoComplete="name"
+              />
+            </div>
+            {profileError && <p className="error-msg">{profileError}</p>}
+            {profileMsg && <p className={styles.successMsg}>{profileMsg}</p>}
+            <button className="btn-primary" type="submit" disabled={profileLoad} style={{ width: '100%', marginTop: 4 }}>
+              {profileLoad ? 'Saving…' : 'Save Name'}
+            </button>
+          </form>
+        </div>
+      </SubView>
     </div>
   );
 
@@ -371,7 +423,7 @@ export default function AccountSettings() {
         </div>
 
         {/* Profile card */}
-        <div className={styles.profileCard}>
+        <div className={styles.profileCard} onClick={() => { setProfileName(user?.name ?? ''); setProfileMsg(''); setProfileError(''); setView('edit-profile'); }}>
           <div className={styles.avatar}>{initials(user?.name)}</div>
           <div className={styles.profileInfo}>
             <p className={styles.profileName}>{user?.name ?? '—'}</p>
