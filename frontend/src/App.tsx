@@ -28,6 +28,7 @@ import ErrorBoundary from './components/ErrorBoundary';
 import AuthTransitionOverlay from './components/AuthTransitionOverlay';
 import Terms from './pages/Terms';
 import Privacy from './pages/Privacy';
+import Plans from './pages/Plans';
 
 const GOOGLE_CLIENT_ID = process.env.REACT_APP_GOOGLE_CLIENT_ID ?? '';
 
@@ -74,6 +75,7 @@ export default function App() {
           <Route path="/guide" element={<PrivateRoute><Guide /></PrivateRoute>} />
           <Route path="/terms" element={<Terms />} />
           <Route path="/privacy" element={<Privacy />} />
+          <Route path="/plans" element={<PrivateRoute><Plans /></PrivateRoute>} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
         <Footer />
