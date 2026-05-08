@@ -10,6 +10,7 @@ interface AuthContextValue {
   authTransition: 'idle' | 'signing-in' | 'signing-out';
   login: (email: string, password: string, captchaToken?: string, totpCode?: string) => Promise<void>;
   loginWithGoogle: (idToken: string) => Promise<void>;
+  setUserFromToken: (user: User) => void;
   register: (data: RegisterData) => Promise<void>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
@@ -67,6 +68,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const setUserFromToken = (u: User): void => {
+    setUser(u);
+  };
+
   const register = async (data: RegisterData): Promise<void> => {
     setAuthTransition('signing-in');
     try {
@@ -102,7 +107,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, authTransition, login, loginWithGoogle, register, logout, refreshUser }}>
+    <AuthContext.Provider value={{ user, loading, authTransition, login, loginWithGoogle, setUserFromToken, register, logout, refreshUser }}>
       {children}
     </AuthContext.Provider>
   );

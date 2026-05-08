@@ -23,14 +23,12 @@ import Offers from './pages/Offers';
 import Bonus from './pages/Bonus';
 import Guide from './pages/Guide';
 import { ReactNode } from 'react';
-import { GoogleOAuthProvider } from '@react-oauth/google';
 import ErrorBoundary from './components/ErrorBoundary';
 import AuthTransitionOverlay from './components/AuthTransitionOverlay';
 import Terms from './pages/Terms';
 import Privacy from './pages/Privacy';
 import Plans from './pages/Plans';
-
-const GOOGLE_CLIENT_ID = process.env.REACT_APP_GOOGLE_CLIENT_ID ?? '';
+import AuthCallback from './pages/AuthCallback';
 
 function PrivateRoute({ children }: { children: ReactNode }) {
   const { user, loading } = useAuth();
@@ -47,7 +45,6 @@ function PublicRoute({ children }: { children: ReactNode }) {
 export default function App() {
   return (
     <ErrorBoundary>
-    <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID}>
     <ThemeProvider>
     <AuthProvider>
       <ToastProvider>
@@ -76,6 +73,7 @@ export default function App() {
           <Route path="/terms" element={<Terms />} />
           <Route path="/privacy" element={<Privacy />} />
           <Route path="/plans" element={<PrivateRoute><Plans /></PrivateRoute>} />
+          <Route path="/auth/callback" element={<AuthCallback />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
         <Footer />
@@ -83,7 +81,6 @@ export default function App() {
       </ToastProvider>
     </AuthProvider>
     </ThemeProvider>
-    </GoogleOAuthProvider>
     </ErrorBoundary>
   );
 }
