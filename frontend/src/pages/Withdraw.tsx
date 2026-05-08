@@ -83,6 +83,7 @@ export default function Withdraw() {
   };
 
   const confirmWithdrawal = async () => {
+    if (otpLoad) return;
     setOtpErr('');
     setOtpLoad(true);
     try {
