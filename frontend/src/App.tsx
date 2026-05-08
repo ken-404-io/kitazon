@@ -23,6 +23,9 @@ import Offers from './pages/Offers';
 import Bonus from './pages/Bonus';
 import Guide from './pages/Guide';
 import { ReactNode } from 'react';
+import ErrorBoundary from './components/ErrorBoundary';
+import Terms from './pages/Terms';
+import Privacy from './pages/Privacy';
 
 function PrivateRoute({ children }: { children: ReactNode }) {
   const { user, loading } = useAuth();
@@ -38,6 +41,7 @@ function PublicRoute({ children }: { children: ReactNode }) {
 
 export default function App() {
   return (
+    <ErrorBoundary>
     <ThemeProvider>
     <AuthProvider>
       <ToastProvider>
@@ -62,6 +66,8 @@ export default function App() {
           <Route path="/offers" element={<PrivateRoute><Offers /></PrivateRoute>} />
           <Route path="/bonus" element={<PrivateRoute><Bonus /></PrivateRoute>} />
           <Route path="/guide" element={<PrivateRoute><Guide /></PrivateRoute>} />
+          <Route path="/terms" element={<Terms />} />
+          <Route path="/privacy" element={<Privacy />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
         <Footer />
@@ -69,5 +75,6 @@ export default function App() {
       </ToastProvider>
     </AuthProvider>
     </ThemeProvider>
+    </ErrorBoundary>
   );
 }
