@@ -46,8 +46,8 @@ export async function requestOtp(req: Request, res: Response, next: NextFunction
   try {
     const { amount } = req.body as { amount: string | number };
     const parsed = parseFloat(String(amount));
-    if (!parsed || isNaN(parsed) || parsed < 50) {
-      res.status(400).json({ message: 'Minimum withdrawal is ₱50.' });
+    if (!parsed || isNaN(parsed) || parsed < 5) {
+      res.status(400).json({ message: 'Minimum withdrawal is ₱5.' });
       return;
     }
 
@@ -71,8 +71,8 @@ export async function create(req: Request, res: Response, next: NextFunction): P
     };
     const parsed = parseFloat(String(amount));
 
-    if (!parsed || isNaN(parsed) || parsed < 50) {
-      res.status(400).json({ message: 'Minimum withdrawal is ₱50.' });
+    if (!parsed || isNaN(parsed) || parsed < 5) {
+      res.status(400).json({ message: 'Minimum withdrawal is ₱5.' });
       return;
     }
     if (parsed > 50000) {
