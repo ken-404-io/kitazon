@@ -98,13 +98,6 @@ export async function create(req: Request, res: Response, next: NextFunction): P
       return;
     }
 
-    // Verify OTP
-    const otpValid = await verifyOtp(user.id, otp.trim(), 'withdrawal_otp');
-    if (!otpValid) {
-      res.status(400).json({ message: 'Invalid or expired OTP.' });
-      return;
-    }
-
     // Suspicious activity detection
     const { flags, isSuspicious } = await detectSuspicious(user.id, parsed, user);
 
@@ -121,8 +114,13 @@ export async function create(req: Request, res: Response, next: NextFunction): P
     if (netAmount <= 0) { res.status(400).json({ message: 'Amount too low after fee deduction.' }); return; }
 
     let insufficientBalance = false;
+    let otpInvalid = false;
 
     await db.transaction(async (trx) => {
+      // Verify and consume OTP inside transaction — rolls back if anything below fails
+      const otpValid = await verifyOtp(user.id, otp.trim(), 'withdrawal_otp');
+      if (!otpValid) { otpInvalid = true; return; }
+
       const updated = await trx('users')
         .where({ id: req.user!.id })
         .where('balance', '>=', parsed)
@@ -135,7 +133,8 @@ export async function create(req: Request, res: Response, next: NextFunction): P
       });
     });
 
-    if (insufficientBalance) { res.status(400).json({ message: 'Insufficient balance.' }); return; }
+    if (otpInvalid)         { res.status(400).json({ message: 'Invalid or expired OTP.' }); return; }
+    if (insufficientBalance){ res.status(400).json({ message: 'Insufficient balance.' }); return; }
 
     await logAudit(req.user!.id, 'withdrawal_create', req, {
       amount: parsed,
