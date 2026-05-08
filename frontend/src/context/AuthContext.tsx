@@ -7,6 +7,7 @@ import { User } from '../types';
 interface AuthContextValue {
   user: User | null;
   loading: boolean;
+  authTransition: 'idle' | 'signing-in' | 'signing-out';
   login: (email: string, password: string, captchaToken?: string, totpCode?: string) => Promise<void>;
   register: (data: RegisterData) => Promise<void>;
   logout: () => Promise<void>;
@@ -26,6 +27,7 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [authTransition, setAuthTransition] = useState<'idle' | 'signing-in' | 'signing-out'>('idle');
 
   useEffect(() => {
     // On app load, try to restore session via httpOnly cookie (silent refresh)
@@ -36,22 +38,36 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const login = async (email: string, password: string, captchaToken?: string, totpCode?: string): Promise<void> => {
-    const res = await api.post<{ token: string; user: User }>('/auth/login', {
-      email, password,
-      ...(captchaToken ? { captcha_token: captchaToken } : {}),
-      ...(totpCode ? { totp_code: totpCode } : {}),
-    });
-    setToken(res.data.token);
-    setUser(res.data.user);
+    setAuthTransition('signing-in');
+    try {
+      const res = await api.post<{ token: string; user: User }>('/auth/login', {
+        email, password,
+        ...(captchaToken ? { captcha_token: captchaToken } : {}),
+        ...(totpCode ? { totp_code: totpCode } : {}),
+      });
+      setToken(res.data.token);
+      setUser(res.data.user);
+      // Keep overlay visible briefly so it covers the route change
+      await new Promise(r => setTimeout(r, 700));
+    } finally {
+      setAuthTransition('idle');
+    }
   };
 
   const register = async (data: RegisterData): Promise<void> => {
-    const res = await api.post<{ token: string; user: User }>('/auth/register', data);
-    setToken(res.data.token);
-    setUser(res.data.user);
+    setAuthTransition('signing-in');
+    try {
+      const res = await api.post<{ token: string; user: User }>('/auth/register', data);
+      setToken(res.data.token);
+      setUser(res.data.user);
+      await new Promise(r => setTimeout(r, 700));
+    } finally {
+      setAuthTransition('idle');
+    }
   };
 
   const logout = useCallback(async (): Promise<void> => {
+    setAuthTransition('signing-out');
     try {
       if (getToken()) await api.post('/auth/logout', {});
     } catch {
@@ -59,6 +75,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } finally {
       setToken(null);
       setUser(null);
+      await new Promise(r => setTimeout(r, 500));
+      setAuthTransition('idle');
     }
   }, []);
 
@@ -71,7 +89,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, register, logout, refreshUser }}>
+    <AuthContext.Provider value={{ user, loading, authTransition, login, register, logout, refreshUser }}>
       {children}
     </AuthContext.Provider>
   );
