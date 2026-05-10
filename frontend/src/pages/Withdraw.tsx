@@ -266,7 +266,7 @@ export default function Withdraw() {
               <span className={styles.creditsIcon}>🎟️</span>
               <div>
                 <p className={styles.creditsTitle}>Withdrawal Credits</p>
-                <p className={styles.creditsSub}>1 credit = withdraw ₱1 · Earn via check-in or convert PHP</p>
+                <p className={styles.creditsSub}>₱25 = 1 credit · 1 credit = withdraw ₱1 · Earn via daily check-in</p>
               </div>
             </div>
             <div className={styles.creditsBal}>
@@ -291,15 +291,16 @@ export default function Withdraw() {
             <button
               className="btn-primary"
               style={{ fontSize: 13, padding: '0.55rem 1rem', whiteSpace: 'nowrap' }}
-              disabled={converting || !convertAmt || Number(convertAmt) < 1 || Number(convertAmt) > balance}
+              disabled={converting || !convertAmt || Number(convertAmt) < 25 || Number(convertAmt) > balance}
               onClick={convertCredits}
             >
               {converting ? 'Converting…' : 'Convert → Credits'}
             </button>
           </div>
           <p className={styles.convertHint}>
-            Convert ₱{convertAmt || '0'} → <strong>{Math.floor(Number(convertAmt) || 0)} credits</strong>
-            {Number(convertAmt) > 0 && Number(convertAmt) > balance ? <span style={{ color: 'var(--red)' }}> · Insufficient balance</span> : null}
+            ₱25 per credit · ₱{convertAmt || '0'} → <strong>{Math.floor((Number(convertAmt) || 0) / 25)} credits</strong>
+            {Number(convertAmt) > 0 && Number(convertAmt) < 25 ? <span style={{ color: 'var(--red)' }}> · Minimum ₱25</span> : null}
+            {Number(convertAmt) >= 25 && Number(convertAmt) > balance ? <span style={{ color: 'var(--red)' }}> · Insufficient balance</span> : null}
           </p>
         </div>
 
