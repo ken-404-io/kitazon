@@ -29,6 +29,8 @@ export default function Register() {
   const [error, setError]     = useState('');
   const [loading, setLoading] = useState(false);
   const captchaRef = useRef<HCaptcha>(null);
+  // Track when the page loaded so the backend can reject impossibly fast bot submissions
+  const pageLoadTime = useRef(Date.now());
 
   const set = (f: keyof FormState) => (e: React.ChangeEvent<HTMLInputElement>) =>
     setForm((p) => ({ ...p, [f]: e.target.value }));
@@ -60,7 +62,7 @@ export default function Register() {
         const result = await captchaRef.current?.execute({ async: true });
         captcha_token = result?.response;
       }
-      await register({ name, email, password: form.password, referral_code, captcha_token, website: form.website });
+      await register({ name, email, password: form.password, referral_code, captcha_token, website: form.website, _t: String(pageLoadTime.current) });
     } catch (err: unknown) {
       captchaRef.current?.resetCaptcha();
       const msg = (err as { response?: { data?: { message?: string } } }).response?.data?.message;

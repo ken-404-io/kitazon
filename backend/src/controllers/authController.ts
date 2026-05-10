@@ -64,6 +64,7 @@ export const tokenBlacklist = new Set<string>();
 setInterval(() => { tokenBlacklist.clear(); }, 60 * 60 * 1000);
 
 // ─── Registration fraud guards ────────────────────────────────────────────────
+
 const DISPOSABLE_DOMAINS = new Set([
   'mailinator.com','guerrillamail.com','guerrillamail.info','guerrillamail.biz',
   'guerrillamail.de','guerrillamail.net','guerrillamail.org','guerrillamailblock.com',
@@ -76,11 +77,35 @@ const DISPOSABLE_DOMAINS = new Set([
   'owlpic.com','tempinbox.com','chacuo.net','mailtemp.net','mt2014.com','mt2015.com',
   'spamfree24.org','spammotel.com','spamspot.com','trashmail.com','trashmail.me',
   'trashmail.net','trashmail.org','trashmail.io','trashmail.at','trashmail.xyz',
-  'trashmail.app','mailnesia.com','mailnull.com','spamgourmet.com','getnada.com',
-  'zetmail.com','mintemail.com','spamwc.de','tempail.com','10minutemail.com',
-  '10minutemail.net','10minutemail.org','10minutemail.co.uk','10minutemail.us',
-  'burnermail.io','tempmail.com','tempmail.net','tempmail.org','tempmail.us',
-  'mailsac.com','mohmal.com','crazydomain.com','fakemail.net','mailforspam.com',
+  'trashmail.app','mailnesia.com','getnada.com','zetmail.com','mintemail.com',
+  'spamwc.de','tempail.com','10minutemail.com','10minutemail.net','10minutemail.org',
+  '10minutemail.co.uk','10minutemail.us','burnermail.io','tempmail.com','tempmail.net',
+  'tempmail.org','tempmail.us','mailsac.com','mohmal.com','crazydomain.com',
+  'fakemail.net','mailforspam.com','throwam.com','anonbox.net','anonymail.dk',
+  'mailexpire.com','spamgob.com','wegwerfmail.de','wegwerfmail.net','wegwerfmail.org',
+  'trashdevil.com','trashdevil.de','mailscrap.com','spamfree.eu','spamthis.co.uk',
+  'spamoff.de','emailsensei.com','spamgourmet.net','mytrashmail.com','no-spam.ws',
+  'nospamfor.us','nospam4.us','spambox.us','spamcon.org','spamcorner.com',
+  'spamday.com','spamdecoy.net','spamex.com','spamfighter.cf','spamfree24.org',
+  'spamgob.com','spamhereplease.com','spamhole.com','spamify.com','spaminmotion.com',
+  'tempinbox.com','throwam.com','tempr.email','tempemail.net','spamgourmet.com',
+]);
+
+// Block known bot/scraper user-agents
+const BLOCKED_UA_PATTERNS = [
+  /^python-requests/i, /^curl\//i, /^wget\//i, /^httpie/i, /^go-http/i,
+  /^java\//i, /^php\//i, /^ruby/i, /^perl/i, /^libwww/i, /HeadlessChrome/i,
+  /PhantomJS/i, /Selenium/i, /puppeteer/i, /playwright/i, /^axios\//i,
+];
+
+// Top common passwords to reject
+const COMMON_PASSWORDS = new Set([
+  'password','password1','password123','123456','123456789','12345678','1234567',
+  'qwerty','abc123','monkey','dragon','111111','baseball','iloveyou','master',
+  'sunshine','ashley','bailey','passw0rd','shadow','123123','654321','superman',
+  'michael','football','letmein','welcome','hello','charlie','donald','password2',
+  'qwerty123','1q2w3e4r','admin','admin123','root','toor','pass','test','guest',
+  'login','welcome1','hello123','changeme','secret','trustno1','starwars','solo',
 ]);
 
 function isDisposableEmail(email: string): boolean {
@@ -88,7 +113,19 @@ function isDisposableEmail(email: string): boolean {
   return DISPOSABLE_DOMAINS.has(domain);
 }
 
-// Detect obviously bot-generated names: very high consonant ratio, no vowels, or too random
+// Normalise Gmail address: remove dots and strip +alias so duplicates are caught
+function normalizeEmail(email: string): string {
+  const [local, domain] = email.toLowerCase().split('@');
+  if (!local || !domain) return email.toLowerCase();
+  if (domain === 'gmail.com' || domain === 'googlemail.com') {
+    const stripped = local.split('+')[0].replace(/\./g, '');
+    return `${stripped}@gmail.com`;
+  }
+  // Strip +alias for other major providers too
+  const strippedLocal = local.split('+')[0];
+  return `${strippedLocal}@${domain}`;
+}
+
 function isLikelyFakeName(name: string): boolean {
   const clean = name.replace(/[^a-zA-Z]/g, '').toLowerCase();
   if (clean.length < 2) return true;
@@ -97,11 +134,33 @@ function isLikelyFakeName(name: string): boolean {
   // Consonant ratio > 80% for names longer than 5 chars
   const vowels = (clean.match(/[aeiou]/g) ?? []).length;
   if (clean.length > 5 && vowels / clean.length < 0.15) return true;
-  // Contains commas or obvious gibberish patterns (like "dfrw,mgotrk1meojkf")
+  // Contains commas or obvious gibberish patterns
   if (/[,;@#$%^&*=+|<>]/.test(name)) return true;
   // All digits
   if (/^\d+$/.test(name.trim())) return true;
+  // Repeating characters (e.g. "aaaaaa", "ababab")
+  if (/^(.)\1{4,}$/.test(clean)) return true;
+  // Keyboard walk patterns (qwerty, asdfgh, zxcvbn, etc.)
+  if (/^(qwert|asdfg|zxcvb|qwerty|asdfgh|zxcvbn)/i.test(clean)) return true;
+  // Obviously fake: "test", "user", "admin", "fake", "null", "none", "anonymous"
+  if (/^(test|user|admin|fake|null|none|anonymous|unknown|noname|bot|robot)$/i.test(clean)) return true;
+  // Name is just numbers appended to a generic word (e.g. "user12345")
+  if (/^(user|test|admin)\d+$/i.test(name.trim())) return true;
   return false;
+}
+
+// Detect if password is too similar to the email or name (e.g. password = email username)
+function isPasswordTooSimilar(password: string, email: string, name: string): boolean {
+  const pw = password.toLowerCase();
+  const emailUser = email.split('@')[0].toLowerCase();
+  const nameLower = name.toLowerCase().replace(/\s+/g, '');
+  if (pw.includes(emailUser) && emailUser.length > 3) return true;
+  if (pw.includes(nameLower) && nameLower.length > 4) return true;
+  return false;
+}
+
+function isBlockedUserAgent(ua: string): boolean {
+  return BLOCKED_UA_PATTERNS.some((p) => p.test(ua));
 }
 
 function getIp(req: Request): string {
@@ -183,11 +242,26 @@ async function generateReferralCode(): Promise<string> {
 export async function register(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     const { name, email, password, referral_code, captcha_token } = req.body as {
-      name: string; email: string; password: string; referral_code?: string; captcha_token?: string;
+      name: string; email: string; password: string; referral_code?: string; captcha_token?: string; _t?: string; website?: string;
     };
 
     // ── Honeypot: bots fill hidden fields, humans don't ──
     if ((req.body as { website?: string }).website) {
+      res.status(400).json({ message: 'Registration failed.' });
+      return;
+    }
+
+    // ── Block known bot/scraper user-agents ──
+    const ua = req.headers['user-agent'] ?? '';
+    if (!ua || isBlockedUserAgent(ua)) {
+      res.status(400).json({ message: 'Registration failed.' });
+      return;
+    }
+
+    // ── Form timing: reject if submitted impossibly fast (< 3 s) ──
+    const formMs = Number((req.body as { _t?: string })._t ?? 0);
+    if (formMs > 0 && Date.now() - formMs < 3000) {
+      console.warn(`[FRAUD] register too fast: ip=${getIp(req)} elapsed=${Date.now() - formMs}ms`);
       res.status(400).json({ message: 'Registration failed.' });
       return;
     }
@@ -216,6 +290,18 @@ export async function register(req: Request, res: Response, next: NextFunction):
     const pwError = validatePassword(password);
     if (pwError) { res.status(400).json({ message: pwError }); return; }
 
+    // ── Common password check ──
+    if (COMMON_PASSWORDS.has(password.toLowerCase())) {
+      res.status(400).json({ message: 'This password is too common. Please choose a stronger one.' });
+      return;
+    }
+
+    // ── Password too similar to email/name ──
+    if (isPasswordTooSimilar(password, email, name.trim())) {
+      res.status(400).json({ message: 'Password must not be similar to your name or email.' });
+      return;
+    }
+
     // ── IP multi-account guard: block if this IP already has 3+ accounts ──
     const ip = getIp(req);
     if (ip) {
@@ -227,8 +313,14 @@ export async function register(req: Request, res: Response, next: NextFunction):
       }
     }
 
-    const normalizedEmail = email.toLowerCase();
-    const exists = await db<DbUser>('users').where({ email: normalizedEmail }).first();
+    const normalizedEmail = email.toLowerCase().trim();
+    const canonicalEmail  = normalizeEmail(normalizedEmail);
+
+    // Check both raw email and canonical form (catches gmail dots/+alias tricks)
+    const exists = await db<DbUser>('users')
+      .where({ email: normalizedEmail })
+      .orWhere({ email: canonicalEmail })
+      .first();
     if (exists) { res.status(409).json({ message: 'Email already registered.' }); return; }
 
     const [hash, code] = await Promise.all([bcrypt.hash(password, 12), generateReferralCode()]);

@@ -23,6 +23,7 @@ interface RegisterData {
   referral_code?: string;
   captcha_token?: string;
   website?: string;
+  _t?: string;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
