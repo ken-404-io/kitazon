@@ -25,7 +25,7 @@ export default function Bonus() {
         <div>
           <span style={{ fontWeight: 700, color: 'var(--gold)', fontSize: 16 }}>Claim Bonus ₱20</span>
           <span style={{ fontSize: 13, color: 'var(--text-muted)', marginLeft: 10 }}>
-            Complete one offer to unlock a one-time ₱20 bonus credited to your balance.
+            Complete a task to unlock a one-time ₱20 bonus credited to your balance.
           </span>
         </div>
         <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>

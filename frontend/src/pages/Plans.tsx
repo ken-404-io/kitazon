@@ -22,7 +22,7 @@ const PLANS: {
     dailyLimit: 5,
     price:      'Free',
     priceNum:   0,
-    features:   ['₱5/day withdrawal limit', 'PayPal withdrawals', 'Task & offer earnings', 'Referral commissions'],
+    features:   ['₱5/day withdrawal limit', 'PayPal withdrawals', 'Task earnings', 'Referral bonuses'],
   },
   {
     plan:       'silver',

@@ -25,7 +25,7 @@ export default function Guide() {
         <div>
           <span style={{ fontWeight: 700, color: 'var(--gold)', fontSize: 16 }}>Free Earning Guide</span>
           <span style={{ fontSize: 13, color: 'var(--text-muted)', marginLeft: 10 }}>
-            Complete one offer to unlock the "How to Earn Fast on Kitazon" guide.
+            Complete a task to unlock the "How to Earn Fast on Kitazon" guide.
           </span>
         </div>
         <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>
