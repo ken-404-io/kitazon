@@ -226,52 +226,54 @@ export default function Withdraw() {
           </div>
         )}
 
-        {/* Hero balance */}
-        <div className={styles.heroCard}>
-          <p className={styles.heroLabel}>Current Balance</p>
-          <p className={styles.heroBalance}>₱{balance.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
-          <div>
-            <span className={styles.heroDelta}>+₱{weekAmt.toFixed(2)} this week</span>
+        {/* ── Balance + Credits side-by-side cards ── */}
+        <div className={styles.balanceRow}>
+          <div className={styles.balanceCard}>
+            <div className={styles.balanceCardIcon}>
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="2" y="5" width="20" height="14" rx="2"/>
+                <line x1="2" y1="10" x2="22" y2="10"/>
+              </svg>
+            </div>
+            <p className={styles.balanceCardLabel}>Total Balance</p>
+            <p className={styles.balanceCardVal}>₱{balance.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
           </div>
-          <button
-            className={styles.withdrawBtn}
-            onClick={() => setView('form')}
-            disabled={elig !== null && !elig.eligible}
-            style={elig !== null && !elig.eligible ? { opacity: 0.4, cursor: 'not-allowed' } : undefined}
-          >
-            {elig !== null && !elig.eligible ? '🔒 Locked' : 'Fast Cash →'}
-          </button>
+
+          <div className={`${styles.balanceCard} ${styles.creditsBalCard}`}>
+            <div className={styles.balanceCardIcon} style={{ background: 'rgba(96,165,250,0.15)', color: '#60a5fa' }}>
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="10"/>
+                <path d="M15 9.5a3.5 3.5 0 1 0-3 5.5"/>
+                <line x1="12" y1="17" x2="12" y2="17.5"/>
+              </svg>
+            </div>
+            <p className={styles.balanceCardLabel}>Credits Available</p>
+            <p className={styles.balanceCardVal} style={{ color: '#60a5fa' }}>{(elig?.withdrawal_credits ?? 0).toLocaleString()}</p>
+          </div>
         </div>
 
-        {/* Stats */}
-        <div className={styles.statsRow}>
-          <div className={styles.statBox}>
-            <p className={styles.statVal}>₱{todayAmt.toFixed(2)}</p>
-            <p className={styles.statLabel}>Earned Today</p>
-          </div>
-          <div className={styles.statBox}>
-            <p className={styles.statVal}>₱{weekAmt.toFixed(2)}</p>
-            <p className={styles.statLabel}>This Week</p>
-          </div>
-        </div>
+        <button
+          className={styles.withdrawBtn}
+          onClick={() => setView('form')}
+          disabled={elig !== null && !elig.eligible}
+          style={elig !== null && !elig.eligible ? { opacity: 0.4, cursor: 'not-allowed' } : undefined}
+        >
+          {elig !== null && !elig.eligible ? '🔒 Locked' : 'Fast Cash →'}
+        </button>
 
         <div className={styles.totalStrip}>
           Total Lifetime Earnings — <strong>₱{totalAmt.toFixed(2)}</strong>
         </div>
 
-        {/* ── Withdrawal Credits card ── */}
+        {/* ── Withdrawal Credits convert card ── */}
         <div className={styles.creditsCard}>
           <div className={styles.creditsHeader}>
             <div className={styles.creditsInfo}>
               <span className={styles.creditsIcon}>🎟️</span>
               <div>
-                <p className={styles.creditsTitle}>Withdrawal Credits</p>
-                <p className={styles.creditsSub}>1 credit = withdraw ₱1 · Earn via check-in or convert PHP</p>
+                <p className={styles.creditsTitle}>Get Withdrawal Credits</p>
+                <p className={styles.creditsSub}>₱25 = 1 credit · 1 credit = withdraw ₱1 · +1 credit per daily check-in</p>
               </div>
-            </div>
-            <div className={styles.creditsBal}>
-              <span className={styles.creditsNum}>{elig?.withdrawal_credits ?? 0}</span>
-              <span className={styles.creditsUnit}>credits</span>
             </div>
           </div>
 
@@ -291,15 +293,16 @@ export default function Withdraw() {
             <button
               className="btn-primary"
               style={{ fontSize: 13, padding: '0.55rem 1rem', whiteSpace: 'nowrap' }}
-              disabled={converting || !convertAmt || Number(convertAmt) < 1 || Number(convertAmt) > balance}
+              disabled={converting || !convertAmt || Number(convertAmt) < 25 || Number(convertAmt) > balance}
               onClick={convertCredits}
             >
               {converting ? 'Converting…' : 'Convert → Credits'}
             </button>
           </div>
           <p className={styles.convertHint}>
-            Convert ₱{convertAmt || '0'} → <strong>{Math.floor(Number(convertAmt) || 0)} credits</strong>
-            {Number(convertAmt) > 0 && Number(convertAmt) > balance ? <span style={{ color: 'var(--red)' }}> · Insufficient balance</span> : null}
+            ₱25 per credit · ₱{convertAmt || '0'} → <strong>{Math.floor((Number(convertAmt) || 0) / 25)} credits</strong>
+            {Number(convertAmt) > 0 && Number(convertAmt) < 25 ? <span style={{ color: 'var(--red)' }}> · Minimum ₱25</span> : null}
+            {Number(convertAmt) >= 25 && Number(convertAmt) > balance ? <span style={{ color: 'var(--red)' }}> · Insufficient balance</span> : null}
           </p>
         </div>
 
