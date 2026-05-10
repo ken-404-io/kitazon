@@ -46,13 +46,6 @@ export async function complete(req: Request, res: Response, next: NextFunction):
       await trx('earnings').insert({ user_id: req.user!.id, task_id: taskId, amount: task.payout, type: 'task', description: task.title });
       await trx('users').where({ id: req.user!.id }).increment('balance', task.payout);
 
-      const referral = await trx('referrals').where({ referred_id: req.user!.id }).first();
-      if (referral) {
-        const commission = parseFloat((task.payout * 0.20).toFixed(2));
-        await trx('referrals').where({ id: referral.id }).increment('commission_earned', commission);
-        await trx('earnings').insert({ user_id: referral.referrer_id, task_id: taskId, amount: commission, type: 'referral_commission', description: `Referral commission — ${task.title}` });
-        await trx('users').where({ id: referral.referrer_id }).increment('balance', commission);
-      }
     });
 
     if (duplicate) {

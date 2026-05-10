@@ -67,7 +67,7 @@ export interface DbEarning {
   user_id: number;
   task_id: number | null;
   amount: number;
-  type: 'task' | 'referral_signup' | 'referral_commission' | 'spin' | 'admin_adjustment' | 'checkin';
+  type: 'task' | 'referral_signup' | 'spin' | 'admin_adjustment' | 'checkin';
   description: string;
   created_at: Date;
 }
