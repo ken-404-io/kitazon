@@ -203,6 +203,24 @@ export async function create(req: Request, res: Response, next: NextFunction): P
       console.warn(`[FRAUD] user=${req.user!.id} ip=${ip} flags=${flags.join(',')}`);
     }
 
+    // Hard block: same IP used by multiple accounts recently
+    if (flags.includes('multiple_accounts_same_ip')) {
+      res.status(403).json({ message: 'This network connection has been used by multiple accounts recently. Withdrawal blocked for security.' });
+      return;
+    }
+
+    // Hard block: account created less than 10 minutes ago
+    if (flags.includes('new_account')) {
+      res.status(403).json({ message: 'New accounts must wait at least 10 minutes before making a withdrawal.' });
+      return;
+    }
+
+    // Hard block: too many withdrawals today
+    if (flags.includes('excessive_daily_withdrawals')) {
+      res.status(403).json({ message: 'You have reached the maximum number of withdrawals for today. Please try again tomorrow.' });
+      return;
+    }
+
     const now = new Date();
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
     const [monthTotal] = await db('withdrawals')
@@ -271,11 +289,18 @@ export async function create(req: Request, res: Response, next: NextFunction): P
     sendWithdrawalSubmittedEmail(user.email, user.name, parsed, channel, netAmount, fee).catch(() => {});
     if (isSuspicious) sendSuspiciousWithdrawalEmail(user.email, user.name, parsed, flags).catch(() => {});
 
+    const flagNotices: Record<string, string> = {
+      account_age_lt_24h:       'Your account is less than 24 hours old — this withdrawal is under manual review.',
+      high_balance_percentage:  'You are withdrawing a large portion of your balance — this withdrawal is under review.',
+      multiple_withdrawals_24h: 'Multiple withdrawals detected in the last 24 hours — this withdrawal is under review.',
+    };
+    const notice = flags.map(f => flagNotices[f]).find(Boolean) ?? (isSuspicious ? 'Your withdrawal is under review due to unusual activity.' : undefined);
+
     res.status(201).json({
       message: 'Withdrawal submitted successfully.',
       fee,
       net_amount: netAmount,
-      ...(isSuspicious ? { notice: 'Your withdrawal is under review due to unusual activity.' } : {}),
+      ...(notice ? { notice } : {}),
     });
   } catch (err) { next(err); }
 }
