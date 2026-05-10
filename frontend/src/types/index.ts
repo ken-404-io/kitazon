@@ -12,6 +12,7 @@ export interface User {
   last_login_at?: string | null;
   plan?: UserPlan;
   plan_expires_at?: string | null;
+  avatar_url?: string | null;
 }
 
 export interface Task {

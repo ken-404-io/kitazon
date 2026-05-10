@@ -4,7 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import api from '../services/api';
 import { WithdrawalStatus, WithdrawalChannel } from '../types';
 
-type Tab = 'stats' | 'users' | 'withdrawals' | 'tasks' | 'logs';
+type Tab = 'stats' | 'users' | 'withdrawals' | 'tasks' | 'logs' | 'revenue' | 'broadcast';
 
 interface PlatformStats {
   users: number;
@@ -72,6 +72,14 @@ interface AuditLog {
   user_email: string | null;
 }
 
+interface RevenueStats {
+  plan_counts: { free: number; silver: number; gold: number; diamond: number };
+  active_subscribers: number;
+  total_paid_out: number;
+  total_earnings_distributed: number;
+  new_users_30d: number;
+}
+
 const fmt = (n: number | string) => Number(n).toFixed(2);
 const STATUS_COLORS: Record<string, string> = {
   pending: '#d97706', processing: '#2563eb', completed: '#16a34a', failed: '#dc2626',
@@ -111,6 +119,23 @@ export default function Admin() {
   const [logPage, setLogPage] = useState(1);
   const [logPages, setLogPages] = useState(1);
   const [logLoading, setLogLoading] = useState(false);
+
+  // Revenue
+  const [revenueStats, setRevenueStats] = useState<RevenueStats | null>(null);
+  const [revenueLoading, setRevenueLoading] = useState(false);
+
+  // Balance adjustment
+  const [adjustingUser, setAdjustingUser] = useState<number | null>(null);
+  const [adjustAmount, setAdjustAmount] = useState('');
+  const [adjustNote, setAdjustNote] = useState('');
+  const [adjustLoading, setAdjustLoading] = useState(false);
+
+  // Broadcast
+  const [broadcastTarget, setBroadcastTarget] = useState<'all' | 'verified' | 'paid'>('all');
+  const [broadcastSubject, setBroadcastSubject] = useState('');
+  const [broadcastMessage, setBroadcastMessage] = useState('');
+  const [broadcastLoading, setBroadcastLoading] = useState(false);
+  const [broadcastResult, setBroadcastResult] = useState<string | null>(null);
 
   // Toast
   const [toast, setToast] = useState<string | null>(null);
@@ -168,13 +193,22 @@ export default function Admin() {
     } finally { setLogLoading(false); }
   }, []);
 
+  const loadRevenue = useCallback(async () => {
+    setRevenueLoading(true);
+    try {
+      const res = await api.get<RevenueStats>('/admin/revenue');
+      setRevenueStats(res.data);
+    } finally { setRevenueLoading(false); }
+  }, []);
+
   useEffect(() => {
     if (tab === 'stats' && !stats) loadStats();
     if (tab === 'users') loadUsers(userPage, userSearch);
     if (tab === 'withdrawals') loadWithdrawals(wPage, wFilter);
     if (tab === 'tasks') loadTasks();
     if (tab === 'logs') loadLogs(logPage);
-  }, [tab, userPage, wPage, wFilter, logPage, stats, loadStats, loadUsers, loadWithdrawals, loadTasks, loadLogs]);
+    if (tab === 'revenue' && !revenueStats) loadRevenue();
+  }, [tab, userPage, wPage, wFilter, logPage, stats, revenueStats, loadStats, loadUsers, loadWithdrawals, loadTasks, loadLogs, loadRevenue]);
 
   const toggleActive = async (userId: number) => {
     await api.patch(`/admin/users/${userId}/toggle-active`);
@@ -185,6 +219,38 @@ export default function Admin() {
     await api.patch(`/admin/users/${userId}/plan`, { plan });
     setUsers(prev => prev.map(u => u.id === userId ? { ...u, plan } : u));
     showToast(`Plan updated to ${plan}`);
+  };
+
+  const adjustBalance = async (userId: number) => {
+    const amount = parseFloat(adjustAmount);
+    if (isNaN(amount) || adjustNote.trim() === '') {
+      showToast('Amount and note are required.'); return;
+    }
+    setAdjustLoading(true);
+    try {
+      await api.post(`/admin/users/${userId}/balance`, { amount, note: adjustNote.trim() });
+      showToast(`Balance adjusted by ₱${amount.toFixed(2)}`);
+      setAdjustingUser(null); setAdjustAmount(''); setAdjustNote('');
+      loadUsers(userPage, userSearch);
+    } catch (err: unknown) {
+      showToast((err as { response?: { data?: { message?: string } } }).response?.data?.message ?? 'Failed to adjust balance.');
+    } finally { setAdjustLoading(false); }
+  };
+
+  const sendBroadcast = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setBroadcastLoading(true); setBroadcastResult(null);
+    try {
+      const res = await api.post<{ queued: number }>('/admin/broadcast', {
+        target: broadcastTarget,
+        subject: broadcastSubject,
+        message: broadcastMessage,
+      });
+      setBroadcastResult(`Done! ${res.data.queued} email${res.data.queued !== 1 ? 's' : ''} queued.`);
+      setBroadcastSubject(''); setBroadcastMessage('');
+    } catch (err: unknown) {
+      setBroadcastResult((err as { response?: { data?: { message?: string } } }).response?.data?.message ?? 'Broadcast failed.');
+    } finally { setBroadcastLoading(false); }
   };
 
   const updateWStatus = async (id: number, status: string) => {
@@ -211,7 +277,7 @@ export default function Admin() {
       )}
       <h2>Admin Panel</h2>
       <div style={{ display: 'flex', gap: 8, marginBottom: '1.5rem', flexWrap: 'wrap' }}>
-        {(['stats', 'users', 'withdrawals', 'tasks', 'logs'] as Tab[]).map(t => (
+        {(['stats', 'revenue', 'users', 'withdrawals', 'tasks', 'logs', 'broadcast'] as Tab[]).map(t => (
           <button key={t} style={tabStyle(t)} onClick={() => setTab(t)}>
             {t.charAt(0).toUpperCase() + t.slice(1)}
           </button>
@@ -308,14 +374,64 @@ export default function Admin() {
                         {new Date(u.created_at).toLocaleDateString()}
                       </td>
                       <td style={{ padding: '8px 10px' }}>
-                        {!u.is_admin && (
+                        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                          {!u.is_admin && (
+                            <button
+                              className="btn-outline"
+                              style={{ fontSize: 12, padding: '4px 10px', borderColor: u.is_active ? '#dc2626' : 'green', color: u.is_active ? '#dc2626' : 'green' }}
+                              onClick={() => toggleActive(u.id)}
+                            >
+                              {u.is_active ? 'Disable' : 'Enable'}
+                            </button>
+                          )}
                           <button
                             className="btn-outline"
-                            style={{ fontSize: 12, padding: '4px 10px', borderColor: u.is_active ? '#dc2626' : 'green', color: u.is_active ? '#dc2626' : 'green' }}
-                            onClick={() => toggleActive(u.id)}
+                            style={{ fontSize: 12, padding: '4px 10px', borderColor: '#f59e0b', color: '#f59e0b' }}
+                            onClick={() => {
+                              if (adjustingUser === u.id) { setAdjustingUser(null); }
+                              else { setAdjustingUser(u.id); setAdjustAmount(''); setAdjustNote(''); }
+                            }}
                           >
-                            {u.is_active ? 'Disable' : 'Enable'}
+                            💰 Adjust
                           </button>
+                        </div>
+                        {adjustingUser === u.id && (
+                          <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 6, minWidth: 200 }}>
+                            <input
+                              type="number"
+                              placeholder="Amount (+ credit / - debit)"
+                              value={adjustAmount}
+                              onChange={e => setAdjustAmount(e.target.value)}
+                              step="0.01"
+                              style={{ padding: '5px 8px', borderRadius: 6, border: '1px solid #e5e7eb', fontSize: 12, width: '100%' }}
+                            />
+                            <input
+                              type="text"
+                              placeholder="Note (required)"
+                              value={adjustNote}
+                              onChange={e => setAdjustNote(e.target.value)}
+                              maxLength={200}
+                              required
+                              style={{ padding: '5px 8px', borderRadius: 6, border: '1px solid #e5e7eb', fontSize: 12, width: '100%' }}
+                            />
+                            <div style={{ display: 'flex', gap: 6 }}>
+                              <button
+                                className="btn-primary"
+                                style={{ fontSize: 12, padding: '4px 10px', flex: 1 }}
+                                disabled={adjustLoading}
+                                onClick={() => adjustBalance(u.id)}
+                              >
+                                {adjustLoading ? 'Saving…' : 'Apply'}
+                              </button>
+                              <button
+                                className="btn-outline"
+                                style={{ fontSize: 12, padding: '4px 10px' }}
+                                onClick={() => setAdjustingUser(null)}
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                          </div>
                         )}
                       </td>
                     </tr>

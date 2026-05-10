@@ -139,3 +139,43 @@ export async function updateProfile(req: Request, res: Response, next: NextFunct
     res.json({ message: 'Profile updated.', name: name.trim() });
   } catch (err) { next(err); }
 }
+
+export async function updateAvatar(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const { avatar_url } = req.body as { avatar_url: unknown };
+
+    if (!avatar_url || typeof avatar_url !== 'string') {
+      res.status(400).json({ message: 'avatar_url is required.' }); return;
+    }
+    const url = String(avatar_url).trim();
+    if (!url.startsWith('https://')) {
+      res.status(400).json({ message: 'avatar_url must be a valid https:// URL.' }); return;
+    }
+    if (url.length > 500) {
+      res.status(400).json({ message: 'avatar_url must be 500 characters or fewer.' }); return;
+    }
+
+    await db('users').where({ id: req.user!.id }).update({ avatar_url: url });
+    await logAudit(req.user!.id, 'avatar_update', req);
+
+    const user = await db<DbUser>('users').where({ id: req.user!.id }).first();
+    if (!user) { res.status(404).json({ message: 'User not found.' }); return; }
+
+    res.json({
+      message: 'Avatar updated.',
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        balance: user.balance,
+        referral_code: user.referral_code,
+        email_verified: user.email_verified,
+        is_admin: user.is_admin,
+        totp_enabled: user.totp_enabled,
+        last_login_at: user.last_login_at,
+        plan: user.plan,
+        avatar_url: user.avatar_url,
+      },
+    });
+  } catch (err) { next(err); }
+}

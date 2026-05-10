@@ -2,7 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import db from '../../config/database';
 import { DbUser, DbWithdrawal, WithdrawalStatus, UserPlan } from '../types';
 import { logAudit } from '../services/audit';
-import { sendWithdrawalStatusEmail } from '../services/email';
+import { sendWithdrawalStatusEmail, sendBroadcastEmail } from '../services/email';
 
 const VALID_STATUSES: WithdrawalStatus[] = ['pending', 'processing', 'completed', 'failed'];
 
@@ -270,6 +270,153 @@ export async function updateUserPlan(req: Request, res: Response, next: NextFunc
       .first();
 
     res.json({ message: 'User plan updated.', user: updated });
+  } catch (err) { next(err); }
+}
+
+// ─── Balance adjustment ───────────────────────────────────────────────────────
+export async function adjustBalance(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const userId = Number(req.params.id);
+    const { amount, note } = req.body as { amount: unknown; note: unknown };
+
+    if (typeof amount !== 'number' || isNaN(amount) || amount === 0 || amount < -100000 || amount > 100000) {
+      res.status(400).json({ message: 'amount must be a non-zero number between -100000 and 100000.' });
+      return;
+    }
+    if (!note || typeof note !== 'string' || !String(note).trim()) {
+      res.status(400).json({ message: 'note is required.' });
+      return;
+    }
+
+    const user = await db<DbUser>('users').where({ id: userId }).first();
+    if (!user) { res.status(404).json({ message: 'User not found.' }); return; }
+
+    if (amount < 0 && Number(user.balance) + amount < 0) {
+      res.status(400).json({ message: 'Insufficient balance. Cannot go below zero.' });
+      return;
+    }
+
+    let updatedBalance: number;
+    await db.transaction(async (trx) => {
+      if (amount > 0) {
+        await trx<DbUser>('users').where({ id: userId }).increment('balance', amount);
+      } else {
+        await trx<DbUser>('users').where({ id: userId }).decrement('balance', Math.abs(amount));
+      }
+      await trx('earnings').insert({
+        user_id: userId,
+        task_id: null,
+        amount,
+        type: 'admin_adjustment',
+        description: String(note).trim(),
+      });
+      const [updated] = await trx<DbUser>('users').where({ id: userId }).select('balance');
+      updatedBalance = Number(updated.balance);
+    });
+
+    await logAudit(req.user!.id, 'admin_balance_adjustment', req, {
+      amount,
+      metadata: { target_user_id: userId, amount, note: String(note).trim() },
+    });
+
+    res.json({ message: 'Balance adjusted.', balance: updatedBalance! });
+  } catch (err) { next(err); }
+}
+
+// ─── Broadcast email ──────────────────────────────────────────────────────────
+export async function broadcastEmail(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const { subject, message, target } = req.body as { subject: unknown; message: unknown; target: unknown };
+
+    if (!subject || typeof subject !== 'string' || !String(subject).trim()) {
+      res.status(400).json({ message: 'subject is required.' }); return;
+    }
+    if (!message || typeof message !== 'string' || !String(message).trim()) {
+      res.status(400).json({ message: 'message is required.' }); return;
+    }
+    if (!target || !['all', 'verified', 'paid'].includes(String(target))) {
+      res.status(400).json({ message: 'target must be one of: all, verified, paid.' }); return;
+    }
+    if (String(subject).trim().length > 200) {
+      res.status(400).json({ message: 'subject must be 200 characters or fewer.' }); return;
+    }
+    if (String(message).trim().length > 2000) {
+      res.status(400).json({ message: 'message must be 2000 characters or fewer.' }); return;
+    }
+
+    let query = db<DbUser>('users').where({ is_active: true }).select('email', 'name').limit(500);
+
+    if (target === 'verified') {
+      query = query.where({ email_verified: true });
+    } else if (target === 'paid') {
+      query = query.whereNot({ plan: 'free' });
+    }
+
+    const users = await query;
+
+    const subjectStr = String(subject).trim();
+    const messageStr = String(message).trim();
+
+    // Fire-and-forget
+    Promise.allSettled(
+      users.map((u) => sendBroadcastEmail(u.email, u.name, subjectStr, messageStr))
+    ).catch(() => {});
+
+    await logAudit(req.user!.id, 'admin_broadcast_email', req, {
+      metadata: { target, subject: subjectStr, recipient_count: users.length },
+    });
+
+    res.json({ queued: users.length });
+  } catch (err) { next(err); }
+}
+
+// ─── Revenue stats ────────────────────────────────────────────────────────────
+const PLAN_PRICES: Record<string, number> = { silver: 99, gold: 199, diamond: 399 };
+
+export async function revenueStats(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+
+    // Plan upgrade audit log entries — approximate revenue
+    const upgradeRows = await db('audit_logs')
+      .where({ action: 'plan_upgrade' })
+      .select('metadata');
+
+    let subscriptionRevenue = 0;
+    for (const row of upgradeRows) {
+      let meta: Record<string, unknown> = {};
+      try {
+        meta = typeof row.metadata === 'string' ? JSON.parse(row.metadata) : (row.metadata ?? {});
+      } catch { /* skip */ }
+      const plan = String(meta.plan ?? '');
+      subscriptionRevenue += PLAN_PRICES[plan] ?? 0;
+    }
+
+    const [planBreakdownRows, totalWithdrawals, totalEarnings, newUsers, activeSubscribers] = await Promise.all([
+      db<DbUser>('users').select('plan').count('id as cnt').groupBy('plan'),
+      db('withdrawals').where({ status: 'completed' }).sum('net_amount as total').first(),
+      db('earnings').sum('amount as total').first(),
+      db<DbUser>('users').where('created_at', '>=', thirtyDaysAgo).count('id as total').first(),
+      db<DbUser>('users')
+        .whereNot({ plan: 'free' })
+        .where('plan_expires_at', '>', new Date())
+        .count('id as total')
+        .first(),
+    ]);
+
+    const planBreakdown: Record<string, number> = { free: 0, silver: 0, gold: 0, diamond: 0 };
+    for (const row of planBreakdownRows) {
+      planBreakdown[String(row.plan)] = Number((row as unknown as { cnt: unknown }).cnt);
+    }
+
+    res.json({
+      subscription_revenue: subscriptionRevenue,
+      plan_breakdown: planBreakdown,
+      total_withdrawals_paid: Number(totalWithdrawals?.total ?? 0),
+      total_earnings_distributed: Number(totalEarnings?.total ?? 0),
+      new_users_30d: Number((newUsers as unknown as { total: unknown } | undefined)?.total ?? 0),
+      active_subscribers: Number((activeSubscribers as unknown as { total: unknown } | undefined)?.total ?? 0),
+    });
   } catch (err) { next(err); }
 }
 

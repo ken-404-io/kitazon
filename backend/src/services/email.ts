@@ -176,6 +176,16 @@ export async function sendPlanUpgradeEmail(to: string, name: string, plan: strin
   `));
 }
 
+export async function sendBroadcastEmail(to: string, name: string, subject: string, message: string): Promise<void> {
+  const dashboardLink = `${BASE}/dashboard`;
+  await send(to, subject, layout(subject, `
+    ${h2(`Hi ${name.split(' ')[0]},`)}
+    ${p(message.replace(/\n/g, '<br>'))}
+    <div style="text-align:center;margin:24px 0;">${btn(dashboardLink, 'Go to Dashboard')}</div>
+    ${p('Thank you for being part of the Kitazon community.')}
+  `));
+}
+
 export async function sendReferralEarnedEmail(to: string, name: string, referredName: string, amount: number): Promise<void> {
   const dashboardLink = `${BASE}/dashboard`;
   await send(to, `You earned ₱${amount.toFixed(2)} from a referral!`, layout('Referral Bonus Earned', `
