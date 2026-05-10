@@ -85,14 +85,8 @@ export async function requestOtp(req: Request, res: Response, next: NextFunction
 
     const elig = await getWithdrawalEligibility(user.id, user);
     if (!elig.eligible) {
-      if (elig.reasons.includes('account_too_new')) {
-        res.status(403).json({ message: `Your account must be at least ${ACCOUNT_AGE_DAYS_REQUIRED} days old before withdrawing. ${elig.hours_remaining} hours remaining.` });
-        return;
-      }
-      if (elig.reasons.includes('insufficient_tasks')) {
-        res.status(403).json({ message: `Complete at least ${TASKS_REQUIRED} tasks before withdrawing. You have completed ${elig.tasks_completed}/${TASKS_REQUIRED}.` });
-        return;
-      }
+      res.status(403).json({ message: 'Please verify your email before making withdrawals.' });
+      return;
     }
 
     // Credits pre-check so user gets feedback before receiving OTP
@@ -151,14 +145,8 @@ export async function create(req: Request, res: Response, next: NextFunction): P
 
     const elig = await getWithdrawalEligibility(user.id, user);
     if (!elig.eligible) {
-      if (elig.reasons.includes('account_too_new')) {
-        res.status(403).json({ message: `Your account must be at least ${ACCOUNT_AGE_DAYS_REQUIRED} days old. ${elig.hours_remaining} hours remaining.` });
-        return;
-      }
-      if (elig.reasons.includes('insufficient_tasks')) {
-        res.status(403).json({ message: `Complete at least ${TASKS_REQUIRED} tasks before withdrawing. You have completed ${elig.tasks_completed}/${TASKS_REQUIRED}.` });
-        return;
-      }
+      res.status(403).json({ message: 'Please verify your email before making withdrawals.' });
+      return;
     }
 
     // Withdrawal credits check: need 1 credit per ₱1 withdrawn
