@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
+import dns from 'dns/promises';
 import db from '../../config/database';
 import { DbUser, DbRefreshToken, AuthPayload } from '../types';
 import { sendVerificationEmail, sendPasswordResetEmail, sendLoginAlertEmail, sendReferralEarnedEmail } from '../services/email';
@@ -167,6 +168,26 @@ function getIp(req: Request): string {
   return ((req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim()) ?? req.ip ?? '';
 }
 
+// Verify email domain has real MX records (catches invented domains)
+async function hasMxRecord(email: string): Promise<boolean> {
+  const domain = email.split('@')[1];
+  if (!domain) return false;
+  try {
+    const records = await dns.resolveMx(domain);
+    return records.length > 0;
+  } catch {
+    return false;
+  }
+}
+
+// Check if IP matches referrer — falls back to last_login_ip when registration_ip is null
+function isSameIpAsReferrer(ip: string, referrer: DbUser & { registration_ip?: string | null }): boolean {
+  if (!ip) return false;
+  if (referrer.registration_ip && referrer.registration_ip === ip) return true;
+  if (referrer.last_login_ip && referrer.last_login_ip === ip) return true;
+  return false;
+}
+
 // ─── Account lockout (DB-backed — survives restarts) ─────────────────────────
 const MAX_ATTEMPTS = 5;
 const LOCKOUT_MS   = 15 * 60 * 1000;
@@ -287,6 +308,12 @@ export async function register(req: Request, res: Response, next: NextFunction):
       res.status(400).json({ message: 'Disposable or temporary email addresses are not allowed. Please use a real email.' });
       return;
     }
+    // Verify the email domain has real MX records — catches invented domains like @fake-xyz.com
+    const mxValid = await hasMxRecord(email);
+    if (!mxValid) {
+      res.status(400).json({ message: 'Email domain does not appear to be valid. Please use a real email address.' });
+      return;
+    }
     const pwError = validatePassword(password);
     if (pwError) { res.status(400).json({ message: pwError }); return; }
 
@@ -335,41 +362,21 @@ export async function register(req: Request, res: Response, next: NextFunction):
     const verifyToken = await createOtp(user.id, 'email_verify', 24 * 60);
     await sendVerificationEmail(user.email, user.name, verifyToken).catch(() => {});
 
-    // Referral signup bonus (in transaction, idempotency-guarded)
+    // Record referral relationship — bonus is deferred until email is verified
     if (referral_code) {
       const upperCode = referral_code.toUpperCase().trim();
       if (upperCode.length > 0 && upperCode !== code) {
         const referrer = await db<DbUser>('users').where({ referral_code: upperCode, is_active: true }).first();
-        const referrerIp = referrer ? (referrer as DbUser & { registration_ip?: string }).registration_ip : null;
-
-        // Block bonus if: referrer doesn't exist, self-referral, or same IP as referrer
-        const sameIp = ip && referrerIp && ip === referrerIp;
-
-        // Block bonus if this IP already claimed a bonus for this referral code before
-        const ipAbuseCount = ip ? await db('referrals')
-          .join('users as referred', 'referrals.referred_id', 'referred.id')
-          .where('referrals.referrer_id', referrer?.id ?? 0)
-          .whereRaw('referred.registration_ip = ?', [ip])
-          .count('referrals.id as cnt').first() : null;
-        const ipAbused = Number((ipAbuseCount as { cnt?: unknown })?.cnt ?? 0) > 0;
-
-        if (referrer && referrer.id !== user.id && !sameIp && !ipAbused) {
-          await db.transaction(async (trx) => {
-            const existing = await trx('referrals').where({ referred_id: user.id }).first();
-            if (existing) return;
-            await trx('referrals').insert({ referrer_id: referrer.id, referred_id: user.id, commission_earned: 0 });
-            await trx('earnings').insert({ user_id: referrer.id, task_id: null, amount: 50, type: 'referral_signup', description: `Referral signup bonus — ${name.trim()}` });
-            await trx<DbUser>('users').where({ id: referrer.id }).increment('balance', 50);
-            await sendReferralEarnedEmail(referrer.email, referrer.name, name.trim(), 50).catch(() => {});
-          });
-        } else if (referrer) {
-          // Still record the referral link (no bonus) so we can track the relationship
+        if (referrer && referrer.id !== user.id) {
           const existing = await db('referrals').where({ referred_id: user.id }).first();
           if (!existing) {
-            await db('referrals').insert({ referrer_id: referrer.id, referred_id: user.id, commission_earned: 0 });
-          }
-          if (sameIp || ipAbused) {
-            console.warn(`[FRAUD] referral bonus blocked: referrer=${referrer.id} new_user=${user.id} ip=${ip} reason=${sameIp ? 'same_ip' : 'ip_already_claimed'}`);
+            // Store relationship; bonus_paid=false so verifyEmail can grant it after checks
+            try {
+              await db('referrals').insert({ referrer_id: referrer.id, referred_id: user.id, commission_earned: 0, bonus_paid: false });
+            } catch {
+              // Fallback if bonus_paid column doesn't exist yet
+              await db('referrals').insert({ referrer_id: referrer.id, referred_id: user.id, commission_earned: 0 });
+            }
           }
         }
       }
@@ -556,6 +563,50 @@ export async function verifyEmail(req: Request, res: Response, next: NextFunctio
       await trx('otp_tokens').where({ id: otpRecord.id }).update({ used_at: new Date() });
       await trx('users').where({ id: otpRecord.user_id }).update({ email_verified: true });
     });
+
+    // Grant referral signup bonus now that email is confirmed real
+    try {
+      const verifiedUser = await db<DbUser>('users').where({ id: otpRecord.user_id }).first();
+      if (verifiedUser) {
+        const referral = await db('referrals').where({ referred_id: verifiedUser.id }).first();
+        if (referral) {
+          // Check if bonus already paid (bonus_paid column may not exist — treat missing as unpaid)
+          const alreadyPaid = referral.bonus_paid === true;
+          if (!alreadyPaid) {
+            const referrer = await db<DbUser>('users').where({ id: referral.referrer_id }).first();
+            if (referrer) {
+              const userIp = verifiedUser.registration_ip ?? null;
+
+              // Fraud checks at bonus grant time
+              const sameIp = isSameIpAsReferrer(userIp ?? '', referrer as DbUser & { registration_ip?: string | null });
+
+              const ipAbuseCount = userIp ? await db('referrals')
+                .join('users as referred', 'referrals.referred_id', 'referred.id')
+                .where('referrals.referrer_id', referrer.id)
+                .where('referrals.referred_id', '!=', verifiedUser.id)
+                .whereRaw('referred.registration_ip = ?', [userIp])
+                .count('referrals.id as cnt').first() : null;
+              const ipAbused = Number((ipAbuseCount as { cnt?: unknown })?.cnt ?? 0) > 0;
+
+              if (!sameIp && !ipAbused) {
+                await db.transaction(async (trx) => {
+                  await trx('earnings').insert({ user_id: referrer.id, task_id: null, amount: 50, type: 'referral_signup', description: `Referral signup bonus — ${verifiedUser.name}` });
+                  await trx<DbUser>('users').where({ id: referrer.id }).increment('balance', 50);
+                  try { await trx('referrals').where({ id: referral.id }).update({ bonus_paid: true }); } catch { /* column may not exist */ }
+                });
+                sendReferralEarnedEmail(referrer.email, referrer.name, verifiedUser.name, 50).catch(() => {});
+              } else {
+                console.warn(`[FRAUD] referral bonus blocked at verify: referrer=${referrer.id} user=${verifiedUser.id} ip=${userIp} reason=${sameIp ? 'same_ip' : 'ip_already_claimed'}`);
+                try { await db('referrals').where({ id: referral.id }).update({ bonus_paid: true }); } catch { /* mark paid so we don't retry */ }
+              }
+            }
+          }
+        }
+      }
+    } catch (bonusErr) {
+      // Never let bonus logic break email verification
+      console.error('[verifyEmail] referral bonus error:', bonusErr);
+    }
 
     res.json({ message: 'Email verified successfully. You can now make withdrawals.' });
   } catch (err) { next(err); }
