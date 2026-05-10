@@ -21,8 +21,9 @@ interface FormState {
 export default function Register() {
   const { register } = useAuth();
   const [params] = useSearchParams();
+  const refFromUrl = params.get('ref') ?? '';
   const [form, setForm] = useState<FormState>({
-    name: '', email: '', password: '', referral_code: params.get('ref') ?? '',
+    name: '', email: '', password: '', referral_code: refFromUrl,
   });
   const [touched, setTouched] = useState({ name: false, email: false, password: false });
   const [error, setError]     = useState('');
@@ -135,13 +136,15 @@ export default function Register() {
             {passwordErr && <p className="field-hint hint-invalid">{passwordErr}</p>}
           </div>
           <div className="form-group">
-            <label>Referral Code (optional)</label>
+            <label>Referral Code {refFromUrl ? '' : '(optional)'}</label>
             <input
               type="text"
               value={form.referral_code}
-              onChange={set('referral_code')}
+              onChange={refFromUrl ? undefined : set('referral_code')}
+              readOnly={!!refFromUrl}
               autoComplete="off"
               maxLength={20}
+              style={refFromUrl ? { opacity: 0.7, cursor: 'not-allowed' } : undefined}
             />
           </div>
           {HCAPTCHA_SITE_KEY && (
