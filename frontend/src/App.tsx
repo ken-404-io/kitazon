@@ -19,7 +19,6 @@ import ResetPassword from './pages/ResetPassword';
 import Admin from './pages/Admin';
 import Leaderboard from './pages/Leaderboard';
 import WithdrawalReceipt from './pages/WithdrawalReceipt';
-import Offers from './pages/Offers';
 import Bonus from './pages/Bonus';
 import Guide from './pages/Guide';
 import { ReactNode } from 'react';
@@ -72,7 +71,6 @@ export default function App() {
           <Route path="/admin" element={<PrivateRoute><Admin /></PrivateRoute>} />
           <Route path="/leaderboard" element={<Leaderboard />} />
           <Route path="/withdrawals/:id/receipt" element={<PrivateRoute><WithdrawalReceipt /></PrivateRoute>} />
-          <Route path="/offers" element={<PrivateRoute><Offers /></PrivateRoute>} />
           <Route path="/bonus" element={<PrivateRoute><Bonus /></PrivateRoute>} />
           <Route path="/guide" element={<PrivateRoute><Guide /></PrivateRoute>} />
           <Route path="/terms" element={<Terms />} />

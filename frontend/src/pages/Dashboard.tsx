@@ -18,7 +18,6 @@ import styles from './Dashboard.module.css';
 function earningIcon(type: string) {
   if (type === 'spin')               return <DiceIcon />;
   if (type === 'referral_commission') return <UsersIcon />;
-  if (type === 'affiliate_offer')     return <SmartphoneIcon />;
   return <CheckCircleIcon />;
 }
 
@@ -84,7 +83,7 @@ export default function Dashboard() {
             <div className={styles.promoIcon} style={{ background: 'var(--primary-subtle)', color: 'var(--primary)' }}><GiftIcon /></div>
             <div>
               <div style={{ fontWeight: 700, color: 'var(--primary)', fontSize: 15 }}>Claim Bonus ₱20</div>
-              <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>Complete one offer to unlock</div>
+              <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>Complete a task to unlock</div>
             </div>
             <span style={{ marginLeft: 'auto', color: 'var(--primary)', fontSize: 18, fontWeight: 700 }}>→</span>
           </div>
