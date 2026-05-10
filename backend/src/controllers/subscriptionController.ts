@@ -157,13 +157,22 @@ export async function captureOrder(req: Request, res: Response, next: NextFuncti
     }
 
     const planExpiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
-    await db<DbUser>('users').where({ id: req.user!.id }).update({
-      plan: plan as UserPlan,
-      plan_expires_at: planExpiresAt,
-    });
+
+    // Try updating with plan_expires_at; fall back to plan-only if column doesn't exist yet
+    try {
+      await db<DbUser>('users').where({ id: req.user!.id }).update({
+        plan: plan as UserPlan,
+        plan_expires_at: planExpiresAt,
+      });
+    } catch (dbErr) {
+      console.warn('[Plan upgrade] plan_expires_at update failed, retrying without it:', dbErr);
+      await db<DbUser>('users').where({ id: req.user!.id }).update({ plan: plan as UserPlan });
+    }
+
     await logAudit(req.user!.id, 'plan_upgrade', req, { metadata: { plan, paypal_order_id: orderId_confirmed } });
 
     const user = await db<DbUser>('users').where({ id: req.user!.id }).first();
+    console.log(`[Plan upgrade] userId=${req.user!.id} plan=${plan} db_plan=${user?.plan}`);
 
     // Send upgrade confirmation email (fire-and-forget)
     if (user) {
@@ -192,10 +201,11 @@ export async function paypalWebhook(req: Request, res: Response, next: NextFunct
         if (userId && plan && plan in { silver: 1, gold: 1, diamond: 1 }) {
           try {
             const planExpiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
-            await db<DbUser>('users').where({ id: userId }).update({
-              plan,
-              plan_expires_at: planExpiresAt,
-            });
+            try {
+              await db<DbUser>('users').where({ id: userId }).update({ plan, plan_expires_at: planExpiresAt });
+            } catch {
+              await db<DbUser>('users').where({ id: userId }).update({ plan });
+            }
 
             const user = await db<DbUser>('users').where({ id: userId }).first();
             if (user) {
