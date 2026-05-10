@@ -35,11 +35,6 @@ type View = 'overview' | 'form' | 'history';
 
 interface Eligibility {
   eligible: boolean;
-  account_age_days: number;
-  account_age_required: number;
-  hours_remaining: number;
-  tasks_completed: number;
-  tasks_required: number;
   email_verified: boolean;
   is_first_withdrawal: boolean;
   withdrawal_credits: number;
@@ -173,41 +168,16 @@ export default function Withdraw() {
                 {elig.email_verified && <span className={styles.reqBadge}>Done</span>}
               </div>
 
-              {/* Account age */}
-              <div className={`${styles.reqRow} ${elig.account_age_days >= elig.account_age_required ? styles.reqDone : styles.reqPending}`}>
-                <span className={styles.reqIcon}>
-                  {elig.account_age_days >= elig.account_age_required
-                    ? <CheckIcon />
-                    : <span className={styles.reqNum}>2</span>}
-                </span>
+              {/* Withdrawal credits */}
+              <div className={`${styles.reqRow} ${elig.withdrawal_credits >= 5 ? styles.reqDone : styles.reqPending}`}>
+                <span className={styles.reqIcon}>{elig.withdrawal_credits >= 5 ? <CheckIcon /> : <span className={styles.reqNum}>2</span>}</span>
                 <div className={styles.reqText}>
-                  <span>Account must be {elig.account_age_required} days old</span>
-                  {elig.account_age_days < elig.account_age_required
-                    ? <span className={styles.reqSub}>{elig.hours_remaining}h remaining · Account is {elig.account_age_days.toFixed(1)} days old</span>
-                    : <span className={styles.reqSub}>Account is {elig.account_age_days.toFixed(1)} days old</span>}
+                  <span>Have withdrawal credits</span>
+                  <span className={styles.reqSub}>You have {elig.withdrawal_credits} credit{elig.withdrawal_credits !== 1 ? 's' : ''} · earn via daily check-in or convert ₱25 → 1 credit</span>
                 </div>
-                {elig.account_age_days >= elig.account_age_required
+                {elig.withdrawal_credits >= 5
                   ? <span className={styles.reqBadge}>Done</span>
-                  : <span className={styles.reqCountdown}>{elig.hours_remaining}h left</span>}
-              </div>
-
-              {/* Tasks completed */}
-              <div className={`${styles.reqRow} ${elig.tasks_completed >= elig.tasks_required ? styles.reqDone : styles.reqPending}`}>
-                <span className={styles.reqIcon}>
-                  {elig.tasks_completed >= elig.tasks_required
-                    ? <CheckIcon />
-                    : <span className={styles.reqNum}>3</span>}
-                </span>
-                <div className={styles.reqText}>
-                  <span>Complete {elig.tasks_required} tasks</span>
-                  <span className={styles.reqSub}>{elig.tasks_completed} of {elig.tasks_required} completed</span>
-                </div>
-                <div className={styles.reqProgress}>
-                  <div className={styles.reqBar}>
-                    <div className={styles.reqBarFill} style={{ width: `${Math.min(100, (elig.tasks_completed / elig.tasks_required) * 100)}%` }} />
-                  </div>
-                  <span className={styles.reqProgressLabel}>{elig.tasks_completed}/{elig.tasks_required}</span>
-                </div>
+                  : <span className={styles.reqCountdown}>{elig.withdrawal_credits} credits</span>}
               </div>
 
             </div>
