@@ -188,6 +188,53 @@ function isSameIpAsReferrer(ip: string, referrer: DbUser & { registration_ip?: s
   return false;
 }
 
+// Levenshtein distance — detect suspiciously similar email usernames across referrals
+function levenshtein(a: string, b: string): number {
+  const m = a.length, n = b.length;
+  const dp: number[][] = Array.from({ length: m + 1 }, (_, i) =>
+    Array.from({ length: n + 1 }, (_, j) => (i === 0 ? j : j === 0 ? i : 0))
+  );
+  for (let i = 1; i <= m; i++)
+    for (let j = 1; j <= n; j++)
+      dp[i][j] = a[i-1] === b[j-1] ? dp[i-1][j-1] : 1 + Math.min(dp[i-1][j], dp[i][j-1], dp[i-1][j-1]);
+  return dp[m][n];
+}
+
+async function hasEmailCluster(newEmail: string, referrerId: number): Promise<boolean> {
+  const newUser = newEmail.split('@')[0].toLowerCase();
+  // Get email usernames of the last 10 referred users for this referrer
+  const recent = await db('referrals')
+    .join('users as referred', 'referrals.referred_id', 'referred.id')
+    .where('referrals.referrer_id', referrerId)
+    .orderBy('referrals.id', 'desc')
+    .limit(10)
+    .pluck('referred.email') as string[];
+  for (const email of recent) {
+    const existing = email.split('@')[0].toLowerCase();
+    // Flag if username differs by only 1-2 chars (e.g. user1, user2, user3)
+    if (existing.length > 3 && levenshtein(newUser, existing) <= 2) return true;
+  }
+  return false;
+}
+
+// Referrer eligibility: verified email + account >= 3 days old
+async function isReferrerEligible(referrer: DbUser): Promise<boolean> {
+  if (!referrer.email_verified) return false;
+  const ageMs = Date.now() - new Date(referrer.created_at).getTime();
+  if (ageMs < 3 * 24 * 60 * 60 * 1000) return false; // account < 3 days old
+  return true;
+}
+
+// Referral velocity: block bonus if referrer already got 3+ bonuses in the last 24h
+async function referrerExceedsDailyLimit(referrerId: number): Promise<boolean> {
+  const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
+  const [row] = await db('earnings')
+    .where({ user_id: referrerId, type: 'referral_signup' })
+    .where('created_at', '>', since)
+    .count('id as cnt');
+  return Number(row.cnt) >= 3;
+}
+
 // ─── Account lockout (DB-backed — survives restarts) ─────────────────────────
 const MAX_ATTEMPTS = 5;
 const LOCKOUT_MS   = 15 * 60 * 1000;
@@ -263,8 +310,9 @@ async function generateReferralCode(): Promise<string> {
 export async function register(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     const { name, email, password, referral_code, captcha_token } = req.body as {
-      name: string; email: string; password: string; referral_code?: string; captcha_token?: string; _t?: string; website?: string;
+      name: string; email: string; password: string; referral_code?: string; captcha_token?: string; _t?: string; website?: string; _fp?: string;
     };
+    const deviceFingerprint = (req.body as { _fp?: string })._fp ?? null;
 
     // ── Honeypot: bots fill hidden fields, humans don't ──
     if ((req.body as { website?: string }).website) {
@@ -340,6 +388,18 @@ export async function register(req: Request, res: Response, next: NextFunction):
       }
     }
 
+    // ── Device fingerprint guard: block if this browser fingerprint has 2+ accounts ──
+    if (deviceFingerprint) {
+      try {
+        const fpCount = await db('users').whereRaw('device_fingerprint = ?', [deviceFingerprint]).count('id as cnt').first();
+        if (Number((fpCount as { cnt?: unknown })?.cnt ?? 0) >= 2) {
+          console.warn(`[FRAUD] register blocked: fingerprint=${deviceFingerprint} already has 2+ accounts`);
+          res.status(429).json({ message: 'Too many accounts registered from this device. Please contact support.' });
+          return;
+        }
+      } catch { /* column may not exist yet — skip */ }
+    }
+
     const normalizedEmail = email.toLowerCase().trim();
     const canonicalEmail  = normalizeEmail(normalizedEmail);
 
@@ -356,6 +416,7 @@ export async function register(req: Request, res: Response, next: NextFunction):
       name: name.trim(), email: normalizedEmail, password_hash: hash,
       referral_code: code, balance: 0, email_verified: false,
       registration_ip: ip || null,
+      ...(deviceFingerprint ? { device_fingerprint: deviceFingerprint } : {}),
     }).returning('*');
 
     // Send verification email
@@ -588,7 +649,26 @@ export async function verifyEmail(req: Request, res: Response, next: NextFunctio
                 .count('referrals.id as cnt').first() : null;
               const ipAbused = Number((ipAbuseCount as { cnt?: unknown })?.cnt ?? 0) > 0;
 
-              if (!sameIp && !ipAbused) {
+              // Referrer eligibility: verified + account >= 3 days old
+              const referrerEligible = await isReferrerEligible(referrer);
+              // Referrer velocity: max 3 bonuses per 24h
+              const velocityExceeded = await referrerExceedsDailyLimit(referrer.id);
+              // Email username similarity clustering
+              const emailClustered = await hasEmailCluster(verifiedUser.email, referrer.id);
+              // Device fingerprint match
+              const referrerFp = (referrer as DbUser & { device_fingerprint?: string | null }).device_fingerprint;
+              const verifiedFp  = (verifiedUser as DbUser & { device_fingerprint?: string | null }).device_fingerprint;
+              const sameFp = !!(referrerFp && verifiedFp && referrerFp === verifiedFp);
+
+              const fraudReasons: string[] = [];
+              if (sameIp)            fraudReasons.push('same_ip');
+              if (ipAbused)          fraudReasons.push('ip_already_claimed');
+              if (!referrerEligible) fraudReasons.push('referrer_not_eligible');
+              if (velocityExceeded)  fraudReasons.push('velocity_exceeded');
+              if (emailClustered)    fraudReasons.push('email_cluster');
+              if (sameFp)            fraudReasons.push('same_device_fingerprint');
+
+              if (fraudReasons.length === 0) {
                 await db.transaction(async (trx) => {
                   await trx('earnings').insert({ user_id: referrer.id, task_id: null, amount: 50, type: 'referral_signup', description: `Referral signup bonus — ${verifiedUser.name}` });
                   await trx<DbUser>('users').where({ id: referrer.id }).increment('balance', 50);
@@ -596,7 +676,7 @@ export async function verifyEmail(req: Request, res: Response, next: NextFunctio
                 });
                 sendReferralEarnedEmail(referrer.email, referrer.name, verifiedUser.name, 50).catch(() => {});
               } else {
-                console.warn(`[FRAUD] referral bonus blocked at verify: referrer=${referrer.id} user=${verifiedUser.id} ip=${userIp} reason=${sameIp ? 'same_ip' : 'ip_already_claimed'}`);
+                console.warn(`[FRAUD] referral bonus blocked at verify: referrer=${referrer.id} user=${verifiedUser.id} ip=${userIp} reasons=${fraudReasons.join(',')}`);
                 try { await db('referrals').where({ id: referral.id }).update({ bonus_paid: true }); } catch { /* mark paid so we don't retry */ }
               }
             }
