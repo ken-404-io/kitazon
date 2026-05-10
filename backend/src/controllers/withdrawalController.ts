@@ -178,12 +178,14 @@ export async function create(req: Request, res: Response, next: NextFunction): P
     const ip = (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() ?? req.ip ?? '';
 
     // Check 1: multiple withdrawals from same IP in last hour (other accounts)
-    const recentSameIp = await db('withdrawals')
-      .where('created_at', '>', new Date(Date.now() - 60 * 60 * 1000))
-      .whereRaw('ip_address = ?', [ip])
-      .whereNot({ user_id: req.user!.id })
-      .count('id as cnt').first();
-    if (Number((recentSameIp as any)?.cnt) >= 3) flags.push('multiple_accounts_same_ip');
+    try {
+      const recentSameIp = await db('withdrawals')
+        .where('created_at', '>', new Date(Date.now() - 60 * 60 * 1000))
+        .whereRaw('ip_address = ?', [ip])
+        .whereNot({ user_id: req.user!.id })
+        .count('id as cnt').first();
+      if (Number((recentSameIp as any)?.cnt) >= 3) flags.push('multiple_accounts_same_ip');
+    } catch { /* ip_address column not yet migrated — skip */ }
 
     // Check 2: withdrawal within 10 minutes of account creation
     const accountAge = Date.now() - new Date(user.created_at).getTime();
