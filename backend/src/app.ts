@@ -15,7 +15,6 @@ import payoutRoutes from './routes/payouts';
 import accountRoutes from './routes/account';
 import adminRoutes from './routes/admin';
 import totpRoutes from './routes/totp';
-import affiliateRoutes from './routes/affiliate';
 import googleAuthRoutes from './routes/googleAuth';
 import subscriptionRoutes from './routes/subscriptions';
 
@@ -146,7 +145,6 @@ app.use('/api/payouts', payoutRoutes);
 app.use('/api/account', accountRoutes);
 app.use('/api/admin', authLimiter, adminRoutes);
 app.use('/api/totp', totpRoutes);
-app.use('/api/affiliate', affiliateRoutes);
 app.use('/api/auth', googleAuthRoutes);
 app.use('/api/subscriptions', subscriptionRoutes);
 

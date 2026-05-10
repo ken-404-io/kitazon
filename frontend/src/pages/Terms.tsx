@@ -24,7 +24,7 @@ export default function Terms() {
 
         <section className={styles.section}>
           <h2>4. Earning and Withdrawals</h2>
-          <p>Earnings are credited when qualifying tasks or offers are completed as verified by our third-party partners. Kitazon reserves the right to withhold or reverse credits obtained through fraudulent activity. Withdrawals are subject to minimum amounts and processing fees disclosed at the time of request.</p>
+          <p>Earnings are credited when qualifying tasks are completed. Kitazon reserves the right to withhold or reverse credits obtained through fraudulent activity. Withdrawals are subject to minimum amounts and processing fees disclosed at the time of request.</p>
         </section>
 
         <section className={styles.section}>

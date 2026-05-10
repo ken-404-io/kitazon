@@ -19,7 +19,7 @@ export default function Privacy() {
 
         <section className={styles.section}>
           <h2>3. Sharing of Information</h2>
-          <p>We do not sell your personal data. We share data only with: (a) third-party offer partners to verify task completions; (b) payment processors to execute withdrawals; (c) service providers under confidentiality obligations; (d) law enforcement when legally required.</p>
+          <p>We do not sell your personal data. We share data only with: (a) payment processors to execute withdrawals; (b) service providers under confidentiality obligations; (c) law enforcement when legally required.</p>
         </section>
 
         <section className={styles.section}>
