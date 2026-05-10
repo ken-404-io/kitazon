@@ -119,17 +119,41 @@ export async function captureOrder(req: Request, res: Response, next: NextFuncti
       headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
     });
 
-    if (!capture.ok) {
-      const err = await capture.text();
-      console.error('PayPal capture error:', err);
-      res.status(502).json({ message: 'Payment capture failed.' });
-      return;
-    }
+    let orderId_confirmed = orderId;
 
-    const captureData = await capture.json() as { status: string; id: string };
-    if (captureData.status !== 'COMPLETED') {
-      res.status(402).json({ message: `Payment not completed. Status: ${captureData.status}` });
-      return;
+    if (!capture.ok) {
+      const errText = await capture.text();
+      console.error('PayPal capture error:', capture.status, errText);
+
+      // ORDER_ALREADY_CAPTURED means payment went through — verify order status instead
+      if (capture.status === 422 || errText.includes('ORDER_ALREADY_CAPTURED') || errText.includes('ORDER_ALREADY_COMPLETED')) {
+        const orderRes = await fetch(`${paypalBase()}/v2/checkout/orders/${orderId}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (orderRes.ok) {
+          const orderData = await orderRes.json() as { status: string; id: string };
+          if (orderData.status === 'COMPLETED') {
+            orderId_confirmed = orderData.id;
+            // Fall through to plan upgrade below
+          } else {
+            res.status(402).json({ message: 'Payment not completed.' });
+            return;
+          }
+        } else {
+          res.status(502).json({ message: 'Payment capture failed.' });
+          return;
+        }
+      } else {
+        res.status(502).json({ message: 'Payment capture failed.' });
+        return;
+      }
+    } else {
+      const captureData = await capture.json() as { status: string; id: string };
+      if (captureData.status !== 'COMPLETED') {
+        res.status(402).json({ message: `Payment not completed. Status: ${captureData.status}` });
+        return;
+      }
+      orderId_confirmed = captureData.id;
     }
 
     const planExpiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
@@ -137,7 +161,7 @@ export async function captureOrder(req: Request, res: Response, next: NextFuncti
       plan: plan as UserPlan,
       plan_expires_at: planExpiresAt,
     });
-    await logAudit(req.user!.id, 'plan_upgrade', req, { metadata: { plan, paypal_order_id: captureData.id } });
+    await logAudit(req.user!.id, 'plan_upgrade', req, { metadata: { plan, paypal_order_id: orderId_confirmed } });
 
     const user = await db<DbUser>('users').where({ id: req.user!.id }).first();
 
