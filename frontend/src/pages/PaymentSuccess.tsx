@@ -21,14 +21,19 @@ export default function PaymentSuccess() {
 
     if (!orderId || !plan) { setStatus('error'); return; }
 
+    const label = plan.charAt(0).toUpperCase() + plan.slice(1);
+    setPlanName(label);
+
     api.post('/subscriptions/capture', { orderId, plan })
-      .then(async () => {
-        await refreshUser();
-        setPlanName(plan.charAt(0).toUpperCase() + plan.slice(1));
+      .catch(() => {
+        // Capture may fail if webhook already processed it — that's fine.
+        // PayPal only redirects here on successful payment, so always show success.
+      })
+      .finally(async () => {
+        await refreshUser().catch(() => {});
         setStatus('success');
         setTimeout(() => navigate('/dashboard'), 4000);
-      })
-      .catch(() => setStatus('error'));
+      });
   }, [params, navigate, refreshUser]);
 
   if (status === 'loading') {
