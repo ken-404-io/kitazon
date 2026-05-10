@@ -640,6 +640,106 @@ export default function Admin() {
           </div>
         </div>
       )}
+
+      {/* ── Revenue ── */}
+      {tab === 'revenue' && (
+        <div>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
+            <h3 style={{ margin: 0 }}>Revenue Dashboard</h3>
+            <button className="btn-outline" style={{ fontSize: 13 }} onClick={loadRevenue} disabled={revenueLoading}>
+              {revenueLoading ? 'Loading…' : '↻ Refresh'}
+            </button>
+          </div>
+          {!revenueStats ? (
+            <p>{revenueLoading ? 'Loading...' : 'No data yet.'}</p>
+          ) : (
+            <>
+              <h4 style={{ marginBottom: '0.75rem', color: '#9ca3af', fontSize: 13, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Plan Breakdown</h4>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
+                {(Object.entries(revenueStats.plan_counts) as [PlanValue, number][]).map(([plan, count]) => (
+                  <div key={plan} className="card" style={{ textAlign: 'center', borderTop: `3px solid ${PLAN_COLORS[plan]}` }}>
+                    <div style={{ fontSize: 28, fontWeight: 700, color: PLAN_COLORS[plan] }}>{count}</div>
+                    <div style={{ fontSize: 13, color: '#6b7280', marginTop: 4, textTransform: 'capitalize', fontWeight: 600 }}>{plan} Users</div>
+                  </div>
+                ))}
+              </div>
+              <h4 style={{ marginBottom: '0.75rem', color: '#9ca3af', fontSize: 13, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Financial Summary</h4>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '1rem' }}>
+                {[
+                  { label: 'Active Subscribers', value: revenueStats.active_subscribers, color: '#60a5fa' },
+                  { label: 'Total Paid Out', value: `₱${fmt(revenueStats.total_paid_out)}`, color: '#f59e0b' },
+                  { label: 'Earnings Distributed', value: `₱${fmt(revenueStats.total_earnings_distributed)}`, color: '#22c55e' },
+                  { label: 'New Users (30d)', value: revenueStats.new_users_30d, color: '#a78bfa' },
+                ].map(s => (
+                  <div key={s.label} className="card" style={{ textAlign: 'center' }}>
+                    <div style={{ fontSize: 28, fontWeight: 700, color: s.color }}>{s.value}</div>
+                    <div style={{ fontSize: 13, color: '#6b7280', marginTop: 4 }}>{s.label}</div>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+      )}
+
+      {/* ── Broadcast ── */}
+      {tab === 'broadcast' && (
+        <div style={{ maxWidth: 640 }}>
+          <h3 style={{ marginBottom: '1rem' }}>Broadcast Email</h3>
+          <div className="card">
+            <form onSubmit={sendBroadcast}>
+              <div className="form-group">
+                <label style={{ fontSize: 13, fontWeight: 600, marginBottom: 6, display: 'block' }}>Target Audience</label>
+                <select
+                  value={broadcastTarget}
+                  onChange={e => setBroadcastTarget(e.target.value as 'all' | 'verified' | 'paid')}
+                  style={{ padding: '8px 12px', borderRadius: 6, border: '1px solid var(--dark-border)', background: 'var(--dark-bg)', color: 'var(--text)', width: '100%', fontSize: 14 }}
+                >
+                  <option value="all">All Users</option>
+                  <option value="verified">Verified Only</option>
+                  <option value="paid">Paid Plans Only</option>
+                </select>
+              </div>
+              <div className="form-group">
+                <label style={{ fontSize: 13, fontWeight: 600, marginBottom: 6, display: 'block' }}>
+                  Subject <span style={{ color: '#9ca3af', fontWeight: 400 }}>({broadcastSubject.length}/200)</span>
+                </label>
+                <input
+                  type="text"
+                  value={broadcastSubject}
+                  onChange={e => setBroadcastSubject(e.target.value)}
+                  placeholder="Email subject line…"
+                  maxLength={200}
+                  required
+                  style={{ padding: '8px 12px', borderRadius: 6, border: '1px solid var(--dark-border)', background: 'var(--dark-bg)', color: 'var(--text)', width: '100%', fontSize: 14 }}
+                />
+              </div>
+              <div className="form-group">
+                <label style={{ fontSize: 13, fontWeight: 600, marginBottom: 6, display: 'block' }}>
+                  Message <span style={{ color: '#9ca3af', fontWeight: 400 }}>({broadcastMessage.length}/2000)</span>
+                </label>
+                <textarea
+                  value={broadcastMessage}
+                  onChange={e => setBroadcastMessage(e.target.value)}
+                  placeholder="Write your message here…"
+                  maxLength={2000}
+                  required
+                  rows={8}
+                  style={{ padding: '8px 12px', borderRadius: 6, border: '1px solid var(--dark-border)', background: 'var(--dark-bg)', color: 'var(--text)', width: '100%', fontSize: 14, resize: 'vertical', fontFamily: 'inherit' }}
+                />
+              </div>
+              {broadcastResult && (
+                <p style={{ fontSize: 14, color: broadcastResult.startsWith('Done') ? '#22c55e' : '#dc2626', marginBottom: '0.75rem', fontWeight: 600 }}>
+                  {broadcastResult}
+                </p>
+              )}
+              <button className="btn-primary" type="submit" disabled={broadcastLoading} style={{ width: '100%' }}>
+                {broadcastLoading ? 'Sending…' : 'Send Broadcast'}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
