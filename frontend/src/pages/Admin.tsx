@@ -15,6 +15,15 @@ interface PlatformStats {
   total_earnings_distributed: number;
 }
 
+type PlanValue = 'free' | 'silver' | 'gold' | 'diamond';
+
+const PLAN_COLORS: Record<PlanValue, string> = {
+  free: '#6b7280',
+  silver: '#9ca3af',
+  gold: '#f59e0b',
+  diamond: '#60a5fa',
+};
+
 interface AdminUser {
   id: number;
   name: string;
@@ -25,6 +34,8 @@ interface AdminUser {
   email_verified: boolean;
   created_at: string;
   last_login_at: string | null;
+  plan?: string;
+  plan_expires_at?: string | null;
 }
 
 interface AdminWithdrawal {
@@ -101,6 +112,13 @@ export default function Admin() {
   const [logPages, setLogPages] = useState(1);
   const [logLoading, setLogLoading] = useState(false);
 
+  // Toast
+  const [toast, setToast] = useState<string | null>(null);
+  const showToast = (msg: string) => {
+    setToast(msg);
+    setTimeout(() => setToast(null), 3000);
+  };
+
   // Redirect non-admins
   useEffect(() => {
     if (user && !user.is_admin) navigate('/dashboard', { replace: true });
@@ -163,6 +181,12 @@ export default function Admin() {
     loadUsers(userPage, userSearch);
   };
 
+  const changePlan = async (userId: number, plan: PlanValue) => {
+    await api.patch(`/admin/users/${userId}/plan`, { plan });
+    setUsers(prev => prev.map(u => u.id === userId ? { ...u, plan } : u));
+    showToast(`Plan updated to ${plan}`);
+  };
+
   const updateWStatus = async (id: number, status: string) => {
     await api.patch(`/admin/withdrawals/${id}/status`, { status });
     loadWithdrawals(wPage, wFilter);
@@ -180,6 +204,11 @@ export default function Admin() {
 
   return (
     <div style={{ maxWidth: 1100, margin: '2rem auto', padding: '0 1rem' }}>
+      {toast && (
+        <div style={{ position: 'fixed', top: 20, right: 20, background: '#16a34a', color: '#fff', padding: '10px 18px', borderRadius: 8, zIndex: 9999, fontWeight: 600 }}>
+          {toast}
+        </div>
+      )}
       <h2>Admin Panel</h2>
       <div style={{ display: 'flex', gap: 8, marginBottom: '1.5rem', flexWrap: 'wrap' }}>
         {(['stats', 'users', 'withdrawals', 'tasks', 'logs'] as Tab[]).map(t => (
@@ -230,7 +259,7 @@ export default function Admin() {
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
                 <thead>
                   <tr style={{ borderBottom: '2px solid #e5e7eb', background: '#f9fafb' }}>
-                    {['ID', 'Name', 'Email', 'Balance', 'Verified', 'Active', 'Joined', 'Actions'].map(h => (
+                    {['ID', 'Name', 'Email', 'Balance', 'Plan', 'Verified', 'Active', 'Joined', 'Actions'].map(h => (
                       <th key={h} style={{ padding: '8px 10px', textAlign: 'left', whiteSpace: 'nowrap' }}>{h}</th>
                     ))}
                   </tr>
@@ -242,6 +271,33 @@ export default function Admin() {
                       <td style={{ padding: '8px 10px' }}>{u.name}</td>
                       <td style={{ padding: '8px 10px' }}>{u.email}</td>
                       <td style={{ padding: '8px 10px' }}>₱{fmt(u.balance)}</td>
+                      <td style={{ padding: '8px 10px' }}>
+                        <span style={{
+                          display: 'inline-block',
+                          padding: '2px 8px',
+                          borderRadius: 12,
+                          fontSize: 11,
+                          fontWeight: 700,
+                          background: PLAN_COLORS[(u.plan ?? 'free') as PlanValue] + '22',
+                          color: PLAN_COLORS[(u.plan ?? 'free') as PlanValue],
+                          border: `1px solid ${PLAN_COLORS[(u.plan ?? 'free') as PlanValue]}`,
+                          marginBottom: 4,
+                          textTransform: 'uppercase',
+                        }}>
+                          {u.plan ?? 'free'}
+                        </span>
+                        <br />
+                        <select
+                          value={u.plan ?? 'free'}
+                          onChange={e => changePlan(u.id, e.target.value as PlanValue)}
+                          style={{ fontSize: 11, padding: '2px 6px', borderRadius: 4, border: '1px solid #e5e7eb', marginTop: 2 }}
+                        >
+                          <option value="free">free</option>
+                          <option value="silver">silver</option>
+                          <option value="gold">gold</option>
+                          <option value="diamond">diamond</option>
+                        </select>
+                      </td>
                       <td style={{ padding: '8px 10px', color: u.email_verified ? 'green' : '#d97706' }}>
                         {u.email_verified ? 'Yes' : 'No'}
                       </td>

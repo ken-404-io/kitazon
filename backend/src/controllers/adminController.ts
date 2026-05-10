@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import db from '../../config/database';
-import { DbUser, DbWithdrawal, WithdrawalStatus } from '../types';
+import { DbUser, DbWithdrawal, WithdrawalStatus, UserPlan } from '../types';
 import { logAudit } from '../services/audit';
 import { sendWithdrawalStatusEmail } from '../services/email';
 
@@ -36,7 +36,7 @@ export async function listUsers(req: Request, res: Response, next: NextFunction)
     const search = String(req.query.search ?? '').trim();
 
     let query = db<DbUser>('users')
-      .select('id', 'name', 'email', 'balance', 'is_active', 'is_admin', 'email_verified', 'created_at', 'last_login_at')
+      .select('id', 'name', 'email', 'balance', 'is_active', 'is_admin', 'email_verified', 'created_at', 'last_login_at', 'plan', 'plan_expires_at')
       .orderBy('created_at', 'desc')
       .limit(limit)
       .offset(offset);

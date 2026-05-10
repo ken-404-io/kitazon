@@ -11,6 +11,7 @@ export interface User {
   totp_enabled?: boolean;
   last_login_at?: string | null;
   plan?: UserPlan;
+  plan_expires_at?: string | null;
 }
 
 export interface Task {
