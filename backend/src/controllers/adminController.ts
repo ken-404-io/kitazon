@@ -226,6 +226,53 @@ export async function updateTask(req: Request, res: Response, next: NextFunction
   } catch (err) { next(err); }
 }
 
+// ─── Plan management ──────────────────────────────────────────────────────────
+const VALID_PLANS: UserPlan[] = ['free', 'silver', 'gold', 'diamond'];
+
+export async function updateUserPlan(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const userId = Number(req.params.id);
+    const { plan, plan_expires_at } = req.body as { plan?: string; plan_expires_at?: string };
+
+    if (!plan || !VALID_PLANS.includes(plan as UserPlan)) {
+      res.status(400).json({ message: 'Invalid plan. Must be one of: free, silver, gold, diamond.' });
+      return;
+    }
+
+    const user = await db<DbUser>('users').where({ id: userId }).first();
+    if (!user) { res.status(404).json({ message: 'User not found.' }); return; }
+
+    let expiresAt: Date | null;
+    if (plan === 'free') {
+      expiresAt = null;
+    } else if (plan_expires_at) {
+      expiresAt = new Date(plan_expires_at);
+      if (isNaN(expiresAt.getTime())) {
+        res.status(400).json({ message: 'Invalid plan_expires_at date.' });
+        return;
+      }
+    } else {
+      expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+    }
+
+    await db<DbUser>('users').where({ id: userId }).update({
+      plan: plan as UserPlan,
+      plan_expires_at: expiresAt,
+    });
+
+    await logAudit(req.user!.id, 'admin_update_user_plan', req, {
+      metadata: { target_user_id: userId, plan, plan_expires_at: expiresAt },
+    });
+
+    const updated = await db<DbUser>('users')
+      .where({ id: userId })
+      .select('id', 'name', 'email', 'plan', 'plan_expires_at', 'is_active', 'balance')
+      .first();
+
+    res.json({ message: 'User plan updated.', user: updated });
+  } catch (err) { next(err); }
+}
+
 // ─── Audit logs ───────────────────────────────────────────────────────────────
 export async function listAuditLogs(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
