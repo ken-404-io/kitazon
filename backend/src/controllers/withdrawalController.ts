@@ -8,6 +8,40 @@ import { logAudit } from '../services/audit';
 
 const VALID_CHANNELS: WithdrawalChannel[] = ['paypal'];
 const ACCOUNT_PATTERN = /^[a-zA-Z0-9@.\-\s]{5,60}$/;
+const ACCOUNT_AGE_DAYS_REQUIRED = 3;
+const TASKS_REQUIRED = 3;
+
+// ─── Shared eligibility helper ────────────────────────────────────────────────
+async function getWithdrawalEligibility(userId: number, user: DbUser) {
+  const accountAgeDays = (Date.now() - new Date(user.created_at).getTime()) / (1000 * 60 * 60 * 24);
+  const hoursRemaining = Math.max(0, Math.ceil((ACCOUNT_AGE_DAYS_REQUIRED * 24) - accountAgeDays * 24));
+
+  const taskRow = await db('earnings')
+    .where({ user_id: userId, type: 'task' })
+    .countDistinct('task_id as cnt')
+    .first();
+  const tasksCompleted = Number(taskRow?.cnt ?? 0);
+
+  const prevWithdrawal = await db('withdrawals').where({ user_id: userId }).first();
+  const isFirstWithdrawal = !prevWithdrawal;
+
+  const reasons: string[] = [];
+  if (!user.email_verified)                        reasons.push('email_not_verified');
+  if (accountAgeDays < ACCOUNT_AGE_DAYS_REQUIRED)  reasons.push('account_too_new');
+  if (tasksCompleted < TASKS_REQUIRED)              reasons.push('insufficient_tasks');
+
+  return {
+    eligible: reasons.length === 0,
+    account_age_days: Math.floor(accountAgeDays * 10) / 10,
+    account_age_required: ACCOUNT_AGE_DAYS_REQUIRED,
+    hours_remaining: hoursRemaining,
+    tasks_completed: tasksCompleted,
+    tasks_required: TASKS_REQUIRED,
+    email_verified: user.email_verified,
+    is_first_withdrawal: isFirstWithdrawal,
+    reasons,
+  };
+}
 
 
 function maskAccount(account: string): string {
@@ -42,6 +76,14 @@ async function detectSuspicious(userId: number, amount: number, user: DbUser): P
   return { flags, isSuspicious: flags.length > 0 };
 }
 
+export async function eligibility(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const user = await db<DbUser>('users').where({ id: req.user!.id }).first();
+    if (!user) { res.status(404).json({ message: 'User not found.' }); return; }
+    res.json(await getWithdrawalEligibility(user.id, user));
+  } catch (err) { next(err); }
+}
+
 export async function requestOtp(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     const { amount } = req.body as { amount: string | number };
@@ -56,6 +98,18 @@ export async function requestOtp(req: Request, res: Response, next: NextFunction
     if (!user.email_verified) {
       res.status(403).json({ message: 'Please verify your email before making withdrawals.' });
       return;
+    }
+
+    const elig = await getWithdrawalEligibility(user.id, user);
+    if (!elig.eligible) {
+      if (elig.reasons.includes('account_too_new')) {
+        res.status(403).json({ message: `Your account must be at least ${ACCOUNT_AGE_DAYS_REQUIRED} days old before withdrawing. ${elig.hours_remaining} hours remaining.` });
+        return;
+      }
+      if (elig.reasons.includes('insufficient_tasks')) {
+        res.status(403).json({ message: `Complete at least ${TASKS_REQUIRED} tasks before withdrawing. You have completed ${elig.tasks_completed}/${TASKS_REQUIRED}.` });
+        return;
+      }
     }
 
     const otp = await createOtp(user.id, 'withdrawal_otp', 10);
@@ -97,6 +151,18 @@ export async function create(req: Request, res: Response, next: NextFunction): P
     if (!user.email_verified) {
       res.status(403).json({ message: 'Please verify your email before making withdrawals.' });
       return;
+    }
+
+    const elig = await getWithdrawalEligibility(user.id, user);
+    if (!elig.eligible) {
+      if (elig.reasons.includes('account_too_new')) {
+        res.status(403).json({ message: `Your account must be at least ${ACCOUNT_AGE_DAYS_REQUIRED} days old. ${elig.hours_remaining} hours remaining.` });
+        return;
+      }
+      if (elig.reasons.includes('insufficient_tasks')) {
+        res.status(403).json({ message: `Complete at least ${TASKS_REQUIRED} tasks before withdrawing. You have completed ${elig.tasks_completed}/${TASKS_REQUIRED}.` });
+        return;
+      }
     }
 
     // Block if user already has a pending or processing withdrawal
@@ -177,10 +243,11 @@ export async function create(req: Request, res: Response, next: NextFunction): P
           channel, account_number, status: 'pending',
           ip_address: ip || null,
           is_flagged: isSuspicious,
-          metadata: flags.length > 0 ? JSON.stringify({ flags }) : null,
+          is_first_withdrawal: elig.is_first_withdrawal,
+          metadata: JSON.stringify({ flags: flags.length > 0 ? flags : undefined, is_first: elig.is_first_withdrawal }),
         });
       } catch {
-        // Fallback: insert without optional fraud columns if they don't exist in DB yet
+        // Fallback: insert without optional columns if they don't exist in DB yet
         await trx('withdrawals').insert({
           user_id: req.user!.id, amount: parsed, fee, net_amount: netAmount,
           channel, account_number, status: 'pending',

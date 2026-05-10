@@ -33,12 +33,25 @@ const STATUS_COLOR: Record<WithdrawalStatus, string> = {
 
 type View = 'overview' | 'form' | 'history';
 
+interface Eligibility {
+  eligible: boolean;
+  account_age_days: number;
+  account_age_required: number;
+  hours_remaining: number;
+  tasks_completed: number;
+  tasks_required: number;
+  email_verified: boolean;
+  is_first_withdrawal: boolean;
+  reasons: string[];
+}
+
 export default function Withdraw() {
   const { user }      = useAuth();
   const { showToast } = useToast();
   const [view,      setView]      = useState<View>('overview');
   const [stats,     setStats]     = useState<UserStats | null>(null);
   const [history,   setHistory]   = useState<Withdrawal[]>([]);
+  const [elig,      setElig]      = useState<Eligibility | null>(null);
   const [preset,    setPreset]    = useState<number | null>(null);
   const [account,   setAccount]   = useState('');
   const [loading,   setLoading]   = useState(false);
@@ -52,6 +65,7 @@ export default function Withdraw() {
   const loadData = () => {
     api.get<UserStats>('/auth/me/stats').then(r => setStats(r.data)).catch(() => {});
     api.get<Withdrawal[]>('/withdrawals').then(r => setHistory(r.data)).catch(() => {});
+    api.get<Eligibility>('/withdrawals/eligibility').then(r => setElig(r.data)).catch(() => {});
   };
   useEffect(() => { loadData(); }, []);
 
@@ -124,6 +138,77 @@ export default function Withdraw() {
           {plan === 'free' && <Link to="/plans" className={styles.upgradeLink}>Upgrade →</Link>}
         </div>
 
+        {/* ── Withdrawal requirements checklist ── */}
+        {elig && !elig.eligible && (
+          <div className={styles.requirementsCard}>
+            <p className={styles.reqTitle}>
+              <LockIcon /> Complete these steps to unlock withdrawals
+            </p>
+            <div className={styles.reqList}>
+
+              {/* Email verification */}
+              <div className={`${styles.reqRow} ${elig.email_verified ? styles.reqDone : styles.reqPending}`}>
+                <span className={styles.reqIcon}>{elig.email_verified ? <CheckIcon /> : <span className={styles.reqNum}>1</span>}</span>
+                <div className={styles.reqText}>
+                  <span>Verify your email</span>
+                  {!elig.email_verified && <span className={styles.reqSub}>Check your inbox for the verification link</span>}
+                </div>
+                {elig.email_verified && <span className={styles.reqBadge}>Done</span>}
+              </div>
+
+              {/* Account age */}
+              <div className={`${styles.reqRow} ${elig.account_age_days >= elig.account_age_required ? styles.reqDone : styles.reqPending}`}>
+                <span className={styles.reqIcon}>
+                  {elig.account_age_days >= elig.account_age_required
+                    ? <CheckIcon />
+                    : <span className={styles.reqNum}>2</span>}
+                </span>
+                <div className={styles.reqText}>
+                  <span>Account must be {elig.account_age_required} days old</span>
+                  {elig.account_age_days < elig.account_age_required
+                    ? <span className={styles.reqSub}>{elig.hours_remaining}h remaining · Account is {elig.account_age_days.toFixed(1)} days old</span>
+                    : <span className={styles.reqSub}>Account is {elig.account_age_days.toFixed(1)} days old</span>}
+                </div>
+                {elig.account_age_days >= elig.account_age_required
+                  ? <span className={styles.reqBadge}>Done</span>
+                  : <span className={styles.reqCountdown}>{elig.hours_remaining}h left</span>}
+              </div>
+
+              {/* Tasks completed */}
+              <div className={`${styles.reqRow} ${elig.tasks_completed >= elig.tasks_required ? styles.reqDone : styles.reqPending}`}>
+                <span className={styles.reqIcon}>
+                  {elig.tasks_completed >= elig.tasks_required
+                    ? <CheckIcon />
+                    : <span className={styles.reqNum}>3</span>}
+                </span>
+                <div className={styles.reqText}>
+                  <span>Complete {elig.tasks_required} tasks</span>
+                  <span className={styles.reqSub}>{elig.tasks_completed} of {elig.tasks_required} completed</span>
+                </div>
+                <div className={styles.reqProgress}>
+                  <div className={styles.reqBar}>
+                    <div className={styles.reqBarFill} style={{ width: `${Math.min(100, (elig.tasks_completed / elig.tasks_required) * 100)}%` }} />
+                  </div>
+                  <span className={styles.reqProgressLabel}>{elig.tasks_completed}/{elig.tasks_required}</span>
+                </div>
+              </div>
+
+            </div>
+            <Link to="/tasks" className={styles.reqCta}>Go to Tasks →</Link>
+          </div>
+        )}
+
+        {/* First-withdrawal notice (shown even when eligible) */}
+        {elig?.eligible && elig.is_first_withdrawal && (
+          <div className={styles.firstWithdrawNotice}>
+            <AlertIcon />
+            <div>
+              <strong>First withdrawal is reviewed by our team</strong>
+              <p>This is a one-time check. After approval, all future withdrawals are processed automatically.</p>
+            </div>
+          </div>
+        )}
+
         {/* Hero balance */}
         <div className={styles.heroCard}>
           <p className={styles.heroLabel}>Current Balance</p>
@@ -131,8 +216,13 @@ export default function Withdraw() {
           <div>
             <span className={styles.heroDelta}>+₱{weekAmt.toFixed(2)} this week</span>
           </div>
-          <button className={styles.withdrawBtn} onClick={() => setView('form')}>
-            Fast Cash →
+          <button
+            className={styles.withdrawBtn}
+            onClick={() => setView('form')}
+            disabled={elig !== null && !elig.eligible}
+            style={elig !== null && !elig.eligible ? { opacity: 0.4, cursor: 'not-allowed' } : undefined}
+          >
+            {elig !== null && !elig.eligible ? '🔒 Locked' : 'Fast Cash →'}
           </button>
         </div>
 
