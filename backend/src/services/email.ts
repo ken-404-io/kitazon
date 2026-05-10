@@ -158,3 +158,34 @@ export async function sendWithdrawalSubmittedEmail(to: string, name: string, amo
     ${p('If you did <strong style="color:#e8e8e8;">not</strong> request this withdrawal, contact support immediately.')}
   `));
 }
+
+export async function sendPlanUpgradeEmail(to: string, name: string, plan: string, expiresAt: Date): Promise<void> {
+  const planLabel = plan.charAt(0).toUpperCase() + plan.slice(1);
+  const expiryStr = expiresAt.toLocaleDateString('en-PH', { year: 'numeric', month: 'long', day: 'numeric' });
+  const dashboardLink = `${BASE}/dashboard`;
+  await send(to, `You're now on Kitazon ${planLabel}! 🎉`, layout(`Plan Upgraded to ${planLabel}`, `
+    ${h2(`Welcome to ${planLabel}, ${name.split(' ')[0]}! 🚀`)}
+    ${p(`Your Kitazon account has been upgraded to the <strong style="color:#f97316;">${planLabel} Plan</strong>. Enjoy your new benefits!`)}
+    ${table(
+      row('Plan', `<span style="color:#f97316;font-weight:800;">${planLabel}</span>`) +
+      row('Valid Until', expiryStr)
+    )}
+    ${p('Your plan will automatically revert to Free at the end of the period. Renew anytime to keep your benefits.')}
+    <div style="text-align:center;margin:24px 0;">${btn(dashboardLink, 'Go to Dashboard')}</div>
+    ${p('Thank you for supporting Kitazon!')}
+  `));
+}
+
+export async function sendReferralEarnedEmail(to: string, name: string, referredName: string, amount: number): Promise<void> {
+  const dashboardLink = `${BASE}/dashboard`;
+  await send(to, `You earned ₱${amount.toFixed(2)} from a referral!`, layout('Referral Bonus Earned', `
+    ${h2(`You earned a referral bonus! 🎉`)}
+    ${p(`Hi ${name.split(' ')[0]}, <strong style="color:#e8e8e8;">${referredName}</strong> just signed up using your referral link and you've earned a bonus.`)}
+    ${table(
+      row('Referred User', referredName) +
+      row('Bonus Earned', `<span style="color:#22c55e;font-weight:800;">+₱${amount.toFixed(2)}</span>`)
+    )}
+    ${p('The bonus has been credited to your Kitazon balance. Keep sharing your referral link to earn more!')}
+    <div style="text-align:center;margin:24px 0;">${btn(dashboardLink, 'View My Balance')}</div>
+  `));
+}

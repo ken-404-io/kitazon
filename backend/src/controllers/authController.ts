@@ -4,7 +4,7 @@ import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
 import db from '../../config/database';
 import { DbUser, DbRefreshToken, AuthPayload } from '../types';
-import { sendVerificationEmail, sendPasswordResetEmail, sendLoginAlertEmail } from '../services/email';
+import { sendVerificationEmail, sendPasswordResetEmail, sendLoginAlertEmail, sendReferralEarnedEmail } from '../services/email';
 import { createOtp, verifyOtp } from '../services/otp';
 import { logAudit, logLoginEvent } from '../services/audit';
 import { verifyTotpLogin } from './totpController';
@@ -183,6 +183,7 @@ export async function register(req: Request, res: Response, next: NextFunction):
             await trx('referrals').insert({ referrer_id: referrer.id, referred_id: user.id, commission_earned: 0 });
             await trx('earnings').insert({ user_id: referrer.id, task_id: null, amount: 50, type: 'referral_signup', description: `Referral signup bonus — ${name.trim()}` });
             await trx<DbUser>('users').where({ id: referrer.id }).increment('balance', 50);
+            await sendReferralEarnedEmail(referrer.email, referrer.name, name.trim(), 50).catch(() => {});
           });
         }
       }
@@ -304,11 +305,17 @@ export async function refresh(req: Request, res: Response, next: NextFunction): 
       return;
     }
 
-    const user = await db<DbUser>('users').where({ id: record.user_id, is_active: true }).first();
+    let user = await db<DbUser>('users').where({ id: record.user_id, is_active: true }).first();
     if (!user) {
       clearRefreshCookie(res);
       res.status(401).json({ message: 'User not found.' });
       return;
+    }
+
+    // Auto-downgrade expired paid plans
+    if (user.plan !== 'free' && user.plan_expires_at && new Date(user.plan_expires_at) < new Date()) {
+      await db('users').where({ id: user.id }).update({ plan: 'free', plan_expires_at: null });
+      user = { ...user, plan: 'free', plan_expires_at: null };
     }
 
     // Token rotation: revoke old, issue new

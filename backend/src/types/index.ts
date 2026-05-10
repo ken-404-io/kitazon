@@ -28,6 +28,7 @@ export interface DbUser {
   totp_secret: string | null;
   totp_enabled: boolean;
   plan: UserPlan;
+  plan_expires_at: Date | null;
   created_at: Date;
   updated_at: Date;
 }

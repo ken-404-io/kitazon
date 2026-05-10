@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import db from '../../config/database';
-import { DbUser, DbWithdrawal, WithdrawalStatus } from '../types';
+import { DbUser, DbWithdrawal, WithdrawalStatus, UserPlan } from '../types';
 import { logAudit } from '../services/audit';
 import { sendWithdrawalStatusEmail } from '../services/email';
 
@@ -36,7 +36,7 @@ export async function listUsers(req: Request, res: Response, next: NextFunction)
     const search = String(req.query.search ?? '').trim();
 
     let query = db<DbUser>('users')
-      .select('id', 'name', 'email', 'balance', 'is_active', 'is_admin', 'email_verified', 'created_at', 'last_login_at')
+      .select('id', 'name', 'email', 'balance', 'is_active', 'is_admin', 'email_verified', 'created_at', 'last_login_at', 'plan', 'plan_expires_at')
       .orderBy('created_at', 'desc')
       .limit(limit)
       .offset(offset);
@@ -223,6 +223,53 @@ export async function updateTask(req: Request, res: Response, next: NextFunction
     const [updated] = await db('tasks').where({ id: taskId }).update(updates).returning('*');
     await logAudit(req.user!.id, 'admin_update_task', req, { metadata: { task_id: taskId } });
     res.json(updated);
+  } catch (err) { next(err); }
+}
+
+// ─── Plan management ──────────────────────────────────────────────────────────
+const VALID_PLANS: UserPlan[] = ['free', 'silver', 'gold', 'diamond'];
+
+export async function updateUserPlan(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const userId = Number(req.params.id);
+    const { plan, plan_expires_at } = req.body as { plan?: string; plan_expires_at?: string };
+
+    if (!plan || !VALID_PLANS.includes(plan as UserPlan)) {
+      res.status(400).json({ message: 'Invalid plan. Must be one of: free, silver, gold, diamond.' });
+      return;
+    }
+
+    const user = await db<DbUser>('users').where({ id: userId }).first();
+    if (!user) { res.status(404).json({ message: 'User not found.' }); return; }
+
+    let expiresAt: Date | null;
+    if (plan === 'free') {
+      expiresAt = null;
+    } else if (plan_expires_at) {
+      expiresAt = new Date(plan_expires_at);
+      if (isNaN(expiresAt.getTime())) {
+        res.status(400).json({ message: 'Invalid plan_expires_at date.' });
+        return;
+      }
+    } else {
+      expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+    }
+
+    await db<DbUser>('users').where({ id: userId }).update({
+      plan: plan as UserPlan,
+      plan_expires_at: expiresAt,
+    });
+
+    await logAudit(req.user!.id, 'admin_update_user_plan', req, {
+      metadata: { target_user_id: userId, plan, plan_expires_at: expiresAt },
+    });
+
+    const updated = await db<DbUser>('users')
+      .where({ id: userId })
+      .select('id', 'name', 'email', 'plan', 'plan_expires_at', 'is_active', 'balance')
+      .first();
+
+    res.json({ message: 'User plan updated.', user: updated });
   } catch (err) { next(err); }
 }
 

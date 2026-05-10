@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import db from '../../config/database';
 import { DbUser, UserPlan } from '../types';
 import { logAudit } from '../services/audit';
+import { sendPlanUpgradeEmail } from '../services/email';
 
 const PLAN_PRICES: Record<Exclude<UserPlan, 'free'>, { amount: string; label: string }> = {
   silver:  { amount: '99.00',  label: 'Kitazon Silver Plan' },
@@ -64,6 +65,7 @@ export async function createOrder(req: Request, res: Response, next: NextFunctio
         intent: 'CAPTURE',
         purchase_units: [{
           description: cfg.label,
+          custom_id: `${req.user!.id}:${plan}`,
           amount: { currency_code: 'PHP', value: cfg.amount },
         }],
         application_context: {
@@ -130,10 +132,64 @@ export async function captureOrder(req: Request, res: Response, next: NextFuncti
       return;
     }
 
-    await db<DbUser>('users').where({ id: req.user!.id }).update({ plan: plan as UserPlan });
+    const planExpiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+    await db<DbUser>('users').where({ id: req.user!.id }).update({
+      plan: plan as UserPlan,
+      plan_expires_at: planExpiresAt,
+    });
     await logAudit(req.user!.id, 'plan_upgrade', req, { metadata: { plan, paypal_order_id: captureData.id } });
 
     const user = await db<DbUser>('users').where({ id: req.user!.id }).first();
+
+    // Send upgrade confirmation email (fire-and-forget)
+    if (user) {
+      sendPlanUpgradeEmail(user.email, user.name, plan, planExpiresAt).catch(() => {});
+    }
+
     res.json({ message: 'Plan upgraded successfully.', plan, user: { plan: user?.plan } });
   } catch (err) { next(err); }
+}
+
+/* ── POST /api/subscriptions/webhook ────────────────────────────────────────── */
+export async function paypalWebhook(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const event = req.body as {
+      event_type?: string;
+      resource?: { custom_id?: string };
+    };
+
+    if (event.event_type === 'PAYMENT.CAPTURE.COMPLETED') {
+      const customId = event.resource?.custom_id;
+      if (customId) {
+        const parts = customId.split(':');
+        const userId = Number(parts[0]);
+        const plan = parts[1] as UserPlan;
+
+        if (userId && plan && plan in { silver: 1, gold: 1, diamond: 1 }) {
+          try {
+            const planExpiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+            await db<DbUser>('users').where({ id: userId }).update({
+              plan,
+              plan_expires_at: planExpiresAt,
+            });
+
+            const user = await db<DbUser>('users').where({ id: userId }).first();
+            if (user) {
+              sendPlanUpgradeEmail(user.email, user.name, plan, planExpiresAt).catch(() => {});
+            }
+
+            console.log(`[PayPal Webhook] Plan upgraded: userId=${userId} plan=${plan}`);
+          } catch (updateErr) {
+            console.error('[PayPal Webhook] Failed to update user plan:', updateErr);
+          }
+        }
+      }
+    }
+
+    // Always respond 200 — PayPal retries on non-200
+    res.status(200).json({ received: true });
+  } catch (err) {
+    console.error('[PayPal Webhook] Unexpected error:', err);
+    res.status(200).json({ received: true });
+  }
 }
