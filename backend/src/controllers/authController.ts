@@ -63,6 +63,51 @@ const safeUser = (u: DbUser) => ({
 export const tokenBlacklist = new Set<string>();
 setInterval(() => { tokenBlacklist.clear(); }, 60 * 60 * 1000);
 
+// ─── Registration fraud guards ────────────────────────────────────────────────
+const DISPOSABLE_DOMAINS = new Set([
+  'mailinator.com','guerrillamail.com','guerrillamail.info','guerrillamail.biz',
+  'guerrillamail.de','guerrillamail.net','guerrillamail.org','guerrillamailblock.com',
+  'grr.la','sharklasers.com','spam4.me','yopmail.com','yopmail.fr','cool.fr.nf',
+  'jetable.fr.nf','nospam.ze.tc','nomail.xl.cx','mega.zik.dj','speed.1s.fr',
+  'courriel.fr.nf','moncourrier.fr.nf','monemail.fr.nf','monmail.fr.nf',
+  'temp-mail.org','temp-mail.io','throwam.com','throwaway.email','dispostable.com',
+  'maildrop.cc','mailnull.com','spamgourmet.com','spamgourmet.net','spamgourmet.org',
+  'discard.email','fakeinbox.com','tempr.email','getairmail.com','filzmail.com',
+  'owlpic.com','tempinbox.com','chacuo.net','mailtemp.net','mt2014.com','mt2015.com',
+  'spamfree24.org','spammotel.com','spamspot.com','trashmail.com','trashmail.me',
+  'trashmail.net','trashmail.org','trashmail.io','trashmail.at','trashmail.xyz',
+  'trashmail.app','mailnesia.com','mailnull.com','spamgourmet.com','getnada.com',
+  'zetmail.com','mintemail.com','spamwc.de','tempail.com','10minutemail.com',
+  '10minutemail.net','10minutemail.org','10minutemail.co.uk','10minutemail.us',
+  'burnermail.io','tempmail.com','tempmail.net','tempmail.org','tempmail.us',
+  'mailsac.com','mohmal.com','crazydomain.com','fakemail.net','mailforspam.com',
+]);
+
+function isDisposableEmail(email: string): boolean {
+  const domain = email.split('@')[1]?.toLowerCase() ?? '';
+  return DISPOSABLE_DOMAINS.has(domain);
+}
+
+// Detect obviously bot-generated names: very high consonant ratio, no vowels, or too random
+function isLikelyFakeName(name: string): boolean {
+  const clean = name.replace(/[^a-zA-Z]/g, '').toLowerCase();
+  if (clean.length < 2) return true;
+  // No vowels at all
+  if (!/[aeiou]/.test(clean)) return true;
+  // Consonant ratio > 80% for names longer than 5 chars
+  const vowels = (clean.match(/[aeiou]/g) ?? []).length;
+  if (clean.length > 5 && vowels / clean.length < 0.15) return true;
+  // Contains commas or obvious gibberish patterns (like "dfrw,mgotrk1meojkf")
+  if (/[,;@#$%^&*=+|<>]/.test(name)) return true;
+  // All digits
+  if (/^\d+$/.test(name.trim())) return true;
+  return false;
+}
+
+function getIp(req: Request): string {
+  return ((req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim()) ?? req.ip ?? '';
+}
+
 // ─── Account lockout (DB-backed — survives restarts) ─────────────────────────
 const MAX_ATTEMPTS = 5;
 const LOCKOUT_MS   = 15 * 60 * 1000;
@@ -141,6 +186,12 @@ export async function register(req: Request, res: Response, next: NextFunction):
       name: string; email: string; password: string; referral_code?: string; captcha_token?: string;
     };
 
+    // ── Honeypot: bots fill hidden fields, humans don't ──
+    if ((req.body as { website?: string }).website) {
+      res.status(400).json({ message: 'Registration failed.' });
+      return;
+    }
+
     if (captcha_token !== undefined && !(await verifyCaptcha(captcha_token))) {
       res.status(400).json({ message: 'Captcha verification failed.' });
       return;
@@ -153,9 +204,28 @@ export async function register(req: Request, res: Response, next: NextFunction):
       res.status(400).json({ message: 'Name must be between 2 and 100 characters.' });
       return;
     }
+    if (isLikelyFakeName(name.trim())) {
+      res.status(400).json({ message: 'Please enter your real full name.' });
+      return;
+    }
     if (!isValidEmail(email)) { res.status(400).json({ message: 'Invalid email address.' }); return; }
+    if (isDisposableEmail(email)) {
+      res.status(400).json({ message: 'Disposable or temporary email addresses are not allowed. Please use a real email.' });
+      return;
+    }
     const pwError = validatePassword(password);
     if (pwError) { res.status(400).json({ message: pwError }); return; }
+
+    // ── IP multi-account guard: block if this IP already has 3+ accounts ──
+    const ip = getIp(req);
+    if (ip) {
+      const ipCount = await db('users').whereRaw('registration_ip = ?', [ip]).count('id as cnt').first();
+      if (Number((ipCount as { cnt?: unknown })?.cnt ?? 0) >= 3) {
+        console.warn(`[FRAUD] register blocked: ip=${ip} already has 3+ accounts`);
+        res.status(429).json({ message: 'Too many accounts registered from this device. Please contact support.' });
+        return;
+      }
+    }
 
     const normalizedEmail = email.toLowerCase();
     const exists = await db<DbUser>('users').where({ email: normalizedEmail }).first();
@@ -166,6 +236,7 @@ export async function register(req: Request, res: Response, next: NextFunction):
     const [user] = await db<DbUser>('users').insert({
       name: name.trim(), email: normalizedEmail, password_hash: hash,
       referral_code: code, balance: 0, email_verified: false,
+      registration_ip: ip || null,
     }).returning('*');
 
     // Send verification email
@@ -177,7 +248,20 @@ export async function register(req: Request, res: Response, next: NextFunction):
       const upperCode = referral_code.toUpperCase().trim();
       if (upperCode.length > 0 && upperCode !== code) {
         const referrer = await db<DbUser>('users').where({ referral_code: upperCode, is_active: true }).first();
-        if (referrer && referrer.id !== user.id) {
+        const referrerIp = referrer ? (referrer as DbUser & { registration_ip?: string }).registration_ip : null;
+
+        // Block bonus if: referrer doesn't exist, self-referral, or same IP as referrer
+        const sameIp = ip && referrerIp && ip === referrerIp;
+
+        // Block bonus if this IP already claimed a bonus for this referral code before
+        const ipAbuseCount = ip ? await db('referrals')
+          .join('users as referred', 'referrals.referred_id', 'referred.id')
+          .where('referrals.referrer_id', referrer?.id ?? 0)
+          .whereRaw('referred.registration_ip = ?', [ip])
+          .count('referrals.id as cnt').first() : null;
+        const ipAbused = Number((ipAbuseCount as { cnt?: unknown })?.cnt ?? 0) > 0;
+
+        if (referrer && referrer.id !== user.id && !sameIp && !ipAbused) {
           await db.transaction(async (trx) => {
             const existing = await trx('referrals').where({ referred_id: user.id }).first();
             if (existing) return;
@@ -186,6 +270,15 @@ export async function register(req: Request, res: Response, next: NextFunction):
             await trx<DbUser>('users').where({ id: referrer.id }).increment('balance', 50);
             await sendReferralEarnedEmail(referrer.email, referrer.name, name.trim(), 50).catch(() => {});
           });
+        } else if (referrer) {
+          // Still record the referral link (no bonus) so we can track the relationship
+          const existing = await db('referrals').where({ referred_id: user.id }).first();
+          if (!existing) {
+            await db('referrals').insert({ referrer_id: referrer.id, referred_id: user.id, commission_earned: 0 });
+          }
+          if (sameIp || ipAbused) {
+            console.warn(`[FRAUD] referral bonus blocked: referrer=${referrer.id} new_user=${user.id} ip=${ip} reason=${sameIp ? 'same_ip' : 'ip_already_claimed'}`);
+          }
         }
       }
     }

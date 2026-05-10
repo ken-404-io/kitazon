@@ -15,7 +15,7 @@ const GOOGLE_REDIRECT = `${process.env.REACT_APP_API_URL ?? 'https://api.kitazon
 const HCAPTCHA_SITE_KEY = process.env.REACT_APP_HCAPTCHA_SITE_KEY ?? '';
 
 interface FormState {
-  name: string; email: string; password: string; referral_code: string;
+  name: string; email: string; password: string; referral_code: string; website: string;
 }
 
 export default function Register() {
@@ -23,7 +23,7 @@ export default function Register() {
   const [params] = useSearchParams();
   const refFromUrl = params.get('ref') ?? '';
   const [form, setForm] = useState<FormState>({
-    name: '', email: '', password: '', referral_code: refFromUrl,
+    name: '', email: '', password: '', referral_code: refFromUrl, website: '',
   });
   const [touched, setTouched] = useState({ name: false, email: false, password: false });
   const [error, setError]     = useState('');
@@ -60,7 +60,7 @@ export default function Register() {
         const result = await captchaRef.current?.execute({ async: true });
         captcha_token = result?.response;
       }
-      await register({ name, email, password: form.password, referral_code, captcha_token });
+      await register({ name, email, password: form.password, referral_code, captcha_token, website: form.website });
     } catch (err: unknown) {
       captchaRef.current?.resetCaptcha();
       const msg = (err as { response?: { data?: { message?: string } } }).response?.data?.message;
@@ -92,6 +92,17 @@ export default function Register() {
         <div className={styles.divider}><span>or</span></div>
 
         <form onSubmit={submit} autoComplete="on" noValidate>
+          {/* Honeypot — must stay empty; bots fill it, humans don't */}
+          <input
+            type="text"
+            name="website"
+            value={form.website}
+            onChange={set('website')}
+            tabIndex={-1}
+            autoComplete="off"
+            aria-hidden="true"
+            style={{ position: 'absolute', left: '-9999px', width: '1px', height: '1px', opacity: 0 }}
+          />
           <div className="form-group">
             <label>Full Name</label>
             <input
