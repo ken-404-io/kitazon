@@ -42,6 +42,7 @@ interface Eligibility {
   tasks_required: number;
   email_verified: boolean;
   is_first_withdrawal: boolean;
+  withdrawal_credits: number;
   reasons: string[];
 }
 
@@ -52,6 +53,8 @@ export default function Withdraw() {
   const [stats,     setStats]     = useState<UserStats | null>(null);
   const [history,   setHistory]   = useState<Withdrawal[]>([]);
   const [elig,      setElig]      = useState<Eligibility | null>(null);
+  const [convertAmt, setConvertAmt] = useState('');
+  const [converting, setConverting] = useState(false);
   const [preset,    setPreset]    = useState<number | null>(null);
   const [account,   setAccount]   = useState('');
   const [loading,   setLoading]   = useState(false);
@@ -87,6 +90,20 @@ export default function Withdraw() {
   };
 
   const acctErr = acctTouched ? validateAccount(account) : null;
+
+  const convertCredits = async () => {
+    const amt = parseInt(convertAmt, 10);
+    if (!amt || amt < 1) return;
+    setConverting(true);
+    try {
+      const res = await api.post<{ credits: number; balance: number; message: string }>('/credits/convert', { amount: amt });
+      showToast(res.data.message, 'success');
+      setConvertAmt('');
+      loadData();
+    } catch (err: unknown) {
+      showToast((err as { response?: { data?: { message?: string } } }).response?.data?.message ?? 'Conversion failed.', 'error');
+    } finally { setConverting(false); }
+  };
 
   const requestOtp = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -240,6 +257,50 @@ export default function Withdraw() {
 
         <div className={styles.totalStrip}>
           Total Lifetime Earnings — <strong>₱{totalAmt.toFixed(2)}</strong>
+        </div>
+
+        {/* ── Withdrawal Credits card ── */}
+        <div className={styles.creditsCard}>
+          <div className={styles.creditsHeader}>
+            <div className={styles.creditsInfo}>
+              <span className={styles.creditsIcon}>🎟️</span>
+              <div>
+                <p className={styles.creditsTitle}>Withdrawal Credits</p>
+                <p className={styles.creditsSub}>1 credit = withdraw ₱1 · Earn via check-in or convert PHP</p>
+              </div>
+            </div>
+            <div className={styles.creditsBal}>
+              <span className={styles.creditsNum}>{elig?.withdrawal_credits ?? 0}</span>
+              <span className={styles.creditsUnit}>credits</span>
+            </div>
+          </div>
+
+          <div className={styles.convertRow}>
+            <div className={styles.convertInput}>
+              <span className={styles.convertPrefix}>₱</span>
+              <input
+                type="number"
+                min="1"
+                step="1"
+                placeholder="Amount to convert"
+                value={convertAmt}
+                onChange={e => setConvertAmt(e.target.value)}
+                className={styles.convertField}
+              />
+            </div>
+            <button
+              className="btn-primary"
+              style={{ fontSize: 13, padding: '0.55rem 1rem', whiteSpace: 'nowrap' }}
+              disabled={converting || !convertAmt || Number(convertAmt) < 1 || Number(convertAmt) > balance}
+              onClick={convertCredits}
+            >
+              {converting ? 'Converting…' : 'Convert → Credits'}
+            </button>
+          </div>
+          <p className={styles.convertHint}>
+            Convert ₱{convertAmt || '0'} → <strong>{Math.floor(Number(convertAmt) || 0)} credits</strong>
+            {Number(convertAmt) > 0 && Number(convertAmt) > balance ? <span style={{ color: 'var(--red)' }}> · Insufficient balance</span> : null}
+          </p>
         </div>
 
         <div className={styles.sectionHeader}>

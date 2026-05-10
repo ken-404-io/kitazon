@@ -31,6 +31,7 @@ export interface DbUser {
   plan: UserPlan;
   plan_expires_at: Date | null;
   avatar_url: string | null;
+  withdrawal_credits: number;
   created_at: Date;
   updated_at: Date;
 }
