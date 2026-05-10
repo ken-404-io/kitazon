@@ -6,6 +6,19 @@ import styles from './Home.module.css';
 
 const GOOGLE_REDIRECT = `${process.env.REACT_APP_API_URL ?? 'https://api.kitazon.com'}/api/auth/google/redirect`;
 
+const TICKER_ITEMS = [
+  { name: 'Maria S.', amount: 150 },
+  { name: 'Juan D.', amount: 75 },
+  { name: 'Ana R.', amount: 320 },
+  { name: 'Carlo M.', amount: 50 },
+  { name: 'Liza T.', amount: 200 },
+  { name: 'Renz B.', amount: 90 },
+  { name: 'Jessa P.', amount: 500 },
+  { name: 'Mark C.', amount: 60 },
+  { name: 'Nina V.', amount: 110 },
+  { name: 'Felix A.', amount: 430 },
+];
+
 const EARNING_CATEGORIES = [
   { icon: <SurveyIcon />,    name: 'Surveys & Polls',   range: '₱20 – ₱150',       desc: 'Answer surveys from global market research firms.' },
   { icon: <PhoneIcon />,     name: 'App Installs',      range: '₱30 – ₱500',       desc: 'Install and try apps, earn per qualified install.' },
@@ -35,6 +48,18 @@ export default function Home() {
           <span className="badge badge-green">Cashout via PayPal</span>
           <span className="badge badge-gold">₱15 – ₱500 per Task</span>
         </div>
+
+        {!user && (
+          <div className={styles.ticker} aria-hidden="true">
+            <div className={styles.tickerTrack}>
+              {[...TICKER_ITEMS, ...TICKER_ITEMS].map((item, i) => (
+                <span key={i} className={styles.tickerItem}>
+                  🎉 <strong>{item.name}</strong> earned ₱{item.amount}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
 
         {!user && (
           <div className={styles.heroGoogle}>

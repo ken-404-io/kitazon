@@ -1,11 +1,12 @@
 import { Router } from 'express';
 import authMiddleware from '../middleware/auth';
 import { authLimiter } from '../middleware/rateLimiter';
-import { changePassword, deleteAccount, loginHistory, activeSessions, revokeOtherSessions, updateProfile } from '../controllers/accountController';
+import { changePassword, deleteAccount, loginHistory, activeSessions, revokeOtherSessions, updateProfile, updateAvatar } from '../controllers/accountController';
 
 const router = Router();
 
 router.patch('/profile', authMiddleware, updateProfile);
+router.patch('/avatar', authMiddleware, updateAvatar);
 router.post('/change-password', authMiddleware, authLimiter, changePassword);
 router.delete('/', authMiddleware, deleteAccount);
 router.get('/login-history', authMiddleware, loginHistory);

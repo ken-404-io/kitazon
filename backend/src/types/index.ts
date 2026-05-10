@@ -29,6 +29,7 @@ export interface DbUser {
   totp_enabled: boolean;
   plan: UserPlan;
   plan_expires_at: Date | null;
+  avatar_url: string | null;
   created_at: Date;
   updated_at: Date;
 }
@@ -63,7 +64,7 @@ export interface DbEarning {
   user_id: number;
   task_id: number | null;
   amount: number;
-  type: 'task' | 'referral_signup' | 'referral_commission' | 'spin';
+  type: 'task' | 'referral_signup' | 'referral_commission' | 'spin' | 'admin_adjustment';
   description: string;
   created_at: Date;
 }

@@ -78,6 +78,11 @@ export default function AccountSettings() {
   const [profileMsg, setProfileMsg]       = useState('');
   const [profileLoad, setProfileLoad]     = useState(false);
 
+  const [avatarUrl, setAvatarUrl]         = useState(user?.avatar_url ?? '');
+  const [avatarSaving, setAvatarSaving]   = useState(false);
+  const [avatarMsg, setAvatarMsg]         = useState('');
+  const [avatarError, setAvatarError]     = useState('');
+
   const profileNameErr = profileTouched ? validateName(profileName) : null;
 
   const [sessionMsg, setSessionMsg]   = useState('');
@@ -163,6 +168,23 @@ export default function AccountSettings() {
     } finally { setProfileLoad(false); }
   };
 
+  const saveAvatar = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setAvatarError(''); setAvatarMsg('');
+    const url = avatarUrl.trim();
+    if (url && !url.startsWith('https://')) {
+      setAvatarError('URL must start with https://'); return;
+    }
+    setAvatarSaving(true);
+    try {
+      await api.patch('/account/avatar', { avatar_url: url || null });
+      setAvatarMsg('Avatar updated.');
+      await refreshUser();
+    } catch (err: unknown) {
+      setAvatarError((err as { response?: { data?: { message?: string } } }).response?.data?.message ?? 'Failed to save avatar.');
+    } finally { setAvatarSaving(false); }
+  };
+
   /* ── sub-view wrapper ────────────────────────────────────────────────────── */
   const SubView = ({ title, children }: { title: string; children: React.ReactNode }) => (
     <div className={styles.page}>
@@ -199,6 +221,38 @@ export default function AccountSettings() {
             {profileMsg && <p className={styles.successMsg}>{profileMsg}</p>}
             <button className="btn-primary" type="submit" disabled={profileLoad} style={{ width: '100%', marginTop: 4 }}>
               {profileLoad ? 'Saving…' : 'Save Name'}
+            </button>
+          </form>
+
+          <hr style={{ border: 'none', borderTop: '1px solid var(--dark-border)', margin: '1.25rem 0' }} />
+
+          <form onSubmit={saveAvatar} noValidate>
+            <div className="form-group">
+              <label>Avatar URL</label>
+              <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
+                {avatarUrl && avatarUrl.startsWith('https://') && (
+                  <img
+                    src={avatarUrl}
+                    alt="Avatar preview"
+                    style={{ width: 32, height: 32, borderRadius: '50%', objectFit: 'cover', flexShrink: 0, border: '1px solid var(--dark-border)' }}
+                    onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                  />
+                )}
+                <input
+                  type="url"
+                  value={avatarUrl}
+                  onChange={e => setAvatarUrl(e.target.value)}
+                  placeholder="https://example.com/avatar.jpg"
+                  maxLength={500}
+                  autoComplete="off"
+                  style={{ flex: 1 }}
+                />
+              </div>
+            </div>
+            {avatarError && <p className="error-msg">{avatarError}</p>}
+            {avatarMsg && <p className={styles.successMsg}>{avatarMsg}</p>}
+            <button className="btn-primary" type="submit" disabled={avatarSaving} style={{ width: '100%', marginTop: 4 }}>
+              {avatarSaving ? 'Saving…' : 'Save Avatar'}
             </button>
           </form>
         </div>
@@ -456,8 +510,18 @@ export default function AccountSettings() {
         </div>
 
         {/* Profile card */}
-        <div className={styles.profileCard} onClick={() => { setProfileName(user?.name ?? ''); setProfileMsg(''); setProfileError(''); setView('edit-profile'); }}>
-          <div className={styles.avatar}>{initials(user?.name)}</div>
+        <div className={styles.profileCard} onClick={() => { setProfileName(user?.name ?? ''); setAvatarUrl(user?.avatar_url ?? ''); setProfileMsg(''); setProfileError(''); setAvatarMsg(''); setAvatarError(''); setView('edit-profile'); }}>
+          {user?.avatar_url ? (
+            <img
+              src={user.avatar_url}
+              alt={user.name}
+              className={styles.avatar}
+              style={{ objectFit: 'cover' }}
+              onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
+            />
+          ) : (
+            <div className={styles.avatar}>{initials(user?.name)}</div>
+          )}
           <div className={styles.profileInfo}>
             <p className={styles.profileName}>{user?.name ?? '—'}</p>
             <p className={styles.profileHandle}>{handle(user?.email)}</p>
