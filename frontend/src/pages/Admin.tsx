@@ -137,6 +137,17 @@ export default function Admin() {
   const [broadcastLoading, setBroadcastLoading] = useState(false);
   const [broadcastResult, setBroadcastResult] = useState<string | null>(null);
 
+  // Bulk Import
+  const [bulkImportOpen, setBulkImportOpen] = useState(false);
+  const [bulkJson, setBulkJson] = useState('');
+  const [bulkLoading, setBulkLoading] = useState(false);
+  const [bulkResult, setBulkResult] = useState<string | null>(null);
+
+  // Leaderboard Rewards
+  const [rewardsConfirming, setRewardsConfirming] = useState(false);
+  const [rewardsLoading, setRewardsLoading] = useState(false);
+  const [rewardsResult, setRewardsResult] = useState<string | null>(null);
+
   // Toast
   const [toast, setToast] = useState<string | null>(null);
   const showToast = (msg: string) => {
@@ -567,6 +578,59 @@ export default function Admin() {
                 {editingTask && <button type="button" className="btn-outline" onClick={() => { setEditingTask(null); setTaskForm({ title: '', description: '', category: 'survey', payout: '' }); }}>Cancel</button>}
               </div>
             </form>
+          </div>
+
+          {/* Bulk Import */}
+          <div style={{ marginBottom: '1.5rem' }}>
+            <button
+              className="btn-outline"
+              style={{ fontSize: 13, padding: '6px 14px', borderColor: '#f59e0b', color: '#f59e0b' }}
+              onClick={() => { setBulkImportOpen(o => !o); setBulkResult(null); }}
+            >
+              {bulkImportOpen ? 'Close Bulk Import' : '📋 Bulk Import Tasks'}
+            </button>
+            {bulkImportOpen && (
+              <div className="card" style={{ marginTop: '0.75rem' }}>
+                <h4 style={{ marginBottom: '0.5rem' }}>Bulk Import Tasks</h4>
+                <p style={{ fontSize: 12, color: '#9ca3af', marginBottom: '0.5rem' }}>
+                  Paste a JSON array of task objects:<br />
+                  <code style={{ fontSize: 11 }}>{`[{"title":"...","category":"survey","payout":50,"description":"..."}]`}</code>
+                </p>
+                <textarea
+                  value={bulkJson}
+                  onChange={e => setBulkJson(e.target.value)}
+                  placeholder='[{"title":"Task 1","category":"survey","payout":50,"description":"..."}]'
+                  rows={6}
+                  style={{ width: '100%', padding: '8px 12px', borderRadius: 6, border: '1px solid var(--dark-border)', background: 'var(--dark-bg)', color: 'var(--text)', fontSize: 13, resize: 'vertical', fontFamily: 'monospace' }}
+                />
+                {bulkResult && (
+                  <p style={{ fontSize: 13, marginTop: 8, fontWeight: 600, color: bulkResult.startsWith('Imported') ? '#22c55e' : '#dc2626' }}>
+                    {bulkResult}
+                  </p>
+                )}
+                <button
+                  className="btn-primary"
+                  style={{ marginTop: 10, fontSize: 13 }}
+                  disabled={bulkLoading}
+                  onClick={async () => {
+                    setBulkLoading(true); setBulkResult(null);
+                    try {
+                      const parsed = JSON.parse(bulkJson);
+                      if (!Array.isArray(parsed)) throw new Error('Must be a JSON array.');
+                      const res = await api.post<{ imported: number; skipped: number }>('/admin/tasks/bulk', parsed);
+                      setBulkResult(`Imported ${res.data.imported} tasks, skipped ${res.data.skipped}`);
+                      setBulkJson('');
+                      loadTasks();
+                    } catch (err: unknown) {
+                      const apiErr = err as { response?: { data?: { message?: string } }; message?: string };
+                      setBulkResult(apiErr.response?.data?.message ?? apiErr.message ?? 'Import failed.');
+                    } finally { setBulkLoading(false); }
+                  }}
+                >
+                  {bulkLoading ? 'Importing…' : 'Import'}
+                </button>
+              </div>
+            )}
           </div>
 
           {taskLoading ? <p>Loading...</p> : (

@@ -24,6 +24,7 @@ import Bonus from './pages/Bonus';
 import Guide from './pages/Guide';
 import { ReactNode } from 'react';
 import ErrorBoundary from './components/ErrorBoundary';
+import PWAInstallPrompt from './components/PWAInstallPrompt';
 import AuthTransitionOverlay from './components/AuthTransitionOverlay';
 import Terms from './pages/Terms';
 import Privacy from './pages/Privacy';
@@ -53,6 +54,7 @@ export default function App() {
       <ToastProvider>
       <BrowserRouter>
         <AuthTransitionOverlay />
+        <PWAInstallPrompt />
         <Navbar />
         <Routes>
           <Route path="/" element={<Home />} />
