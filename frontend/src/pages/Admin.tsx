@@ -315,6 +315,60 @@ export default function Admin() {
               ))}
             </div>
           )}
+
+          {/* Leaderboard Rewards */}
+          <div style={{ marginTop: '1.5rem' }}>
+            {!rewardsConfirming ? (
+              <button
+                className="btn-outline"
+                style={{ borderColor: '#f59e0b', color: '#f59e0b', fontSize: 14, padding: '8px 18px' }}
+                onClick={() => { setRewardsConfirming(true); setRewardsResult(null); }}
+              >
+                🏆 Grant Monthly Rewards
+              </button>
+            ) : (
+              <div className="card" style={{ maxWidth: 480 }}>
+                <p style={{ fontSize: 14, fontWeight: 600, marginBottom: '0.75rem' }}>
+                  Award ₱500/₱200/₱100 to this month's top 3 earners?
+                </p>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button
+                    className="btn-primary"
+                    style={{ fontSize: 13, padding: '6px 16px' }}
+                    disabled={rewardsLoading}
+                    onClick={async () => {
+                      setRewardsLoading(true); setRewardsResult(null);
+                      try {
+                        const res = await api.post<{ winners: Array<{ rank: number; name: string; amount: number }> }>('/admin/leaderboard-rewards', {});
+                        const winners = res.data.winners ?? [];
+                        const labels = winners.map((w: { rank: number; name: string; amount: number }) => `${w.rank === 1 ? '1st' : w.rank === 2 ? '2nd' : '3rd'} ${w.name} (₱${w.amount})`);
+                        setRewardsResult(`Rewards granted to: ${labels.join(', ')}`);
+                        setRewardsConfirming(false);
+                      } catch (err: unknown) {
+                        const apiErr = err as { response?: { data?: { message?: string } } };
+                        setRewardsResult(apiErr.response?.data?.message ?? 'Failed to grant rewards.');
+                        setRewardsConfirming(false);
+                      } finally { setRewardsLoading(false); }
+                    }}
+                  >
+                    {rewardsLoading ? 'Processing…' : 'Confirm & Grant'}
+                  </button>
+                  <button
+                    className="btn-outline"
+                    style={{ fontSize: 13, padding: '6px 16px' }}
+                    onClick={() => setRewardsConfirming(false)}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            )}
+            {rewardsResult && (
+              <p style={{ marginTop: 10, fontSize: 13, fontWeight: 600, color: rewardsResult.startsWith('Rewards') ? '#22c55e' : '#dc2626' }}>
+                {rewardsResult}
+              </p>
+            )}
+          </div>
         </div>
       )}
 
