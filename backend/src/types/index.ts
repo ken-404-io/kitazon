@@ -56,6 +56,9 @@ export interface DbWithdrawal {
   channel: WithdrawalChannel;
   account_number: string;
   status: WithdrawalStatus;
+  ip_address?: string | null;
+  is_flagged?: boolean;
+  metadata?: Record<string, unknown> | null;
   created_at: Date;
 }
 
@@ -64,7 +67,7 @@ export interface DbEarning {
   user_id: number;
   task_id: number | null;
   amount: number;
-  type: 'task' | 'referral_signup' | 'referral_commission' | 'spin' | 'admin_adjustment';
+  type: 'task' | 'referral_signup' | 'referral_commission' | 'spin' | 'admin_adjustment' | 'checkin';
   description: string;
   created_at: Date;
 }

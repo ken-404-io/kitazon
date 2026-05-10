@@ -35,7 +35,7 @@ interface LoginEvent {
   user_agent: string | null;
   created_at: string;
 }
-type View = 'main' | 'edit-profile' | 'change-password' | '2fa' | 'login-history' | 'devices' | 'notifications' | 'help' | 'delete';
+type View = 'main' | 'edit-profile' | 'change-password' | '2fa' | 'login-history' | 'devices' | 'notifications' | 'help' | 'delete' | 'checkin';
 
 /* ─── helpers ─────────────────────────────────────────────────────────────── */
 function initials(name?: string) {
@@ -96,6 +96,12 @@ export default function AccountSettings() {
   const [totpMsg, setTotpMsg]       = useState('');
   const [totpLoading, setTotpLoading] = useState(false);
   const [totpEnabled, setTotpEnabled] = useState(user?.totp_enabled ?? false);
+
+  // Check-in state
+  const [checkinLoading, setCheckinLoading] = useState(false);
+  const [checkinMsg, setCheckinMsg]         = useState('');
+  const [checkinStreak, setCheckinStreak]   = useState<number | null>(null);
+  const [checkinDone, setCheckinDone]       = useState(false);
 
   useEffect(() => {
     api.get<{ balance: number }>('/auth/me/stats').then(r => setBalance(r.data.balance ?? 0)).catch(() => {});
@@ -482,6 +488,86 @@ export default function AccountSettings() {
     </div>
   );
 
+  /* ── Check-in view ──────────────────────────────────────────────────────── */
+  if (view === 'checkin') {
+    const handleCheckin = async () => {
+      setCheckinLoading(true); setCheckinMsg('');
+      try {
+        // Try to get status first
+        try {
+          const status = await api.get<{ streak: number; already_claimed: boolean }>('/tasks/checkin-status');
+          if (status.data.already_claimed) {
+            setCheckinDone(true);
+            setCheckinStreak(status.data.streak);
+            setCheckinMsg('Already claimed today! Come back tomorrow ✓');
+            return;
+          }
+          setCheckinStreak(status.data.streak);
+        } catch {
+          // endpoint may not exist, proceed to claim
+        }
+        const res = await api.post<{ amount: number; streak: number }>('/tasks/checkin', {});
+        setCheckinDone(true);
+        setCheckinStreak(res.data.streak ?? null);
+        setCheckinMsg(`You earned ₱${Number(res.data.amount ?? 0).toFixed(2)}! Streak: ${res.data.streak ?? 1} days 🔥`);
+        await refreshUser();
+      } catch (err: unknown) {
+        const apiErr = err as { response?: { data?: { message?: string } } };
+        const msg = apiErr.response?.data?.message ?? 'Failed to claim bonus.';
+        if (msg.toLowerCase().includes('already')) {
+          setCheckinDone(true);
+          setCheckinMsg('Already claimed today! Come back tomorrow ✓');
+        } else {
+          setCheckinMsg(msg);
+        }
+      } finally { setCheckinLoading(false); }
+    };
+
+    return (
+      <div className="page-container">
+        <SubView title="Daily Check-in Bonus">
+          <div className={styles.formCard} style={{ textAlign: 'center' }}>
+            <div style={{ fontSize: 48, marginBottom: '0.5rem' }}>🎁</div>
+            <h3 style={{ fontSize: '1.1rem', fontWeight: 800, marginBottom: '0.25rem' }}>Daily Check-in</h3>
+            {checkinStreak !== null && (
+              <p style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: '1rem' }}>
+                Current streak: <strong style={{ color: 'var(--primary-amber)' }}>{checkinStreak} days 🔥</strong>
+              </p>
+            )}
+            {!checkinDone && !checkinMsg && (
+              <p style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: '1rem' }}>
+                Claim your daily bonus and build your streak!
+              </p>
+            )}
+            {checkinMsg && (
+              <p style={{
+                fontSize: 14,
+                fontWeight: 600,
+                color: checkinMsg.includes('earned') ? 'var(--primary-amber)' : checkinMsg.includes('Already') ? '#22c55e' : 'var(--red)',
+                marginBottom: '1rem',
+                padding: '0.75rem 1rem',
+                background: 'var(--primary-subtle)',
+                borderRadius: 12,
+              }}>
+                {checkinMsg}
+              </p>
+            )}
+            {!checkinDone && (
+              <button
+                className="btn-primary"
+                style={{ width: '100%', padding: '0.9rem', fontSize: '1rem', fontWeight: 800 }}
+                disabled={checkinLoading}
+                onClick={handleCheckin}
+              >
+                {checkinLoading ? 'Claiming…' : 'Claim Today\'s Bonus'}
+              </button>
+            )}
+          </div>
+        </SubView>
+      </div>
+    );
+  }
+
   /* ── Main view ───────────────────────────────────────────────────────────── */
   const emailVerified = user?.email_verified;
   const twoFaStatus   = totpEnabled ? 'Enabled' : 'Disabled';
@@ -602,6 +688,15 @@ export default function AccountSettings() {
           </div>
         </div>
 
+        {/* Daily Check-in */}
+        <div className={styles.settingsCard} style={{ marginBottom: 0 }}>
+          <div className={styles.settingRow} onClick={() => { setCheckinMsg(''); setCheckinDone(false); setCheckinStreak(null); setView('checkin'); }}>
+            <span className={styles.settingIcon}>🎁</span>
+            <span className={styles.settingLabel}>Daily Check-in Bonus</span>
+            <span className={styles.chevron}><ChevronRight /></span>
+          </div>
+        </div>
+
         {/* Account section */}
         <p className={styles.sectionLabel}>Account</p>
         <div className={styles.settingsCard}>
@@ -626,6 +721,24 @@ export default function AccountSettings() {
             <span className={`${styles.settingLabel} ${styles.settingLabelRed}`}>Delete Account</span>
             <span className={styles.chevron}><ChevronRight /></span>
           </div>
+        </div>
+
+        {/* Quick Navigation section */}
+        <p className={styles.sectionLabel}>Quick Navigation</p>
+        <div className={styles.settingsCard}>
+          {[
+            { label: 'Referral Program', path: '/referral' },
+            { label: 'Upgrade Plan',     path: '/plans' },
+            { label: 'Leaderboard',      path: '/leaderboard' },
+            { label: 'Earnings Guide',   path: '/guide' },
+            { label: 'Bonus Center',     path: '/bonus' },
+            { label: 'Payout Proof',     path: '/payout-proof' },
+          ].map(item => (
+            <div key={item.path} className={styles.settingRow} onClick={() => navigate(item.path)}>
+              <span className={styles.settingLabel}>{item.label}</span>
+              <span className={styles.chevron}><ChevronRight /></span>
+            </div>
+          ))}
         </div>
 
         {/* Logout */}

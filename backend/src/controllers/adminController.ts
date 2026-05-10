@@ -226,6 +226,66 @@ export async function updateTask(req: Request, res: Response, next: NextFunction
   } catch (err) { next(err); }
 }
 
+export async function bulkImportTasks(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const { tasks } = req.body as {
+      tasks?: Array<{ title?: unknown; description?: unknown; category?: unknown; payout?: unknown; url?: unknown; is_active?: unknown }>;
+    };
+
+    if (!Array.isArray(tasks) || tasks.length === 0) {
+      res.status(400).json({ message: 'tasks must be a non-empty array.' });
+      return;
+    }
+    if (tasks.length > 100) {
+      res.status(400).json({ message: 'Cannot import more than 100 tasks at once.' });
+      return;
+    }
+
+    const toInsert: Array<Record<string, unknown>> = [];
+    const errors: Array<{ index: number; reason: string }> = [];
+
+    for (let i = 0; i < tasks.length; i++) {
+      const t = tasks[i];
+      const rowErrors: string[] = [];
+
+      if (!t.title || typeof t.title !== 'string' || !String(t.title).trim()) {
+        rowErrors.push('title is required');
+      }
+      const parsedPayout = parseFloat(String(t.payout ?? ''));
+      if (isNaN(parsedPayout) || parsedPayout <= 0) {
+        rowErrors.push('payout must be a number > 0');
+      }
+      if (!VALID_TASK_CATEGORIES.includes(t.category as TaskCategory)) {
+        rowErrors.push(`category must be one of: ${VALID_TASK_CATEGORIES.join(', ')}`);
+      }
+
+      if (rowErrors.length > 0) {
+        errors.push({ index: i, reason: rowErrors.join('; ') });
+        continue;
+      }
+
+      toInsert.push({
+        title: String(t.title).trim(),
+        description: t.description ? String(t.description).trim() : '',
+        category: t.category,
+        payout: parsedPayout,
+        url: t.url ? String(t.url).trim() : null,
+        is_active: t.is_active !== undefined ? Boolean(t.is_active) : true,
+      });
+    }
+
+    if (toInsert.length > 0) {
+      await db('tasks').insert(toInsert);
+    }
+
+    await logAudit(req.user!.id, 'admin_bulk_import_tasks', req, {
+      metadata: { imported: toInsert.length, skipped: errors.length },
+    });
+
+    res.status(201).json({ imported: toInsert.length, skipped: errors.length, errors });
+  } catch (err) { next(err); }
+}
+
 // ─── Plan management ──────────────────────────────────────────────────────────
 const VALID_PLANS: UserPlan[] = ['free', 'silver', 'gold', 'diamond'];
 
@@ -417,6 +477,61 @@ export async function revenueStats(req: Request, res: Response, next: NextFuncti
       new_users_30d: Number((newUsers as unknown as { total: unknown } | undefined)?.total ?? 0),
       active_subscribers: Number((activeSubscribers as unknown as { total: unknown } | undefined)?.total ?? 0),
     });
+  } catch (err) { next(err); }
+}
+
+// ─── Leaderboard rewards ──────────────────────────────────────────────────────
+const LEADERBOARD_BONUSES: Record<number, number> = { 1: 500, 2: 200, 3: 100 };
+
+export async function grantLeaderboardRewards(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const now = new Date();
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+
+    // Query top 3 earners for current month
+    const topEarners = await db('earnings as e')
+      .join('users as u', 'e.user_id', 'u.id')
+      .where('e.created_at', '>=', monthStart)
+      .where('e.created_at', '<', monthEnd)
+      .select('e.user_id', 'u.name', db.raw('SUM(e.amount) as total_earned'))
+      .groupBy('e.user_id', 'u.name')
+      .orderBy('total_earned', 'desc')
+      .limit(3);
+
+    const winners: Array<{ rank: number; name: string; amount_earned: number; bonus_granted: number }> = [];
+
+    for (let i = 0; i < topEarners.length; i++) {
+      const rank = i + 1;
+      const earner = topEarners[i] as { user_id: number; name: string; total_earned: string };
+      const bonus = LEADERBOARD_BONUSES[rank];
+      if (!bonus) continue;
+
+      await db.transaction(async (trx) => {
+        await trx('earnings').insert({
+          user_id: earner.user_id,
+          task_id: null,
+          amount: bonus,
+          type: 'admin_adjustment',
+          description: `Leaderboard reward — Rank #${rank} (${now.toLocaleString('default', { month: 'long' })} ${now.getFullYear()})`,
+        });
+        await trx('users').where({ id: earner.user_id }).increment('balance', bonus);
+      });
+
+      await logAudit(req.user!.id, 'admin_leaderboard_reward', req, {
+        amount: bonus,
+        metadata: { rank, target_user_id: earner.user_id, bonus_granted: bonus },
+      });
+
+      winners.push({
+        rank,
+        name: earner.name,
+        amount_earned: parseFloat(earner.total_earned),
+        bonus_granted: bonus,
+      });
+    }
+
+    res.json({ winners });
   } catch (err) { next(err); }
 }
 

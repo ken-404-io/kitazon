@@ -122,6 +122,83 @@ export async function earningsChart(req: Request, res: Response, next: NextFunct
 }
 
 
+export async function dailyCheckin(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    // Check if already checked in today
+    const alreadyDone = await db<DbEarning>('earnings')
+      .where({ user_id: req.user!.id, type: 'checkin' })
+      .where('created_at', '>=', today)
+      .first();
+
+    // Compute streak: count consecutive days with checkin earnings going backwards
+    // We fetch all checkin dates and count from yesterday backwards
+    const checkinDates = await db('earnings')
+      .where({ user_id: req.user!.id, type: 'checkin' })
+      .orderBy('created_at', 'desc')
+      .select(db.raw('DATE(created_at) as day'));
+
+    // Build set of unique days
+    const daySet = new Set<string>(checkinDates.map((r: { day: string }) => String(r.day).slice(0, 10)));
+
+    // Calculate streak length based on consecutive days ending at yesterday (or today if already done)
+    let streak = 0;
+    const cursor = new Date();
+    cursor.setHours(0, 0, 0, 0);
+    if (alreadyDone) {
+      // today counts, walk from today backwards
+    } else {
+      // not yet done — walk from yesterday backwards to find existing streak
+      cursor.setDate(cursor.getDate() - 1);
+    }
+    // Count consecutive days present in daySet
+    for (let i = 0; i < 366; i++) {
+      const key = cursor.toISOString().slice(0, 10);
+      if (daySet.has(key)) {
+        streak++;
+        cursor.setDate(cursor.getDate() - 1);
+      } else {
+        break;
+      }
+    }
+
+    if (alreadyDone) {
+      const tomorrow = new Date(today);
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      res.status(409).json({ message: 'Already checked in today.', streak, next_checkin_at: tomorrow });
+      return;
+    }
+
+    // New streak will be yesterday's streak + 1
+    const newStreak = streak + 1;
+
+    // Determine bonus amount
+    let amount: number;
+    if (newStreak >= 30) {
+      amount = 5;
+    } else if (newStreak >= 7) {
+      amount = 3;
+    } else {
+      amount = 1;
+    }
+
+    await db.transaction(async (trx) => {
+      await trx('earnings').insert({
+        user_id: req.user!.id,
+        task_id: null,
+        amount,
+        type: 'checkin',
+        description: `Daily check-in bonus — Day ${newStreak}`,
+      });
+      await trx('users').where({ id: req.user!.id }).increment('balance', amount);
+    });
+
+    res.json({ message: `Check-in successful! You earned ₱${amount}.`, amount, streak: newStreak, already_done: false });
+  } catch (err) { next(err); }
+}
+
 export async function recentEarnings(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     const page = Math.max(1, Number(req.query.page ?? 1));

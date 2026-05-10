@@ -110,7 +110,33 @@ export async function create(req: Request, res: Response, next: NextFunction): P
     }
 
     // Suspicious activity detection
-    const { flags, isSuspicious } = await detectSuspicious(user.id, parsed, user);
+    const { flags: baseFlags, isSuspicious: baseSuspicious } = await detectSuspicious(user.id, parsed, user);
+    const flags = [...baseFlags];
+    const ip = (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() ?? req.ip ?? '';
+
+    // Check 1: multiple withdrawals from same IP in last hour (other accounts)
+    const recentSameIp = await db('withdrawals')
+      .where('created_at', '>', new Date(Date.now() - 60 * 60 * 1000))
+      .whereRaw('ip_address = ?', [ip])
+      .whereNot({ user_id: req.user!.id })
+      .count('id as cnt').first();
+    if (Number((recentSameIp as any)?.cnt) >= 3) flags.push('multiple_accounts_same_ip');
+
+    // Check 2: withdrawal within 10 minutes of account creation
+    const accountAge = Date.now() - new Date(user.created_at).getTime();
+    if (accountAge < 10 * 60 * 1000) flags.push('new_account');
+
+    // Check 3: more than 3 withdrawals today
+    const todayWithdrawals = await db('withdrawals')
+      .where({ user_id: req.user!.id })
+      .where('created_at', '>', new Date(new Date().setHours(0, 0, 0, 0)))
+      .count('id as cnt').first();
+    if (Number((todayWithdrawals as any)?.cnt) >= 3) flags.push('excessive_daily_withdrawals');
+
+    const isSuspicious = flags.length > 0;
+    if (flags.length > 0) {
+      console.warn(`[FRAUD] user=${req.user!.id} ip=${ip} flags=${flags.join(',')}`);
+    }
 
     const now = new Date();
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
@@ -145,10 +171,21 @@ export async function create(req: Request, res: Response, next: NextFunction): P
         .decrement('balance', parsed);
       if (updated === 0) { insufficientBalance = true; return; }
 
-      await trx('withdrawals').insert({
-        user_id: req.user!.id, amount: parsed, fee, net_amount: netAmount,
-        channel, account_number, status: 'pending',
-      });
+      try {
+        await trx('withdrawals').insert({
+          user_id: req.user!.id, amount: parsed, fee, net_amount: netAmount,
+          channel, account_number, status: 'pending',
+          ip_address: ip || null,
+          is_flagged: isSuspicious,
+          metadata: flags.length > 0 ? JSON.stringify({ flags }) : null,
+        });
+      } catch {
+        // Fallback: insert without optional fraud columns if they don't exist in DB yet
+        await trx('withdrawals').insert({
+          user_id: req.user!.id, amount: parsed, fee, net_amount: netAmount,
+          channel, account_number, status: 'pending',
+        });
+      }
     });
 
     if (otpInvalid)         { res.status(400).json({ message: 'Invalid or expired OTP.' }); return; }

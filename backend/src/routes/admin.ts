@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import authMiddleware from '../middleware/auth';
 import adminAuth from '../middleware/adminAuth';
-import { platformStats, listUsers, toggleUserActive, listWithdrawals, updateWithdrawalStatus, listAuditLogs, listTasks, createTask, updateTask, updateUserPlan, adjustBalance, broadcastEmail, revenueStats } from '../controllers/adminController';
+import { platformStats, listUsers, toggleUserActive, listWithdrawals, updateWithdrawalStatus, listAuditLogs, listTasks, createTask, updateTask, updateUserPlan, adjustBalance, broadcastEmail, revenueStats, bulkImportTasks, grantLeaderboardRewards } from '../controllers/adminController';
 
 const router = Router();
 
@@ -17,8 +17,10 @@ router.patch('/withdrawals/:id/status', updateWithdrawalStatus);
 router.get('/audit-logs', listAuditLogs);
 router.get('/tasks', listTasks);
 router.post('/tasks', createTask);
+router.post('/tasks/bulk', bulkImportTasks);
 router.patch('/tasks/:id', updateTask);
 router.post('/broadcast', broadcastEmail);
 router.get('/revenue', revenueStats);
+router.post('/leaderboard-rewards', grantLeaderboardRewards);
 
 export default router;
