@@ -5,9 +5,9 @@ import { logAudit } from '../services/audit';
 import { sendPlanUpgradeEmail } from '../services/email';
 
 const PLAN_PRICES: Record<Exclude<UserPlan, 'free'>, { amount: string; label: string }> = {
-  silver:  { amount: '99.00',  label: 'Kitazon Silver Plan' },
-  gold:    { amount: '199.00', label: 'Kitazon Gold Plan' },
-  diamond: { amount: '399.00', label: 'Kitazon Diamond Plan' },
+  silver:  { amount: '1.00', label: 'Kitazon Silver Plan' },
+  gold:    { amount: '1.00', label: 'Kitazon Gold Plan' },
+  diamond: { amount: '1.00', label: 'Kitazon Diamond Plan' },
 };
 
 function paypalBase(): string {
