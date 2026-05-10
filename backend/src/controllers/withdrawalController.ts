@@ -39,6 +39,7 @@ async function getWithdrawalEligibility(userId: number, user: DbUser) {
     tasks_required: TASKS_REQUIRED,
     email_verified: user.email_verified,
     is_first_withdrawal: isFirstWithdrawal,
+    withdrawal_credits: Number(user.withdrawal_credits ?? 0),
     reasons,
   };
 }
@@ -112,6 +113,19 @@ export async function requestOtp(req: Request, res: Response, next: NextFunction
       }
     }
 
+    // Credits pre-check so user gets feedback before receiving OTP
+    const userCredits = Number(user.withdrawal_credits ?? 0);
+    const creditsNeeded = Math.ceil(parsed);
+    if (userCredits < creditsNeeded) {
+      res.status(403).json({
+        message: `You need ${creditsNeeded} withdrawal credits to withdraw ₱${parsed}. You have ${userCredits} credits.`,
+        reason: 'insufficient_credits',
+        credits_available: userCredits,
+        credits_needed: creditsNeeded,
+      });
+      return;
+    }
+
     const otp = await createOtp(user.id, 'withdrawal_otp', 10);
     await sendWithdrawalOtp(user.email, user.name, otp, parsed);
     res.json({ message: 'OTP sent to your email address.' });
@@ -163,6 +177,19 @@ export async function create(req: Request, res: Response, next: NextFunction): P
         res.status(403).json({ message: `Complete at least ${TASKS_REQUIRED} tasks before withdrawing. You have completed ${elig.tasks_completed}/${TASKS_REQUIRED}.` });
         return;
       }
+    }
+
+    // Withdrawal credits check: need 1 credit per ₱1 withdrawn
+    const userCredits = Number(user.withdrawal_credits ?? 0);
+    const creditsNeeded = Math.ceil(parsed);
+    if (userCredits < creditsNeeded) {
+      res.status(403).json({
+        message: `You need ${creditsNeeded} withdrawal credits to withdraw ₱${parsed}. You have ${userCredits} credits.`,
+        reason: 'insufficient_credits',
+        credits_available: userCredits,
+        credits_needed: creditsNeeded,
+      });
+      return;
     }
 
     // Block if user already has a pending or processing withdrawal
@@ -234,8 +261,14 @@ export async function create(req: Request, res: Response, next: NextFunction): P
       const updated = await trx('users')
         .where({ id: req.user!.id })
         .where('balance', '>=', parsed)
+        .whereRaw('COALESCE(withdrawal_credits, 0) >= ?', [creditsNeeded])
         .decrement('balance', parsed);
       if (updated === 0) { insufficientBalance = true; return; }
+
+      // Deduct credits (1 per ₱1 withdrawn)
+      try {
+        await trx('users').where({ id: req.user!.id }).decrement('withdrawal_credits', creditsNeeded);
+      } catch { /* column not yet migrated — skip */ }
 
       try {
         await trx('withdrawals').insert({

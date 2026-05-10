@@ -186,9 +186,13 @@ export async function dailyCheckin(req: Request, res: Response, next: NextFuncti
         description: `Daily check-in bonus — Day ${newStreak}`,
       });
       await trx('users').where({ id: req.user!.id }).increment('balance', amount);
+      // Award 1 withdrawal credit per check-in
+      try {
+        await trx('users').where({ id: req.user!.id }).increment('withdrawal_credits', 1);
+      } catch { /* column not yet migrated — skip */ }
     });
 
-    res.json({ message: `Check-in successful! You earned ₱${amount}.`, amount, streak: newStreak, already_done: false });
+    res.json({ message: `Check-in successful! You earned ₱${amount} and +1 withdrawal credit.`, amount, streak: newStreak, already_done: false });
   } catch (err) { next(err); }
 }
 

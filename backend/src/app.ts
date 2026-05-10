@@ -17,6 +17,7 @@ import adminRoutes from './routes/admin';
 import totpRoutes from './routes/totp';
 import googleAuthRoutes from './routes/googleAuth';
 import subscriptionRoutes from './routes/subscriptions';
+import creditsRoutes from './routes/credits';
 
 // ─── Startup guards ────────────────────────────────────────────────────────────
 if (!process.env.JWT_SECRET || process.env.JWT_SECRET.length < 32) {
@@ -147,6 +148,7 @@ app.use('/api/admin', authLimiter, adminRoutes);
 app.use('/api/totp', totpRoutes);
 app.use('/api/auth', googleAuthRoutes);
 app.use('/api/subscriptions', subscriptionRoutes);
+app.use('/api/credits', creditsRoutes);
 
 // ─── security.txt (RFC 9116) ──────────────────────────────────────────────────
 app.get('/.well-known/security.txt', (_req, res) => {
