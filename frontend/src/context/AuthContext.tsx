@@ -24,6 +24,7 @@ interface RegisterData {
   captcha_token?: string;
   website?: string;
   _t?: string;
+  _fp?: string;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);

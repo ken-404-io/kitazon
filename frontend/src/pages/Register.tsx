@@ -32,6 +32,23 @@ export default function Register() {
   // Track when the page loaded so the backend can reject impossibly fast bot submissions
   const pageLoadTime = useRef(Date.now());
 
+  // Collect a lightweight browser fingerprint (no invasive APIs — just stable browser traits)
+  function getFingerprint(): string {
+    const parts = [
+      navigator.language,
+      navigator.platform,
+      String(screen.width) + 'x' + String(screen.height),
+      String(screen.colorDepth),
+      Intl.DateTimeFormat().resolvedOptions().timeZone,
+      String(navigator.hardwareConcurrency ?? ''),
+      navigator.userAgent,
+    ];
+    // Simple non-crypto hash (djb2)
+    let h = 5381;
+    for (const c of parts.join('|')) h = ((h << 5) + h) ^ c.charCodeAt(0);
+    return String(h >>> 0);
+  }
+
   const set = (f: keyof FormState) => (e: React.ChangeEvent<HTMLInputElement>) =>
     setForm((p) => ({ ...p, [f]: e.target.value }));
   const blur = (f: keyof typeof touched) => () => setTouched(p => ({ ...p, [f]: true }));
@@ -62,7 +79,7 @@ export default function Register() {
         const result = await captchaRef.current?.execute({ async: true });
         captcha_token = result?.response;
       }
-      await register({ name, email, password: form.password, referral_code, captcha_token, website: form.website, _t: String(pageLoadTime.current) });
+      await register({ name, email, password: form.password, referral_code, captcha_token, website: form.website, _t: String(pageLoadTime.current), _fp: getFingerprint() });
     } catch (err: unknown) {
       captchaRef.current?.resetCaptcha();
       const msg = (err as { response?: { data?: { message?: string } } }).response?.data?.message;
