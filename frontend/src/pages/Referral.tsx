@@ -59,7 +59,7 @@ export default function Referral() {
         <div className={styles.heroText}>
           <h1 className={styles.heroTitle}>Referral Program</h1>
           <p className={styles.heroSub}>
-            Earn 20% lifetime commission<br />+ ₱50 per referred signup
+            Earn ₱50 per referred signup
           </p>
         </div>
         <div className={styles.heroIcon} aria-hidden="true">
@@ -71,16 +71,11 @@ export default function Referral() {
         </div>
       </div>
 
-      {/* ── Bonus callouts ── */}
+      {/* ── Bonus callout ── */}
       <div className={styles.bonuses}>
         <div className={styles.bonusCard}>
           <span className={styles.bonusAmt}>₱50</span>
           <span className={styles.bonusLabel}>per signup bonus</span>
-        </div>
-        <div className={styles.bonusDivider} />
-        <div className={styles.bonusCard}>
-          <span className={styles.bonusAmt}>20%</span>
-          <span className={styles.bonusLabel}>lifetime commission</span>
         </div>
       </div>
 
@@ -89,7 +84,7 @@ export default function Referral() {
         <div className={styles.linkCardLeft}>
           <h3 className={styles.linkTitle}>Your Referral Link</h3>
           <p className={styles.linkDesc}>
-            Share your link and start earning on every user's earnings + ₱50 per signup.
+            Share your link and start earning ₱50 for every user who signs up.
           </p>
           <div className={styles.linkRow}>
             <span className={styles.linkText}>{link}</span>
@@ -105,9 +100,6 @@ export default function Referral() {
           <button className={styles.shareBtn} onClick={share}>
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
             <span>Invite more<br/>Earn more</span>
-          </button>
-          <button className={`btn-outline ${styles.howBtn}`} onClick={() => {}}>
-            How it works
           </button>
         </div>
       </div>
