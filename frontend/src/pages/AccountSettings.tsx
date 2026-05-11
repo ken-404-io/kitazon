@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import api from '../services/api';
@@ -51,7 +51,8 @@ export default function AccountSettings() {
   const { user, logout, refreshUser } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const navigate = useNavigate();
-  const [view, setView] = useState<View>('main');
+  const [searchParams] = useSearchParams();
+  const [view, setView] = useState<View>((searchParams.get('view') as View) ?? 'main');
   const [balance, setBalance] = useState<number>(0);
 
   const [pwForm, setPwForm]       = useState({ current: '', next: '' });
