@@ -8,7 +8,7 @@ import EarningsChart from '../components/dashboard/EarningsChart';
 import { SkeletonStat, SkeletonRow } from '../components/ui/Skeleton';
 import {
   CreditCardIcon, CalendarIcon, BarChartIcon, TrophyIcon,
-  GiftIcon, BookIcon, DiceIcon, UsersIcon, SmartphoneIcon,
+  DiceIcon, UsersIcon, SmartphoneIcon,
   CheckCircleIcon, ShieldCheckIcon, TargetIcon, WalletBigIcon,
 } from '../components/ui/Icons';
 import api from '../services/api';
@@ -28,9 +28,6 @@ export default function Dashboard() {
   const [recentEarnings, setRecentEarnings] = useState<Earning[]>([]);
   const [loadingStats, setLoadingStats] = useState(true);
   const [loadingEarnings, setLoadingEarnings] = useState(true);
-  const [earningsPage, setEarningsPage] = useState(1);
-  const [earningsPages, setEarningsPages] = useState(1);
-
   const loadStats = (): void => {
     api.get<UserStats>('/auth/me/stats').then((res) => setStats(res.data)).catch(() => {}).finally(() => setLoadingStats(false));
   };
@@ -39,11 +36,11 @@ export default function Dashboard() {
 
   useEffect(() => {
     setLoadingEarnings(true);
-    api.get<{ earnings: Earning[]; pages: number }>(`/tasks/earnings/recent?page=${earningsPage}`)
-      .then((res) => { setRecentEarnings(res.data.earnings); setEarningsPages(res.data.pages); })
+    api.get<{ earnings: Earning[]; pages: number }>('/tasks/earnings/recent?page=1')
+      .then((res) => { setRecentEarnings(res.data.earnings); })
       .catch(() => {})
       .finally(() => setLoadingEarnings(false));
-  }, [earningsPage]);
+  }, []);
 
   return (
     <div className="page-container">
@@ -76,30 +73,6 @@ export default function Dashboard() {
         )}
       </div>
 
-      {/* Bonus & Guide */}
-      <div className="grid-2" style={{ marginBottom: '1.25rem' }}>
-        <Link to="/bonus" style={{ textDecoration: 'none' }}>
-          <div className={styles.promoCard} style={{ background: 'var(--bonus-bg)', border: '1px solid var(--bonus-border)' }}>
-            <div className={styles.promoIcon} style={{ background: 'var(--primary-subtle)', color: 'var(--primary)' }}><GiftIcon /></div>
-            <div>
-              <div style={{ fontWeight: 700, color: 'var(--primary)', fontSize: 15 }}>Claim Bonus ₱20</div>
-              <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>Complete a task to unlock</div>
-            </div>
-            <span style={{ marginLeft: 'auto', color: 'var(--primary)', fontSize: 18, fontWeight: 700 }}>→</span>
-          </div>
-        </Link>
-        <Link to="/guide" style={{ textDecoration: 'none' }}>
-          <div className={styles.promoCard} style={{ background: 'var(--guide-bg)', border: '1px solid var(--guide-border)' }}>
-            <div className={styles.promoIcon} style={{ background: 'var(--green-subtle)', color: 'var(--green)' }}><BookIcon /></div>
-            <div>
-              <div style={{ fontWeight: 700, color: 'var(--green)', fontSize: 15 }}>Free Earning Guide</div>
-              <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>Unlock tips to earn faster</div>
-            </div>
-            <span style={{ marginLeft: 'auto', color: 'var(--green)', fontSize: 18, fontWeight: 700 }}>→</span>
-          </div>
-        </Link>
-      </div>
-
       {/* Recent Earnings + Spin */}
       <div className={styles.mainGrid}>
         <div>
@@ -113,7 +86,7 @@ export default function Dashboard() {
             <div className="card" style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)' }}>
               No earnings yet. <Link to="/tasks">Complete your first task!</Link>
             </div>
-          ) : recentEarnings.map((e) => (
+          ) : recentEarnings.slice(0, 3).map((e) => (
             <div key={e.id} className={`card ${styles.earningRow}`}>
               <div className={styles.earningIcon} style={{ color: 'var(--primary)' }}>{earningIcon(e.type)}</div>
               <div style={{ flex: 1 }}>
@@ -123,13 +96,6 @@ export default function Dashboard() {
               <span className="badge badge-green">+₱{e.amount}</span>
             </div>
           ))}
-          {earningsPages > 1 && (
-            <div style={{ display: 'flex', gap: 8, marginTop: '0.75rem', alignItems: 'center' }}>
-              <button className="btn-outline" style={{ padding: '4px 12px', fontSize: 13 }} disabled={earningsPage <= 1} onClick={() => setEarningsPage((p) => p - 1)}>← Prev</button>
-              <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>{earningsPage} / {earningsPages}</span>
-              <button className="btn-outline" style={{ padding: '4px 12px', fontSize: 13 }} disabled={earningsPage >= earningsPages} onClick={() => setEarningsPage((p) => p + 1)}>Next →</button>
-            </div>
-          )}
           <EarningsChart />
         </div>
         <SpinWheel onWin={() => { loadStats(); showToast('Spin reward added to your balance!', 'success'); }} />
