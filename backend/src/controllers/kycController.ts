@@ -1,9 +1,26 @@
 import { Request, Response, NextFunction } from 'express';
+import { v2 as cloudinary } from 'cloudinary';
 import db from '../../config/database';
 import { DbUser, KycStatus } from '../types';
 import { logAudit } from '../services/audit';
 
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key:    process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
+});
+
 const VALID_ID_TYPES = ['national_id', 'passport', 'drivers_license', 'umid', 'voters_id', 'prc_id', 'philsys'];
+
+async function uploadToCloudinary(dataUrl: string, folder: string, publicId: string): Promise<string> {
+  const result = await cloudinary.uploader.upload(dataUrl, {
+    folder: `kyc/${folder}`,
+    public_id: publicId,
+    overwrite: true,
+    resource_type: 'image',
+  });
+  return result.secure_url;
+}
 
 // ── User: get KYC status ──────────────────────────────────────────────────────
 export async function getStatus(req: Request, res: Response, next: NextFunction): Promise<void> {
@@ -84,6 +101,14 @@ export async function submit(req: Request, res: Response, next: NextFunction): P
       res.status(400).json({ message: 'Province is required.' }); return;
     }
 
+    // ── Upload images to Cloudinary ───────────────────────────────────────────
+    const uid = String(req.user!.id);
+    const [idFrontUrl, idBackUrl, selfieUrl] = await Promise.all([
+      id_front_data ? uploadToCloudinary(id_front_data, 'id_front', uid) : Promise.resolve(null),
+      id_back_data  ? uploadToCloudinary(id_back_data,  'id_back',  uid) : Promise.resolve(null),
+      selfie_data   ? uploadToCloudinary(selfie_data,   'selfie',   uid) : Promise.resolve(null),
+    ]);
+
     // ── Duplicate detection ───────────────────────────────────────────────────
     const tags: string[] = [];
 
@@ -112,9 +137,9 @@ export async function submit(req: Request, res: Response, next: NextFunction): P
         address: address.trim(),
         city: city.trim(),
         province: province.trim(),
-        id_front_data: id_front_data ?? null,
-        id_back_data: id_back_data ?? null,
-        selfie_data: selfie_data ?? null,
+        id_front_data: idFrontUrl,
+        id_back_data:  idBackUrl,
+        selfie_data:   selfieUrl,
         tags: JSON.stringify(tags),
         status: 'pending',
       });
