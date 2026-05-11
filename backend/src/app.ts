@@ -119,6 +119,7 @@ app.use((req: Request, res: Response, next: NextFunction): void => {
 
 // ─── Body / cookie parsing ────────────────────────────────────────────────────
 app.use(cookieParser());
+app.use('/api/kyc/submit', express.json({ limit: '20mb' }));
 app.use(express.json({ limit: '10kb' }));
 app.use(express.urlencoded({ extended: false, limit: '10kb' }));
 
