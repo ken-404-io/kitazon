@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
+import KycGate from '../components/KycGate';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import EarningsChart from '../components/dashboard/EarningsChart';
@@ -350,6 +351,7 @@ export default function Withdraw() {
 
   /* ══════════════════════════ FORM ════════════════════════════════════════════ */
   return (
+    <KycGate feature="withdrawals">
     <div className="page-container">
       <div className={styles.page}>
 
@@ -507,5 +509,6 @@ export default function Withdraw() {
         </div>
       )}
     </div>
+    </KycGate>
   );
 }
