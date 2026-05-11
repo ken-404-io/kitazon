@@ -25,6 +25,7 @@ import { ReactNode } from 'react';
 import ErrorBoundary from './components/ErrorBoundary';
 import PWAInstallPrompt from './components/PWAInstallPrompt';
 import AuthTransitionOverlay from './components/AuthTransitionOverlay';
+import AdBlockDetector from './components/AdBlockDetector';
 import Terms from './pages/Terms';
 import Privacy from './pages/Privacy';
 import Plans from './pages/Plans';
@@ -54,6 +55,7 @@ export default function App() {
     <AuthProvider>
       <ToastProvider>
       <BrowserRouter>
+        <AdBlockDetector />
         <AuthTransitionOverlay />
         <PWAInstallPrompt />
         <Navbar />
