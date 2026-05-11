@@ -33,6 +33,7 @@ import PaymentSuccess from './pages/PaymentSuccess';
 import PaymentCancel from './pages/PaymentCancel';
 import ReferralLanding from './pages/ReferralLanding';
 import Credits from './pages/Credits';
+import CheckIn from './pages/CheckIn';
 
 function PrivateRoute({ children }: { children: ReactNode }) {
   const { user, loading } = useAuth();
@@ -81,6 +82,7 @@ export default function App() {
           <Route path="/payment/success" element={<PrivateRoute><PaymentSuccess /></PrivateRoute>} />
           <Route path="/payment/cancel"  element={<PrivateRoute><PaymentCancel /></PrivateRoute>} />
           <Route path="/credits" element={<PrivateRoute><Credits /></PrivateRoute>} />
+          <Route path="/checkin" element={<PrivateRoute><CheckIn /></PrivateRoute>} />
           <Route path="/ref/:code" element={<ReferralLanding />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
