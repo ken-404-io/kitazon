@@ -4,7 +4,29 @@ import { useAuth } from '../context/AuthContext';
 import api from '../services/api';
 import { WithdrawalStatus, WithdrawalChannel } from '../types';
 
-type Tab = 'stats' | 'users' | 'withdrawals' | 'tasks' | 'logs' | 'revenue' | 'broadcast';
+type Tab = 'stats' | 'users' | 'withdrawals' | 'tasks' | 'logs' | 'revenue' | 'broadcast' | 'kyc';
+
+interface KycSubmission {
+  id: number;
+  user_id: number;
+  user_name: string;
+  user_email: string;
+  full_name: string;
+  date_of_birth: string;
+  nationality: string;
+  id_type: string;
+  id_number: string;
+  address: string;
+  city: string;
+  province: string;
+  status: string;
+  rejection_reason: string | null;
+  created_at: string;
+  tags: string[] | string;
+  id_front_data: string | null;
+  id_back_data: string | null;
+  selfie_data: string | null;
+}
 
 interface PlatformStats {
   users: number;
@@ -143,6 +165,14 @@ export default function Admin() {
   const [bulkLoading, setBulkLoading] = useState(false);
   const [bulkResult, setBulkResult] = useState<string | null>(null);
 
+  // KYC
+  const [kycList, setKycList] = useState<KycSubmission[]>([]);
+  const [kycFilter, setKycFilter] = useState('pending');
+  const [kycLoading, setKycLoading] = useState(false);
+  const [kycRejectId, setKycRejectId] = useState<number | null>(null);
+  const [kycRejectReason, setKycRejectReason] = useState('');
+  const [kycExpandId, setKycExpandId] = useState<number | null>(null);
+
   // Leaderboard Rewards
   const [rewardsConfirming, setRewardsConfirming] = useState(false);
   const [rewardsLoading, setRewardsLoading] = useState(false);
@@ -212,6 +242,14 @@ export default function Admin() {
     } finally { setRevenueLoading(false); }
   }, []);
 
+  const loadKyc = useCallback(async (status: string) => {
+    setKycLoading(true);
+    try {
+      const res = await api.get<KycSubmission[]>(`/kyc/admin?status=${status}`);
+      setKycList(res.data);
+    } finally { setKycLoading(false); }
+  }, []);
+
   useEffect(() => {
     if (tab === 'stats' && !stats) loadStats();
     if (tab === 'users') loadUsers(userPage, userSearch);
@@ -219,7 +257,8 @@ export default function Admin() {
     if (tab === 'tasks') loadTasks();
     if (tab === 'logs') loadLogs(logPage);
     if (tab === 'revenue' && !revenueStats) loadRevenue();
-  }, [tab, userPage, wPage, wFilter, logPage, stats, revenueStats, loadStats, loadUsers, loadWithdrawals, loadTasks, loadLogs, loadRevenue]);
+    if (tab === 'kyc') loadKyc(kycFilter);
+  }, [tab, userPage, wPage, wFilter, logPage, kycFilter, stats, revenueStats, loadStats, loadUsers, loadWithdrawals, loadTasks, loadLogs, loadRevenue, loadKyc]);
 
   const toggleActive = async (userId: number) => {
     await api.patch(`/admin/users/${userId}/toggle-active`);
@@ -288,7 +327,7 @@ export default function Admin() {
       )}
       <h2>Admin Panel</h2>
       <div style={{ display: 'flex', gap: 8, marginBottom: '1.5rem', flexWrap: 'wrap' }}>
-        {(['stats', 'revenue', 'users', 'withdrawals', 'tasks', 'logs', 'broadcast'] as Tab[]).map(t => (
+        {(['stats', 'revenue', 'users', 'withdrawals', 'tasks', 'kyc', 'logs', 'broadcast'] as Tab[]).map(t => (
           <button key={t} style={tabStyle(t)} onClick={() => setTab(t)}>
             {t.charAt(0).toUpperCase() + t.slice(1)}
           </button>
@@ -856,6 +895,119 @@ export default function Admin() {
               </button>
             </form>
           </div>
+        </div>
+      )}
+
+      {/* ── KYC ── */}
+      {tab === 'kyc' && (
+        <div>
+          <div style={{ display: 'flex', gap: 8, marginBottom: '1rem', flexWrap: 'wrap' }}>
+            {(['pending', 'approved', 'rejected'] as const).map(s => (
+              <button key={s} onClick={() => setKycFilter(s)} style={{
+                padding: '6px 14px', borderRadius: 6, cursor: 'pointer', fontWeight: kycFilter === s ? 700 : 400,
+                background: kycFilter === s ? 'var(--gold)' : 'transparent',
+                color: kycFilter === s ? '#000' : 'inherit',
+                border: '1px solid var(--gold)',
+              }}>{s.charAt(0).toUpperCase() + s.slice(1)}</button>
+            ))}
+          </div>
+
+          {kycLoading && <p>Loading…</p>}
+          {!kycLoading && kycList.length === 0 && <p style={{ color: '#6b7280' }}>No {kycFilter} submissions.</p>}
+
+          {kycList.map(sub => {
+            const rawTags = sub.tags;
+            const tags: string[] = Array.isArray(rawTags) ? rawTags : (typeof rawTags === 'string' ? JSON.parse(rawTags || '[]') : []);
+            const expanded = kycExpandId === sub.id;
+            return (
+              <div key={sub.id} className="card" style={{ marginBottom: '1rem', fontSize: 14 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 8 }}>
+                  <div>
+                    <div style={{ fontWeight: 700, fontSize: 15 }}>{sub.full_name}</div>
+                    <div style={{ color: '#9ca3af', fontSize: 12 }}>{sub.user_email} · User #{sub.user_id}</div>
+                    <div style={{ marginTop: 4, color: '#9ca3af', fontSize: 12 }}>
+                      {sub.id_type.replace(/_/g, ' ')} · {sub.id_number}
+                    </div>
+                    <div style={{ marginTop: 2, color: '#9ca3af', fontSize: 12 }}>
+                      DOB: {sub.date_of_birth} · {sub.nationality}
+                    </div>
+                    <div style={{ marginTop: 2, color: '#9ca3af', fontSize: 12 }}>
+                      {sub.address}, {sub.city}, {sub.province}
+                    </div>
+                    {tags.length > 0 && (
+                      <div style={{ display: 'flex', gap: 6, marginTop: 6, flexWrap: 'wrap' }}>
+                        {tags.map(tag => (
+                          <span key={tag} style={{
+                            background: tag === 'duplicate_id' ? '#dc2626' : '#d97706',
+                            color: '#fff', borderRadius: 5, padding: '2px 8px', fontSize: 11, fontWeight: 700,
+                          }}>{tag.replace(/_/g, ' ')}</span>
+                        ))}
+                      </div>
+                    )}
+                    {sub.rejection_reason && (
+                      <div style={{ marginTop: 6, color: '#fca5a5', fontSize: 12 }}>Reason: {sub.rejection_reason}</div>
+                    )}
+                  </div>
+                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+                    <span style={{ fontSize: 11, color: '#6b7280' }}>{new Date(sub.created_at).toLocaleDateString()}</span>
+                    <button onClick={() => setKycExpandId(expanded ? null : sub.id)} style={{
+                      padding: '5px 12px', borderRadius: 6, cursor: 'pointer', fontSize: 12,
+                      background: 'transparent', border: '1px solid #374151', color: 'inherit',
+                    }}>{expanded ? 'Hide docs' : 'View docs'}</button>
+                    {sub.status === 'pending' && (
+                      <>
+                        <button onClick={async () => { await api.post(`/kyc/admin/${sub.id}/approve`); loadKyc(kycFilter); showToast('KYC approved'); }} style={{
+                          padding: '5px 12px', borderRadius: 6, cursor: 'pointer', fontSize: 12,
+                          background: '#16a34a', border: 'none', color: '#fff', fontWeight: 700,
+                        }}>Approve</button>
+                        <button onClick={() => { setKycRejectId(sub.id); setKycRejectReason(''); }} style={{
+                          padding: '5px 12px', borderRadius: 6, cursor: 'pointer', fontSize: 12,
+                          background: '#dc2626', border: 'none', color: '#fff', fontWeight: 700,
+                        }}>Reject</button>
+                      </>
+                    )}
+                  </div>
+                </div>
+
+                {/* Reject modal inline */}
+                {kycRejectId === sub.id && (
+                  <div style={{ marginTop: '0.75rem', padding: '0.75rem', background: 'rgba(220,38,38,0.08)', borderRadius: 8, border: '1px solid rgba(220,38,38,0.2)' }}>
+                    <p style={{ margin: '0 0 0.5rem', fontWeight: 600, fontSize: 13 }}>Rejection reason:</p>
+                    <textarea value={kycRejectReason} onChange={e => setKycRejectReason(e.target.value)}
+                      rows={3} style={{ width: '100%', borderRadius: 6, padding: '6px 10px', background: 'var(--dark-bg)', border: '1px solid var(--dark-border)', color: 'var(--text)', fontSize: 13, resize: 'vertical', boxSizing: 'border-box', fontFamily: 'inherit' }}
+                      placeholder="Enter rejection reason…" />
+                    <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+                      <button onClick={async () => {
+                        if (!kycRejectReason.trim()) { showToast('Reason required'); return; }
+                        await api.post(`/kyc/admin/${sub.id}/reject`, { reason: kycRejectReason.trim() });
+                        setKycRejectId(null); loadKyc(kycFilter); showToast('KYC rejected');
+                      }} style={{ padding: '5px 14px', borderRadius: 6, background: '#dc2626', border: 'none', color: '#fff', fontWeight: 700, cursor: 'pointer', fontSize: 13 }}>Confirm Reject</button>
+                      <button onClick={() => setKycRejectId(null)} style={{ padding: '5px 14px', borderRadius: 6, background: 'transparent', border: '1px solid #374151', color: 'inherit', cursor: 'pointer', fontSize: 13 }}>Cancel</button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Document previews */}
+                {expanded && (
+                  <div style={{ marginTop: '0.75rem', display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+                    {[
+                      { label: 'ID Front', data: sub.id_front_data },
+                      { label: 'ID Back', data: sub.id_back_data },
+                      { label: 'Selfie', data: sub.selfie_data },
+                    ].map(({ label, data }) => (
+                      <div key={label} style={{ flex: '1 1 180px', minWidth: 160 }}>
+                        <p style={{ margin: '0 0 4px', fontSize: 11, color: '#9ca3af', fontWeight: 600, textTransform: 'uppercase' }}>{label}</p>
+                        {data
+                          ? <img src={data} alt={label} style={{ width: '100%', borderRadius: 8, border: '1px solid #374151', objectFit: 'cover', maxHeight: 200 }} />
+                          : <div style={{ height: 100, borderRadius: 8, border: '1px dashed #374151', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#6b7280', fontSize: 12 }}>Not uploaded</div>
+                        }
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
       )}
     </div>
