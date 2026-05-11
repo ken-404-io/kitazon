@@ -120,16 +120,25 @@ export async function dailyCheckin(req: Request, res: Response, next: NextFuncti
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    // Check if already checked in today
+    // Check if already checked in today — match both 'checkin' type and legacy 'task' type with checkin description
     const alreadyDone = await db<DbEarning>('earnings')
-      .where({ user_id: req.user!.id, type: 'checkin' })
+      .where({ user_id: req.user!.id })
       .where('created_at', '>=', today)
+      .where(function () {
+        this.where('type', 'checkin').orWhere(function () {
+          this.where('type', 'task').where('description', 'like', 'Daily check-in%');
+        });
+      })
       .first();
 
-    // Compute streak: count consecutive days with checkin earnings going backwards
-    // We fetch all checkin dates and count from yesterday backwards
+    // Fetch all checkin dates for streak calculation
     const checkinDates = await db('earnings')
-      .where({ user_id: req.user!.id, type: 'checkin' })
+      .where({ user_id: req.user!.id })
+      .where(function () {
+        this.where('type', 'checkin').orWhere(function () {
+          this.where('type', 'task').where('description', 'like', 'Daily check-in%');
+        });
+      })
       .orderBy('created_at', 'desc')
       .select(db.raw('DATE(created_at) as day'));
 
@@ -178,15 +187,14 @@ export async function dailyCheckin(req: Request, res: Response, next: NextFuncti
     }
 
     await db.transaction(async (trx) => {
-      await trx('earnings').insert({
-        user_id: req.user!.id,
-        task_id: null,
-        amount,
-        type: 'checkin',
-        description: `Daily check-in bonus — Day ${newStreak}`,
-      });
+      const earningRow = { user_id: req.user!.id, task_id: null, amount, description: `Daily check-in bonus — Day ${newStreak}` };
+      try {
+        await trx('earnings').insert({ ...earningRow, type: 'checkin' });
+      } catch {
+        // 'checkin' not yet in DB constraint — use 'task' until migration 015 runs
+        await trx('earnings').insert({ ...earningRow, type: 'task' });
+      }
       await trx('users').where({ id: req.user!.id }).increment('balance', amount);
-      // Award 1 withdrawal credit per check-in
       try {
         await trx('users').where({ id: req.user!.id }).increment('withdrawal_credits', 1);
       } catch { /* column not yet migrated — skip */ }
