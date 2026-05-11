@@ -950,7 +950,7 @@ export default function Admin() {
                     <span style={{ fontSize: 11, color: '#6b7280' }}>{new Date(sub.created_at).toLocaleDateString()}</span>
                     {sub.status === 'pending' && (
                       <>
-                        <button onClick={async () => { await api.post(`/kyc/admin/${sub.id}/approve`); loadKyc(kycFilter); showToast('KYC approved'); }} style={{
+                        <button onClick={async () => { await api.post(`/kyc/admin/${sub.id}/approve`, {}); loadKyc(kycFilter); showToast('KYC approved'); }} style={{
                           padding: '5px 12px', borderRadius: 6, cursor: 'pointer', fontSize: 12,
                           background: '#16a34a', border: 'none', color: '#fff', fontWeight: 700,
                         }}>Approve</button>
