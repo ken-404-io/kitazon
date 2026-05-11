@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import EarningsChart from '../components/dashboard/EarningsChart';
@@ -44,7 +44,8 @@ interface Eligibility {
 export default function Withdraw() {
   const { user }      = useAuth();
   const { showToast } = useToast();
-  const [view,      setView]      = useState<View>('overview');
+  const [searchParams] = useSearchParams();
+  const [view,      setView]      = useState<View>((searchParams.get('view') as View) ?? 'overview');
   const [stats,     setStats]     = useState<UserStats | null>(null);
   const [history,   setHistory]   = useState<Withdrawal[]>([]);
   const [elig,      setElig]      = useState<Eligibility | null>(null);
