@@ -45,9 +45,13 @@ export async function submit(req: Request, res: Response, next: NextFunction): P
       return;
     }
 
-    const { full_name, date_of_birth, nationality, id_type, id_number, address, city, province } = req.body as {
+    const {
+      full_name, date_of_birth, nationality, id_type, id_number,
+      address, city, province, id_front_data, id_back_data, selfie_data,
+    } = req.body as {
       full_name: string; date_of_birth: string; nationality: string;
       id_type: string; id_number: string; address: string; city: string; province: string;
+      id_front_data?: string; id_back_data?: string; selfie_data?: string;
     };
 
     if (!full_name?.trim() || full_name.trim().length < 3) {
@@ -80,6 +84,23 @@ export async function submit(req: Request, res: Response, next: NextFunction): P
       res.status(400).json({ message: 'Province is required.' }); return;
     }
 
+    // ── Duplicate detection ───────────────────────────────────────────────────
+    const tags: string[] = [];
+
+    const dupId = await db('kyc_submissions')
+      .where({ id_type, id_number: id_number.trim() })
+      .whereNot({ user_id: req.user!.id })
+      .first();
+    if (dupId) tags.push('duplicate_id');
+
+    const dupPerson = await db('kyc_submissions')
+      .whereRaw('LOWER(full_name) = LOWER(?)', [full_name.trim()])
+      .where({ date_of_birth })
+      .whereNot({ user_id: req.user!.id })
+      .first();
+    if (dupPerson && !tags.includes('duplicate_id')) tags.push('possible_duplicate_person');
+
+    // ── Persist ───────────────────────────────────────────────────────────────
     await db.transaction(async (trx) => {
       await trx('kyc_submissions').insert({
         user_id: req.user!.id,
@@ -91,6 +112,10 @@ export async function submit(req: Request, res: Response, next: NextFunction): P
         address: address.trim(),
         city: city.trim(),
         province: province.trim(),
+        id_front_data: id_front_data ?? null,
+        id_back_data: id_back_data ?? null,
+        selfie_data: selfie_data ?? null,
+        tags: JSON.stringify(tags),
         status: 'pending',
       });
 
@@ -117,7 +142,8 @@ export async function adminList(req: Request, res: Response, next: NextFunction)
       .select(
         'k.id', 'k.user_id', 'k.full_name', 'k.date_of_birth', 'k.nationality',
         'k.id_type', 'k.id_number', 'k.address', 'k.city', 'k.province',
-        'k.status', 'k.rejection_reason', 'k.created_at',
+        'k.status', 'k.rejection_reason', 'k.created_at', 'k.tags',
+        'k.id_front_data', 'k.id_back_data', 'k.selfie_data',
         'u.name as user_name', 'u.email as user_email'
       );
     res.json(rows);
