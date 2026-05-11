@@ -1,0 +1,259 @@
+.page {
+  min-height: 100vh;
+  background: var(--bg);
+  padding-bottom: 5rem;
+}
+
+/* ── Header ─────────────────────────────────────────────────────────────── */
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1.1rem 1.25rem 0.75rem;
+}
+
+.userRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.avatar {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  background: var(--primary);
+  color: #fff;
+  font-weight: 800;
+  font-size: 1.05rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.hi {
+  font-size: 1rem;
+  font-weight: 800;
+  color: var(--text);
+  line-height: 1.2;
+}
+
+.welcome {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.notifBtn {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+/* ── Balance card ────────────────────────────────────────────────────────── */
+.balanceCard {
+  margin: 0.75rem 1.25rem 0;
+  background: linear-gradient(135deg, #c2410c 0%, #ea580c 50%, #f97316 100%);
+  border-radius: 22px;
+  padding: 1.5rem 1.5rem 1.25rem;
+  text-align: center;
+  box-shadow: 0 8px 32px rgba(249, 115, 22, 0.35);
+}
+
+.balanceLabel {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: rgba(255,255,255,0.75);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 0.5rem;
+}
+
+.balanceRow {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin-bottom: 1.1rem;
+}
+
+.coinIcon { font-size: 2rem; }
+
+.balanceAmt {
+  font-size: clamp(2rem, 8vw, 2.6rem);
+  font-weight: 900;
+  color: #fff;
+  line-height: 1;
+}
+
+.walletBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(255,255,255,0.2);
+  border: 1.5px solid rgba(255,255,255,0.35);
+  color: #fff;
+  font-size: 0.82rem;
+  font-weight: 700;
+  padding: 0.55rem 1.4rem;
+  border-radius: 20px;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.walletBtn:hover { background: rgba(255,255,255,0.3); }
+
+/* ── Quick actions ───────────────────────────────────────────────────────── */
+.quickActions {
+  display: flex;
+  justify-content: space-around;
+  padding: 1.5rem 1rem 0.5rem;
+}
+
+.actionBtn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0 0.5rem;
+  text-decoration: none;
+}
+
+.actionCircle {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.15s;
+}
+
+.actionBtn:active .actionCircle { transform: scale(0.9); }
+
+.actionCheckin { background: rgba(249,115,22,0.15); color: #f97316; border: 2px solid rgba(249,115,22,0.3); }
+.actionDone    { background: rgba(34,197,94,0.15);  color: #22c55e; border: 2px solid rgba(34,197,94,0.3); }
+.actionSpin    { background: rgba(168,85,247,0.15); color: #a855f7; border: 2px solid rgba(168,85,247,0.3); }
+.actionInvite  { background: rgba(59,130,246,0.15); color: #3b82f6; border: 2px solid rgba(59,130,246,0.3); }
+
+.actionLabel {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--text);
+  text-align: center;
+  white-space: nowrap;
+}
+
+.actionSub {
+  font-size: 0.65rem;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+.spinner {
+  width: 20px;
+  height: 20px;
+  border: 2.5px solid rgba(249,115,22,0.3);
+  border-top-color: #f97316;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+  display: inline-block;
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── Tasks section ───────────────────────────────────────────────────────── */
+.tasksSection {
+  padding: 1.25rem 1.25rem 0;
+}
+
+.tasksHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.9rem;
+}
+
+.tasksTitle {
+  font-size: 1rem;
+  font-weight: 800;
+  color: var(--text);
+}
+
+.tasksLink {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--primary);
+  text-decoration: none;
+}
+
+.taskGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+}
+
+.taskCard {
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  text-align: center;
+}
+
+.taskIcon { font-size: 2rem; }
+
+.taskTitle {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--text);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  line-height: 1.3;
+}
+
+.taskPayout {
+  font-size: 0.82rem;
+  font-weight: 800;
+  color: #22c55e;
+}
+
+.taskBtn {
+  margin-top: 4px;
+  width: 100%;
+  background: var(--primary);
+  color: #fff;
+  border: none;
+  border-radius: 20px;
+  padding: 0.45rem 0;
+  font-size: 0.72rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+
+.taskBtn:hover { opacity: 0.85; }
+
+.emptyTasks {
+  text-align: center;
+  padding: 2rem 1rem;
+  color: var(--text-muted);
+  font-size: 0.88rem;
+}
