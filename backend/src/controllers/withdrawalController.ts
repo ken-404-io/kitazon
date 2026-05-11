@@ -255,11 +255,17 @@ export async function create(req: Request, res: Response, next: NextFunction): P
         .decrement('balance', parsed);
       if (updated === 0) { insufficientBalance = true; return; }
 
-      // Deduct credits (1 per ₱1 withdrawn)
+      // Deduct credits (1 per ₱1 withdrawn) — savepoint so failure doesn't abort the transaction
+      await trx.raw('SAVEPOINT sp_credits');
       try {
         await trx('users').where({ id: req.user!.id }).decrement('withdrawal_credits', creditsNeeded);
-      } catch { /* column not yet migrated — skip */ }
+        await trx.raw('RELEASE SAVEPOINT sp_credits');
+      } catch {
+        await trx.raw('ROLLBACK TO SAVEPOINT sp_credits');
+      }
 
+      // Insert withdrawal — try with optional columns, fall back to minimal set via savepoint
+      await trx.raw('SAVEPOINT sp_withdrawal');
       try {
         await trx('withdrawals').insert({
           user_id: req.user!.id, amount: parsed, fee, net_amount: netAmount,
@@ -269,8 +275,9 @@ export async function create(req: Request, res: Response, next: NextFunction): P
           is_first_withdrawal: elig.is_first_withdrawal,
           metadata: JSON.stringify({ flags: flags.length > 0 ? flags : undefined, is_first: elig.is_first_withdrawal }),
         });
+        await trx.raw('RELEASE SAVEPOINT sp_withdrawal');
       } catch {
-        // Fallback: insert without optional columns if they don't exist in DB yet
+        await trx.raw('ROLLBACK TO SAVEPOINT sp_withdrawal');
         await trx('withdrawals').insert({
           user_id: req.user!.id, amount: parsed, fee, net_amount: netAmount,
           channel, account_number, status: 'pending',

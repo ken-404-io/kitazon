@@ -188,16 +188,22 @@ export async function dailyCheckin(req: Request, res: Response, next: NextFuncti
 
     await db.transaction(async (trx) => {
       const earningRow = { user_id: req.user!.id, task_id: null, amount, description: `Daily check-in bonus — Day ${newStreak}` };
+      await trx.raw('SAVEPOINT sp_checkin');
       try {
         await trx('earnings').insert({ ...earningRow, type: 'checkin' });
+        await trx.raw('RELEASE SAVEPOINT sp_checkin');
       } catch {
-        // 'checkin' not yet in DB constraint — use 'task' until migration 015 runs
+        await trx.raw('ROLLBACK TO SAVEPOINT sp_checkin');
         await trx('earnings').insert({ ...earningRow, type: 'task' });
       }
       await trx('users').where({ id: req.user!.id }).increment('balance', amount);
+      await trx.raw('SAVEPOINT sp_checkin_credits');
       try {
         await trx('users').where({ id: req.user!.id }).increment('withdrawal_credits', 1);
-      } catch { /* column not yet migrated — skip */ }
+        await trx.raw('RELEASE SAVEPOINT sp_checkin_credits');
+      } catch {
+        await trx.raw('ROLLBACK TO SAVEPOINT sp_checkin_credits');
+      }
     });
 
     res.json({ message: `Check-in successful! You earned ₱${amount} and +1 withdrawal credit.`, amount, streak: newStreak, already_done: false });
