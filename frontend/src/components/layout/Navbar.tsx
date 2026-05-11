@@ -67,7 +67,7 @@ export default function Navbar() {
     <>
       {/* ── Top header ─────────────────────────────────────────────────────── */}
       <header className={styles.topHeader}>
-        <Link to="/" className={styles.brand}>Kitazon</Link>
+        <span className={styles.brand}>Kitazon</span>
 
         {/* Desktop links */}
         {user ? (
