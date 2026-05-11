@@ -52,19 +52,23 @@ export default function Withdraw() {
   const [convertAmt, setConvertAmt] = useState('');
   const [converting, setConverting] = useState(false);
   const [preset,    setPreset]    = useState<number | null>(null);
-  const [account,   setAccount]   = useState('');
-  const [loading,   setLoading]   = useState(false);
-  const [error,     setError]     = useState('');
-  const [showOtp,   setShowOtp]   = useState(false);
-  const [otp,       setOtp]       = useState('');
-  const [otpErr,    setOtpErr]    = useState('');
-  const [otpLoad,   setOtpLoad]   = useState(false);
+  const [account,     setAccount]     = useState('');
+  const [savedAcct,   setSavedAcct]   = useState<string | null>(null);
+  const [loading,     setLoading]     = useState(false);
+  const [error,       setError]       = useState('');
+  const [showOtp,     setShowOtp]     = useState(false);
+  const [otp,         setOtp]         = useState('');
+  const [otpErr,      setOtpErr]      = useState('');
+  const [otpLoad,     setOtpLoad]     = useState(false);
   const [acctTouched, setAcctTouched] = useState(false);
 
   const loadData = () => {
     api.get<UserStats>('/auth/me/stats').then(r => setStats(r.data)).catch(() => {});
     api.get<Withdrawal[]>('/withdrawals').then(r => setHistory(r.data)).catch(() => {});
     api.get<Eligibility>('/withdrawals/eligibility').then(r => setElig(r.data)).catch(() => {});
+    api.get<{ account_number: string } | null>('/withdrawals/saved-account').then(r => {
+      if (r.data) { setSavedAcct(r.data.account_number); setAccount(r.data.account_number); }
+    }).catch(() => {});
   };
   useEffect(() => { loadData(); }, []);
 
@@ -388,18 +392,31 @@ export default function Withdraw() {
             {/* PayPal email */}
             <div className={styles.sectionCard}>
               <h4>PayPal Email Address</h4>
-              <input
-                type="email"
-                value={account}
-                onChange={e => { setAccount(e.target.value); setAcctTouched(false); }}
-                onBlur={() => setAcctTouched(true)}
-                className={acctTouched ? (acctErr ? 'field-invalid' : 'field-valid') : ''}
-                placeholder="yourname@email.com"
-                maxLength={80}
-                autoComplete="email"
-                required
-              />
-              {acctErr && <p className="field-hint hint-invalid">{acctErr}</p>}
+              {savedAcct ? (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, background: 'var(--surface)', border: '1.5px solid var(--border)', borderRadius: 10, padding: '0.65rem 0.9rem' }}>
+                  <LockIcon />
+                  <span style={{ flex: 1, fontSize: '0.9rem', color: 'var(--text)' }}>{savedAcct}</span>
+                  <span style={{ fontSize: '0.7rem', fontWeight: 700, color: '#22c55e', background: 'rgba(34,197,94,0.1)', padding: '2px 8px', borderRadius: 20 }}>Saved</span>
+                </div>
+              ) : (
+                <input
+                  type="email"
+                  value={account}
+                  onChange={e => { setAccount(e.target.value); setAcctTouched(false); }}
+                  onBlur={() => setAcctTouched(true)}
+                  className={acctTouched ? (acctErr ? 'field-invalid' : 'field-valid') : ''}
+                  placeholder="yourname@email.com"
+                  maxLength={80}
+                  autoComplete="email"
+                  required
+                />
+              )}
+              {acctErr && !savedAcct && <p className="field-hint hint-invalid">{acctErr}</p>}
+              {!savedAcct && (
+                <p style={{ fontSize: '0.71rem', color: 'var(--text-muted)', marginTop: 6 }}>
+                  ⚠️ Once used, this PayPal account will be permanently linked to your profile.
+                </p>
+              )}
             </div>
 
             {/* Amount selection */}
