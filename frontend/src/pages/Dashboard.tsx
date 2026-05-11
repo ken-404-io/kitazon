@@ -88,9 +88,6 @@ export default function Dashboard() {
             <p className={styles.greetSub}>Welcome back</p>
             <h1 className={styles.greetName}>{user?.name?.split(' ')[0] ?? 'User'}</h1>
           </div>
-          <Link to="/account" className={styles.avatarBtn}>
-            {user?.name?.[0]?.toUpperCase() ?? 'U'}
-          </Link>
         </div>
 
         {/* ── Navigation grid ── */}
