@@ -593,7 +593,6 @@ export default function AccountSettings() {
             <h1 className={styles.pageTitle}>Account Settings</h1>
             <p className={styles.pageSub}>Manage your account and security.</p>
           </div>
-          <button className={styles.bellBtn}><BellIcon /></button>
         </div>
 
         {/* Profile card */}

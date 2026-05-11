@@ -50,18 +50,6 @@ export default function Home() {
         </div>
 
         {!user && (
-          <div className={styles.ticker} aria-hidden="true">
-            <div className={styles.tickerTrack}>
-              {[...TICKER_ITEMS, ...TICKER_ITEMS].map((item, i) => (
-                <span key={i} className={styles.tickerItem}>
-                  🎉 <strong>{item.name}</strong> earned ₱{item.amount}
-                </span>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {!user && (
           <div className={styles.heroGoogle}>
             <a href={GOOGLE_REDIRECT} className={styles.heroGoogleBtn}>
               <svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true">

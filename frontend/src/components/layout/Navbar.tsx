@@ -145,8 +145,8 @@ export default function Navbar() {
       {/* Notif overlay */}
       {notifOpen && <div className={styles.notifOverlay} onClick={() => setNotifOpen(false)} />}
 
-      {/* ── Bottom nav (mobile only) ────────────────────────────────────────── */}
-      <nav className={styles.bottomNav}>
+      {/* ── Bottom nav (mobile only, hidden on landing page) ───────────────── */}
+      <nav className={`${styles.bottomNav}${location.pathname === '/' ? ` ${styles.bottomNavHidden}` : ''}`}>
         {user ? (
           <>
             <NavTab to="/dashboard" label="Home"    icon={<HomeIcon />}   active={isActive('/dashboard')} />
