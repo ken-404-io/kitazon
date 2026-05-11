@@ -11,6 +11,8 @@ declare global {
   }
 }
 
+export type KycStatus = 'none' | 'pending' | 'approved' | 'rejected';
+
 export interface DbUser {
   id: number;
   name: string;
@@ -32,6 +34,10 @@ export interface DbUser {
   plan_expires_at: Date | null;
   avatar_url: string | null;
   withdrawal_credits: number;
+  kyc_status: KycStatus;
+  kyc_submitted_at: Date | null;
+  kyc_reviewed_at: Date | null;
+  kyc_rejection_reason: string | null;
   created_at: Date;
   updated_at: Date;
 }

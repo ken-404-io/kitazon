@@ -24,6 +24,7 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'Credits',  to: '/credits',                       icon: <svg {...sz18}><circle cx="12" cy="12" r="10"/><path d="M15 9.5a3.5 3.5 0 1 0-3 5.5"/></svg> },
   { label: 'Plans',    to: '/plans',                         icon: <svg {...sz18}><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg> },
   { label: 'History',  to: '/withdraw?view=history',         icon: <svg {...sz18}><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg> },
+  { label: 'KYC',      to: '/kyc',                           icon: <svg {...sz18}><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/><polyline points="9 11 12 14 22 4"/></svg> },
 ];
 
 function earningIcon(type: string) {
@@ -59,12 +60,18 @@ export default function Dashboard() {
   const [recentEarnings, setRecentEarnings] = useState<Earning[]>([]);
   const [loadingStats,   setLoadingStats]   = useState(true);
   const [loadingEarnings,setLoadingEarnings]= useState(true);
+  const [kycStatus, setKycStatus] = useState<'none'|'pending'|'approved'|'rejected'>('none');
 
   const loadStats = (): void => {
     api.get<UserStats>('/auth/me/stats').then(r => setStats(r.data)).catch(() => {}).finally(() => setLoadingStats(false));
   };
 
   useEffect(() => { loadStats(); }, []);
+  useEffect(() => {
+    api.get<{ kyc_status: string }>('/kyc/status')
+      .then(r => setKycStatus(r.data.kyc_status as any))
+      .catch(() => {});
+  }, []);
   useEffect(() => {
     setLoadingEarnings(true);
     api.get<{ earnings: Earning[] }>('/tasks/earnings/recent?page=1')
@@ -81,6 +88,21 @@ export default function Dashboard() {
   return (
     <div className="page-container">
       <div className={styles.page}>
+
+        {/* ── KYC banner ── */}
+        {kycStatus !== 'approved' && (
+          <Link to="/kyc" className={`${styles.kycBanner} ${styles[`kycBanner_${kycStatus}`]}`}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
+            </svg>
+            <span>
+              {kycStatus === 'none'     && 'Verify your identity to unlock tasks and withdrawals'}
+              {kycStatus === 'pending'  && 'KYC under review — tasks and withdrawals are locked'}
+              {kycStatus === 'rejected' && 'KYC rejected — resubmit to unlock tasks and withdrawals'}
+            </span>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginLeft: 'auto', flexShrink: 0 }}><polyline points="9 18 15 12 9 6"/></svg>
+          </Link>
+        )}
 
         {/* ── Greeting ── */}
         <div className={styles.greeting}>

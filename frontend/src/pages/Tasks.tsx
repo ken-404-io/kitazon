@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import TaskRow from '../components/tasks/TaskRow';
+import KycGate from '../components/KycGate';
 import api from '../services/api';
 import { Task } from '../types';
 import styles from './Tasks.module.css';
@@ -57,6 +58,7 @@ export default function Tasks() {
   };
 
   return (
+    <KycGate feature="tasks">
     <div className="page-container">
 
       {/* Header */}
@@ -139,5 +141,6 @@ export default function Tasks() {
       )}
 
     </div>
+    </KycGate>
   );
 }
