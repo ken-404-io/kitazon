@@ -9,6 +9,10 @@
   display: none;
 }
 
+.footerVisible {
+  display: block;
+}
+
 @media (min-width: 769px) {
   .footer { display: block; }
 }
