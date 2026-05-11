@@ -144,7 +144,7 @@ export async function adminApprove(req: Request, res: Response, next: NextFuncti
       });
     });
 
-    await logAudit(req.user!.id, 'kyc_approve', req, { target_user: sub.user_id });
+    await logAudit(req.user!.id, 'kyc_approve', req, { metadata: { target_user: sub.user_id } });
     res.json({ message: 'KYC approved.' });
   } catch (err) { next(err); }
 }
@@ -175,7 +175,7 @@ export async function adminReject(req: Request, res: Response, next: NextFunctio
       });
     });
 
-    await logAudit(req.user!.id, 'kyc_reject', req, { target_user: sub.user_id, reason });
+    await logAudit(req.user!.id, 'kyc_reject', req, { metadata: { target_user: sub.user_id, reason } });
     res.json({ message: 'KYC rejected.' });
   } catch (err) { next(err); }
 }
