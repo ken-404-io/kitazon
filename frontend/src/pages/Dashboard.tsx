@@ -1,116 +1,188 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
-import EarningsCard from '../components/dashboard/EarningsCard';
 import SpinWheel from '../components/dashboard/SpinWheel';
 import EarningsChart from '../components/dashboard/EarningsChart';
-import { SkeletonStat, SkeletonRow } from '../components/ui/Skeleton';
-import {
-  CreditCardIcon, CalendarIcon, BarChartIcon, TrophyIcon,
-  DiceIcon, UsersIcon, SmartphoneIcon,
-  CheckCircleIcon, ShieldCheckIcon, TargetIcon, WalletBigIcon,
-} from '../components/ui/Icons';
+import { SkeletonRow } from '../components/ui/Skeleton';
 import api from '../services/api';
 import { UserStats, Earning } from '../types';
 import styles from './Dashboard.module.css';
 
+/* ─── Nav shortcut icons (inline SVG for custom colors) ─────────────────── */
+const sz18 = { width: 20, height: 20, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 2, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const };
+
+const NAV_ITEMS = [
+  { label: 'Tasks',    to: '/tasks',    bg: '#fff3e0', color: '#f97316', icon: <svg {...sz18}><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg> },
+  { label: 'Withdraw', to: '/withdraw', bg: '#e8f5e9', color: '#22c55e', icon: <svg {...sz18}><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg> },
+  { label: 'Invite',   to: '/referral', bg: '#e3f2fd', color: '#3b82f6', icon: <svg {...sz18}><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg> },
+  { label: 'Spin',     to: '/tasks',    bg: '#f3e8ff', color: '#a855f7', icon: <svg {...sz18}><rect x="2" y="2" width="20" height="20" rx="3"/><circle cx="8.5" cy="8.5" r="1.5" fill="currentColor" stroke="none"/><circle cx="15.5" cy="8.5" r="1.5" fill="currentColor" stroke="none"/><circle cx="8.5" cy="15.5" r="1.5" fill="currentColor" stroke="none"/><circle cx="15.5" cy="15.5" r="1.5" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.5" fill="currentColor" stroke="none"/></svg> },
+  { label: 'Check-in', to: '/tasks',    bg: '#fff8e1', color: '#f59e0b', icon: <svg {...sz18}><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg> },
+  { label: 'Credits',  to: '/withdraw', bg: '#e0f2fe', color: '#60a5fa', icon: <svg {...sz18}><circle cx="12" cy="12" r="10"/><path d="M15 9.5a3.5 3.5 0 1 0-3 5.5"/></svg> },
+  { label: 'Plans',    to: '/plans',    bg: '#fef3c7', color: '#d97706', icon: <svg {...sz18}><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg> },
+  { label: 'History',  to: '/withdraw', bg: '#fce7f3', color: '#ec4899', icon: <svg {...sz18}><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg> },
+];
+
 function earningIcon(type: string) {
-  if (type === 'spin')               return <DiceIcon />;
-  if (type === 'referral_commission') return <UsersIcon />;
-  return <CheckCircleIcon />;
+  if (type === 'spin') return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="2" y="2" width="20" height="20" rx="3"/>
+      <circle cx="8.5" cy="8.5" r="1.5" fill="currentColor" stroke="none"/>
+      <circle cx="15.5" cy="15.5" r="1.5" fill="currentColor" stroke="none"/>
+    </svg>
+  );
+  if (type === 'referral' || type === 'referral_commission') return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/>
+    </svg>
+  );
+  if (type === 'checkin') return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="4" width="18" height="18" rx="2"/><line x1="3" y1="10" x2="21" y2="10"/><polyline points="9 15 11 17 15 13"/>
+    </svg>
+  );
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="20 6 9 17 4 12"/>
+    </svg>
+  );
 }
 
 export default function Dashboard() {
-  const { user } = useAuth();
+  const { user }      = useAuth();
   const { showToast } = useToast();
-  const [stats, setStats] = useState<UserStats | null>(null);
+  const navigate      = useNavigate();
+  const [stats,          setStats]          = useState<UserStats | null>(null);
   const [recentEarnings, setRecentEarnings] = useState<Earning[]>([]);
-  const [loadingStats, setLoadingStats] = useState(true);
-  const [loadingEarnings, setLoadingEarnings] = useState(true);
+  const [loadingStats,   setLoadingStats]   = useState(true);
+  const [loadingEarnings,setLoadingEarnings]= useState(true);
+
   const loadStats = (): void => {
-    api.get<UserStats>('/auth/me/stats').then((res) => setStats(res.data)).catch(() => {}).finally(() => setLoadingStats(false));
+    api.get<UserStats>('/auth/me/stats').then(r => setStats(r.data)).catch(() => {}).finally(() => setLoadingStats(false));
   };
 
   useEffect(() => { loadStats(); }, []);
-
   useEffect(() => {
     setLoadingEarnings(true);
-    api.get<{ earnings: Earning[]; pages: number }>('/tasks/earnings/recent?page=1')
-      .then((res) => { setRecentEarnings(res.data.earnings); })
+    api.get<{ earnings: Earning[] }>('/tasks/earnings/recent?page=1')
+      .then(r => setRecentEarnings(r.data.earnings))
       .catch(() => {})
       .finally(() => setLoadingEarnings(false));
   }, []);
 
+  const balance  = Number(stats?.balance ?? 0);
+  const today    = Number(stats?.today   ?? 0);
+  const week     = Number(stats?.week    ?? 0);
+  const total    = Number(stats?.total   ?? 0);
+
   return (
     <div className="page-container">
+      <div className={styles.page}>
 
-      {/* Hero banner */}
-      <div className={styles.hero}>
-        <div className={styles.heroLeft}>
-          <h1 className={styles.heroTitle}>Hi, {user?.name?.split(' ')[0]}</h1>
-          <p className={styles.heroSub}>Here's your earnings overview</p>
-          <Link to="/withdraw">
-            <button className="btn-primary" style={{ marginTop: '1rem', borderRadius: 12 }}>
-              Withdraw ₱{Number(stats?.balance ?? 0).toFixed(2)} →
-            </button>
+        {/* ── Greeting ── */}
+        <div className={styles.greeting}>
+          <div>
+            <p className={styles.greetSub}>Welcome back</p>
+            <h1 className={styles.greetName}>{user?.name?.split(' ')[0] ?? 'User'}</h1>
+          </div>
+          <Link to="/account" className={styles.avatarBtn}>
+            {user?.name?.[0]?.toUpperCase() ?? 'U'}
           </Link>
         </div>
-        <div className={styles.heroIcon}><WalletBigIcon /></div>
-      </div>
 
-      {/* Stats */}
-      <div className="grid-4" style={{ marginBottom: '1.25rem' }}>
-        {loadingStats ? (
-          Array.from({ length: 4 }).map((_, i) => <SkeletonStat key={i} />)
-        ) : (
-          <>
-            <EarningsCard label="Balance"   amount={stats?.balance} color="var(--primary)"       icon={<CreditCardIcon />} iconBg="var(--primary-subtle)" />
-            <EarningsCard label="Today"     amount={stats?.today}   color="var(--primary-amber)" icon={<CalendarIcon />}  iconBg="var(--amber-subtle)" />
-            <EarningsCard label="This Week" amount={stats?.week}    color="var(--primary)"       icon={<BarChartIcon />}  iconBg="var(--primary-subtle)" />
-            <EarningsCard label="All Time"  amount={stats?.total}   color="var(--primary-dark)"  icon={<TrophyIcon />}    iconBg="var(--deep-subtle)" />
-          </>
-        )}
-      </div>
-
-      {/* Recent Earnings + Spin */}
-      <div className={styles.mainGrid}>
-        <div>
-          <div className={styles.sectionHeader}>
-            <h3>Recent Earnings</h3>
-            <Link to="/tasks" style={{ fontSize: 13, color: 'var(--primary)' }}>Browse tasks →</Link>
-          </div>
-          {loadingEarnings ? (
-            Array.from({ length: 3 }).map((_, i) => <SkeletonRow key={i} />)
-          ) : recentEarnings.length === 0 ? (
-            <div className="card" style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)' }}>
-              No earnings yet. <Link to="/tasks">Complete your first task!</Link>
-            </div>
-          ) : recentEarnings.slice(0, 3).map((e) => (
-            <div key={e.id} className={`card ${styles.earningRow}`}>
-              <div className={styles.earningIcon} style={{ color: 'var(--primary)' }}>{earningIcon(e.type)}</div>
-              <div style={{ flex: 1 }}>
-                <p className={styles.earningTitle}>{e.task_title}</p>
-                <p className={styles.earningTime}>{new Date(e.created_at).toLocaleString('en-PH')}</p>
+        {/* ── Navigation grid ── */}
+        <p className={styles.sectionLabel}>Navigation</p>
+        <div className={styles.navGrid}>
+          {NAV_ITEMS.map(item => (
+            <Link key={item.label} to={item.to} className={styles.navItem}>
+              <div className={styles.navIconWrap} style={{ background: item.bg, color: item.color }}>
+                {item.icon}
               </div>
-              <span className="badge badge-green">+₱{e.amount}</span>
-            </div>
+              <span className={styles.navLabel}>{item.label}</span>
+            </Link>
           ))}
-          <EarningsChart />
         </div>
-        <SpinWheel onWin={() => { loadStats(); showToast('Spin reward added to your balance!', 'success'); }} />
-      </div>
 
-      {/* Footer nudge */}
-      <div className="card" style={{ marginTop: '1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'var(--nudge-bg)', border: '1px solid var(--nudge-border)' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <div style={{ color: 'var(--green)' }}><ShieldCheckIcon /></div>
+        {/* ── Overview section ── */}
+        <div className={styles.overviewHeader}>
           <div>
-            <div style={{ fontWeight: 700, fontSize: 14 }}>Keep going!</div>
-            <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>Complete tasks and spin daily to earn more.</div>
+            <p className={styles.sectionLabel} style={{ marginBottom: 2 }}>Earnings Overview</p>
+            <p className={styles.overviewSub}>Your complete earnings at a glance</p>
           </div>
         </div>
-        <div style={{ color: 'var(--primary)' }}><TargetIcon /></div>
+
+        {/* ── Big balance card ── */}
+        <div className={styles.balanceCard}>
+          <div className={styles.balanceCardTop}>
+            <div>
+              <p className={styles.balanceCardLabel}>Total Balance</p>
+              {loadingStats
+                ? <div className={styles.balanceSkeleton} />
+                : <p className={styles.balanceCardAmt}>₱{balance.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+              }
+            </div>
+            <button
+              className={styles.withdrawQuickBtn}
+              onClick={() => navigate('/withdraw')}
+            >
+              Withdraw →
+            </button>
+          </div>
+
+          <div className={styles.balanceStats}>
+            <div className={styles.balanceStat}>
+              <p className={styles.balanceStatLabel}>Today</p>
+              <p className={styles.balanceStatVal}>+₱{today.toFixed(2)}</p>
+            </div>
+            <div className={styles.balanceStatDivider} />
+            <div className={styles.balanceStat}>
+              <p className={styles.balanceStatLabel}>This Week</p>
+              <p className={styles.balanceStatVal}>+₱{week.toFixed(2)}</p>
+            </div>
+            <div className={styles.balanceStatDivider} />
+            <div className={styles.balanceStat}>
+              <p className={styles.balanceStatLabel}>All Time</p>
+              <p className={styles.balanceStatVal}>₱{total.toFixed(2)}</p>
+            </div>
+          </div>
+
+          <div className={styles.chartWrap}>
+            <EarningsChart />
+          </div>
+        </div>
+
+        {/* ── Sub cards row ── */}
+        <div className={styles.subCards}>
+          {/* Recent Earnings */}
+          <div className={styles.subCard}>
+            <div className={styles.subCardHeader}>
+              <span className={styles.subCardTitle}>Recent Earnings</span>
+              <Link to="/tasks" className={styles.subCardLink}>See all →</Link>
+            </div>
+            {loadingEarnings
+              ? Array.from({ length: 3 }).map((_, i) => <SkeletonRow key={i} />)
+              : recentEarnings.length === 0
+                ? <p className={styles.emptyMsg}>No earnings yet. <Link to="/tasks">Start a task!</Link></p>
+                : recentEarnings.slice(0, 3).map(e => (
+                  <div key={e.id} className={styles.earningRow}>
+                    <div className={styles.earningIconWrap}>{earningIcon(e.type)}</div>
+                    <div className={styles.earningMeta}>
+                      <p className={styles.earningTitle}>{e.task_title}</p>
+                      <p className={styles.earningTime}>{new Date(e.created_at).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</p>
+                    </div>
+                    <span className={styles.earningAmt}>+₱{Number(e.amount).toFixed(2)}</span>
+                  </div>
+                ))
+            }
+          </div>
+
+          {/* Daily Spin */}
+          <div className={styles.subCard} style={{ overflow: 'hidden' }}>
+            <p className={styles.subCardTitle} style={{ marginBottom: '0.75rem' }}>Daily Spin</p>
+            <SpinWheel onWin={() => { loadStats(); showToast('Spin reward added to your balance!', 'success'); }} />
+          </div>
+        </div>
+
       </div>
     </div>
   );
