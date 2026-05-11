@@ -171,7 +171,6 @@ export default function Admin() {
   const [kycLoading, setKycLoading] = useState(false);
   const [kycRejectId, setKycRejectId] = useState<number | null>(null);
   const [kycRejectReason, setKycRejectReason] = useState('');
-  const [kycExpandId, setKycExpandId] = useState<number | null>(null);
 
   // Leaderboard Rewards
   const [rewardsConfirming, setRewardsConfirming] = useState(false);
@@ -918,7 +917,6 @@ export default function Admin() {
           {kycList.map(sub => {
             const rawTags = sub.tags;
             const tags: string[] = Array.isArray(rawTags) ? rawTags : (typeof rawTags === 'string' ? JSON.parse(rawTags || '[]') : []);
-            const expanded = kycExpandId === sub.id;
             return (
               <div key={sub.id} className="card" style={{ marginBottom: '1rem', fontSize: 14 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 8 }}>
@@ -950,10 +948,6 @@ export default function Admin() {
                   </div>
                   <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
                     <span style={{ fontSize: 11, color: '#6b7280' }}>{new Date(sub.created_at).toLocaleDateString()}</span>
-                    <button onClick={() => setKycExpandId(expanded ? null : sub.id)} style={{
-                      padding: '5px 12px', borderRadius: 6, cursor: 'pointer', fontSize: 12,
-                      background: 'transparent', border: '1px solid #374151', color: 'inherit',
-                    }}>{expanded ? 'Hide docs' : 'View docs'}</button>
                     {sub.status === 'pending' && (
                       <>
                         <button onClick={async () => { await api.post(`/kyc/admin/${sub.id}/approve`); loadKyc(kycFilter); showToast('KYC approved'); }} style={{
@@ -987,8 +981,8 @@ export default function Admin() {
                   </div>
                 )}
 
-                {/* Document previews */}
-                {expanded && (
+                {/* Document previews — always visible */}
+                {(sub.id_front_data || sub.id_back_data || sub.selfie_data) && (
                   <div style={{ marginTop: '0.75rem', display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
                     {[
                       { label: 'ID Front', data: sub.id_front_data },

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useToast } from '../context/ToastContext';
 import api from '../services/api';
@@ -100,19 +100,10 @@ export default function KYC() {
     setCameraTarget(null);
   }, [cameraTarget, stopCamera]);
 
-  // ── File upload fallback ────────────────────────────────────────────────────
-  const handleFileUpload = (target: CaptureTarget) => (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-      const result = ev.target?.result as string;
-      if (target === 'id_front') setIdFront(result);
-      if (target === 'id_back')  setIdBack(result);
-      if (target === 'selfie')   setSelfie(result);
-    };
-    reader.readAsDataURL(file);
-  };
+  const docSlots = useMemo(() => [
+    { key: 'id_front' as CaptureTarget, label: 'ID Front', hint: 'Front side of your government ID', image: idFront, setImg: setIdFront },
+    { key: 'id_back'  as CaptureTarget, label: 'ID Back',  hint: 'Back side of your government ID',  image: idBack,  setImg: setIdBack  },
+  ], [idFront, idBack]);
 
   const set = (k: string) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) =>
     setForm((f) => ({ ...f, [k]: e.target.value }));
@@ -270,10 +261,7 @@ export default function KYC() {
           <div className={styles.form}>
             <p className={styles.formSection}>Government ID</p>
 
-            {[
-              { key: 'id_front' as CaptureTarget, label: 'ID Front', hint: 'Front side of your government ID', image: idFront, set: setIdFront },
-              { key: 'id_back'  as CaptureTarget, label: 'ID Back',  hint: 'Back side of your government ID', image: idBack,  set: setIdBack  },
-            ].map(({ key, label, hint, image, set: setImg }) => (
+            {docSlots.map(({ key, label, hint, image, setImg }) => (
               <div key={key} className={styles.docSlot}>
                 <div className={styles.docSlotInfo}>
                   <p className={styles.docSlotLabel}>{label}</p>
@@ -285,22 +273,13 @@ export default function KYC() {
                     <button className={styles.docRetakeBtn} onClick={() => setImg(null)}>Retake</button>
                   </div>
                 ) : (
-                  <div className={styles.docActions}>
-                    <button className={styles.docCameraBtn} onClick={() => openCamera(key)}>
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
-                        <circle cx="12" cy="13" r="4"/>
-                      </svg>
-                      Camera
-                    </button>
-                    <label className={styles.docUploadBtn}>
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
-                      </svg>
-                      Upload
-                      <input type="file" accept="image/*" style={{ display: 'none' }} onChange={handleFileUpload(key)} />
-                    </label>
-                  </div>
+                  <button className={styles.docCameraBtn} onClick={() => openCamera(key)}>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+                      <circle cx="12" cy="13" r="4"/>
+                    </svg>
+                    Open Camera
+                  </button>
                 )}
               </div>
             ))}
@@ -318,22 +297,13 @@ export default function KYC() {
                   <button className={styles.docRetakeBtn} onClick={() => setSelfie(null)}>Retake</button>
                 </div>
               ) : (
-                <div className={styles.docActions}>
-                  <button className={styles.docCameraBtn} onClick={() => openCamera('selfie')}>
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
-                      <circle cx="12" cy="13" r="4"/>
-                    </svg>
-                    Camera
-                  </button>
-                  <label className={styles.docUploadBtn}>
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
-                    </svg>
-                    Upload
-                    <input type="file" accept="image/*" style={{ display: 'none' }} onChange={handleFileUpload('selfie')} />
-                  </label>
-                </div>
+                <button className={styles.docCameraBtn} onClick={() => openCamera('selfie')}>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+                    <circle cx="12" cy="13" r="4"/>
+                  </svg>
+                  Open Camera
+                </button>
               )}
             </div>
 
