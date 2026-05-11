@@ -30,8 +30,8 @@ const PLANS: {
     badge:      '🥈',
     color:      '#9ca3af',
     dailyLimit: 20,
-    price:      '₱1/mo',
-    priceNum:   99,
+    price:      '₱499/mo',
+    priceNum:   499,
     features:   ['₱20/day withdrawal limit', 'Choose your withdrawal amount', 'Priority support', 'All Free features'],
   },
   {
@@ -40,8 +40,8 @@ const PLANS: {
     badge:      '🥇',
     color:      '#f59e0b',
     dailyLimit: 50,
-    price:      '₱1/mo',
-    priceNum:   199,
+    price:      '₱1,299/mo',
+    priceNum:   1299,
     features:   ['₱50/day withdrawal limit', 'Choose your withdrawal amount', 'Priority support', 'All Silver features'],
   },
   {
@@ -50,8 +50,8 @@ const PLANS: {
     badge:      '💎',
     color:      '#60a5fa',
     dailyLimit: 100,
-    price:      '₱1/mo',
-    priceNum:   399,
+    price:      '₱1,999/mo',
+    priceNum:   1999,
     features:   ['₱100/day withdrawal limit', 'Choose your withdrawal amount', 'VIP support', 'All Gold features'],
   },
 ];

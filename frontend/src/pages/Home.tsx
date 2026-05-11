@@ -3,6 +3,41 @@ import { useAuth } from '../context/AuthContext';
 import { SurveyIcon, PhoneIcon, PlayIcon, BriefcaseIcon, GamepadIcon, UsersIcon, ZapIcon, ClockIcon, ShieldIcon, MapPinIcon } from '../components/ui/Icons';
 import styles from './Home.module.css';
 
+const PRICING_PLANS = [
+  {
+    name: 'Free',
+    price: 'Free',
+    color: 'var(--text-muted)',
+    features: ['₱5/day withdrawal limit', 'PayPal withdrawals', 'Task earnings', 'Referral bonuses'],
+    cta: 'Get Started',
+    highlight: false,
+  },
+  {
+    name: 'Silver',
+    price: '₱499/mo',
+    color: '#9ca3af',
+    features: ['₱20/day withdrawal limit', 'Choose withdrawal amount', 'Priority support', 'All Free features'],
+    cta: 'Upgrade',
+    highlight: false,
+  },
+  {
+    name: 'Gold',
+    price: '₱1,299/mo',
+    color: '#f59e0b',
+    features: ['₱50/day withdrawal limit', 'Choose withdrawal amount', 'Priority support', 'All Silver features'],
+    cta: 'Upgrade',
+    highlight: true,
+  },
+  {
+    name: 'Diamond',
+    price: '₱1,999/mo',
+    color: '#60a5fa',
+    features: ['₱100/day withdrawal limit', 'Choose withdrawal amount', 'VIP support', 'All Gold features'],
+    cta: 'Upgrade',
+    highlight: false,
+  },
+];
+
 const GOOGLE_REDIRECT = `${process.env.REACT_APP_API_URL ?? 'https://api.kitazon.com'}/api/auth/google/redirect`;
 
 const EARNING_CATEGORIES = [
@@ -93,6 +128,29 @@ export default function Home() {
               </div>
             ))}
           </div>
+        </div>
+      </section>
+
+      <section className="page-container">
+        <h2 className={styles.sectionTitle}>Plans &amp; Pricing</h2>
+        <p className={styles.pricingSubtitle}>Upgrade your plan to unlock higher daily withdrawal limits.</p>
+        <div className={styles.pricingGrid}>
+          {PRICING_PLANS.map((p) => (
+            <div key={p.name} className={`${styles.pricingCard} ${p.highlight ? styles.pricingCardHighlight : ''}`}>
+              {p.highlight && <span className={styles.popularBadge}>Most Popular</span>}
+              <p className={styles.pricingName} style={{ color: p.color }}>{p.name}</p>
+              <p className={styles.pricingPrice}>{p.price}</p>
+              <ul className={styles.pricingFeatures}>
+                {p.features.map(f => (
+                  <li key={f}>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className={styles.checkIcon}><polyline points="20 6 9 17 4 12"/></svg>
+                    {f}
+                  </li>
+                ))}
+              </ul>
+              <Link to="/register" className={styles.pricingCta}>{p.cta}</Link>
+            </div>
+          ))}
         </div>
       </section>
     </main>

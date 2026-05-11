@@ -123,3 +123,96 @@
 .whyCard { text-align: center; display: flex; flex-direction: column; gap: 0.4rem; align-items: center; }
 .whyIcon { color: var(--primary-amber); margin-bottom: 0.25rem; }
 .whyCard p { color: var(--text-muted); font-size: 0.83rem; }
+
+/* ── Pricing ──────────────────────────────────────────────────────────────── */
+.pricingSubtitle {
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  margin: -0.75rem 0 1.5rem;
+}
+
+.pricingGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1rem;
+}
+
+.pricingCard {
+  background: var(--dark-card);
+  border: 1px solid var(--dark-border);
+  border-radius: 16px;
+  padding: 1.5rem 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  position: relative;
+}
+
+.pricingCardHighlight {
+  border-color: var(--primary-amber);
+  box-shadow: 0 0 0 1px var(--primary-amber);
+}
+
+.popularBadge {
+  position: absolute;
+  top: -12px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--primary-amber);
+  color: #000;
+  font-size: 0.68rem;
+  font-weight: 800;
+  padding: 0.2rem 0.75rem;
+  border-radius: 999px;
+  white-space: nowrap;
+  letter-spacing: 0.04em;
+}
+
+.pricingName {
+  font-size: 1rem;
+  font-weight: 800;
+  margin: 0;
+}
+
+.pricingPrice {
+  font-size: 1.4rem;
+  font-weight: 900;
+  color: var(--text);
+  margin: 0;
+}
+
+.pricingFeatures {
+  list-style: none;
+  padding: 0;
+  margin: 0.5rem 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  flex: 1;
+}
+
+.pricingFeatures li {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.checkIcon { color: #22c55e; flex-shrink: 0; }
+
+.pricingCta {
+  display: block;
+  text-align: center;
+  padding: 0.6rem;
+  background: var(--primary-amber);
+  color: #000;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  text-decoration: none;
+  margin-top: 0.5rem;
+  transition: opacity 0.15s;
+}
+.pricingCta:hover { opacity: 0.85; text-decoration: none; color: #000; }
