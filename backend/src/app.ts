@@ -62,11 +62,12 @@ app.use(helmet({
   contentSecurityPolicy: {
     directives: {
       defaultSrc: ["'self'"],
-      scriptSrc: ["'self'"],
-      styleSrc: ["'self'", "'unsafe-inline'"],
-      imgSrc: ["'self'", 'data:'],
-      connectSrc: ["'self'"],
-      frameSrc: ["'none'"],
+      scriptSrc: ["'self'", "'unsafe-inline'", "https://accounts.google.com/gsi/client", "https://*.profitablecpmratenetwork.com"],
+      scriptSrcElem: ["'self'", "'unsafe-inline'", "https://accounts.google.com/gsi/client", "https://*.profitablecpmratenetwork.com"],
+      styleSrc: ["'self'", "'unsafe-inline'", "https://accounts.google.com/gsi/style"],
+      imgSrc: ["'self'", "data:", "https:"],
+      connectSrc: ["'self'", "https://api.kitazon.com", "https://accounts.google.com", "https://*.profitablecpmratenetwork.com"],
+      frameSrc: ["https://accounts.google.com"],
       objectSrc: ["'none'"],
       baseUri: ["'none'"],
       formAction: ["'self'"],
