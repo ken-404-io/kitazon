@@ -23,8 +23,6 @@ const CATS: { key: Category; label: string }[] = [
 ];
 
 const sz = { width: 20, height: 20, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 2, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const };
-const MenuIcon = () => <svg {...sz}><line x1="3" y1="6"  x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>;
-const BellIcon = () => <svg {...sz}><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg>;
 const TaskIcon = () => <svg {...sz}><rect x="9" y="3" width="6" height="4" rx="1"/><path d="M7 3H5a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2V5a2 2 0 00-2-2h-2"/><path d="M9 12l2 2 4-4"/></svg>;
 
 export default function Tasks() {
@@ -63,9 +61,7 @@ export default function Tasks() {
 
       {/* Header */}
       <div className={styles.pageHeader}>
-        <button className={styles.menuBtn}><MenuIcon /></button>
         <span className={styles.pageTitle}>My Tasks</span>
-        <button className={styles.bellBtn}><BellIcon /></button>
       </div>
 
       {/* Summary chips */}

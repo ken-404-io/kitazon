@@ -185,6 +185,8 @@
 }
 
 /* ─── Bottom Nav ─────────────────────────────────────────────────────────── */
+.bottomNavHidden { display: none !important; }
+
 .bottomNav {
   display: flex;
   position: fixed;
