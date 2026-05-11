@@ -73,22 +73,26 @@ export default function AdBlockDetector() {
   const intervalRef               = useRef<ReturnType<typeof setInterval> | null>(null);
   const mountedRef                = useRef(true);
 
+  const checkingRef = useRef(false);
+
   const check = useCallback(async () => {
-    if (checking) return;
+    if (checkingRef.current) return;
+    checkingRef.current = true;
     setChecking(true);
     const result = await runDetection();
     if (mountedRef.current) {
       setBlocked(result);
       setChecking(false);
     }
-  }, [checking]);
+    checkingRef.current = false;
+  }, []);
 
   // Initial detection
   useEffect(() => {
     mountedRef.current = true;
     check();
     return () => { mountedRef.current = false; };
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [check]);
 
   // Auto-recheck every 4 s while modal is visible
   useEffect(() => {
