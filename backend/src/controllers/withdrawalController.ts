@@ -67,6 +67,17 @@ export async function eligibility(req: Request, res: Response, next: NextFunctio
   } catch (err) { next(err); }
 }
 
+export async function savedAccount(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const last = await db('withdrawals')
+      .where({ user_id: req.user!.id })
+      .orderBy('created_at', 'desc')
+      .select('account_number', 'channel')
+      .first();
+    res.json(last ? { account_number: last.account_number, channel: last.channel } : null);
+  } catch (err) { next(err); }
+}
+
 export async function requestOtp(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     const { amount } = req.body as { amount: string | number };
@@ -133,6 +144,30 @@ export async function create(req: Request, res: Response, next: NextFunction): P
     }
     if (!otp || typeof otp !== 'string' || !/^\d{6}$/.test(otp.trim())) {
       res.status(400).json({ message: 'A 6-digit OTP is required.' });
+      return;
+    }
+
+    // PayPal account uniqueness: one PayPal per user, not shared across accounts
+    const takenBy = await db('withdrawals')
+      .where('account_number', account_number.trim().toLowerCase())
+      .whereNot({ user_id: req.user!.id })
+      .first();
+    if (takenBy) {
+      res.status(409).json({ message: 'This PayPal account is already registered to another account. Each PayPal address can only be linked to one Kitazon account.' });
+      return;
+    }
+
+    // Also block if this user's own previous PayPal doesn't match (enforce 1 PayPal per user)
+    const ownPrevious = await db('withdrawals')
+      .where({ user_id: req.user!.id })
+      .whereNot('account_number', account_number.trim().toLowerCase())
+      .first();
+    if (ownPrevious) {
+      res.status(409).json({
+        message: `You have already linked PayPal account "${maskAccount(ownPrevious.account_number)}" to your Kitazon account. Only one PayPal account is allowed per user.`,
+        reason: 'paypal_locked',
+        saved_account: ownPrevious.account_number,
+      });
       return;
     }
 
