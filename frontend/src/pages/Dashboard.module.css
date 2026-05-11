@@ -71,10 +71,12 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: transform 0.15s;
+  transition: transform 0.15s, opacity 0.15s;
+  background: transparent;
+  border: 1.5px solid rgba(255,255,255,0.1);
 }
 
-.navItem:active .navIconWrap { transform: scale(0.92); }
+.navItem:active .navIconWrap { transform: scale(0.92); opacity: 0.7; }
 
 .navLabel {
   font-size: 0.68rem;
