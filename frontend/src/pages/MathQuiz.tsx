@@ -229,7 +229,7 @@ export default function MathQuiz() {
             </div>
             <div>
               <h1 className={styles.title}>Math Quiz</h1>
-              <p className={styles.subtitle}>₱1.00 per correct answer · Max {limitLabel}</p>
+              <p className={styles.subtitle}>₱3.00 per correct answer · Max {limitLabel}</p>
             </div>
           </div>
           <QuizInner />

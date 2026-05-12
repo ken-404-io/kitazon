@@ -230,7 +230,7 @@ export async function recentEarnings(req: Request, res: Response, next: NextFunc
   } catch (err) { next(err); }
 }
 
-const QUIZ_REWARD = 1.00;
+const QUIZ_REWARD = 3.00;
 const QUIZ_DAILY_LIMITS: Record<string, number> = {
   free:    150,  // ₱150
   silver:  500,  // ₱500
