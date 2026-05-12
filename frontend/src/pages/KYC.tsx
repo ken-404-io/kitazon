@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useToast } from '../context/ToastContext';
+import { Skeleton } from '../components/ui/Skeleton';
 import api from '../services/api';
 import styles from './KYC.module.css';
 
@@ -128,7 +129,34 @@ export default function KYC() {
     }
   };
 
-  if (loading) return <div className={styles.page}><p className={styles.loading}>Loading…</p></div>;
+  if (loading) return (
+    <div className={styles.page}>
+      <div className={styles.container}>
+        <div className={styles.header} style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
+          <Skeleton height={56} width={56} borderRadius={16} style={{ margin: '0 auto 0.75rem' }} />
+          <Skeleton height={22} width={180} style={{ margin: '0 auto 0.5rem' }} />
+          <Skeleton height={14} width={240} style={{ margin: '0 auto' }} />
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: '1.5rem' }}>
+          <Skeleton height={10} width={10} borderRadius="50%" />
+          <Skeleton height={4} style={{ flex: 1 }} />
+          <Skeleton height={10} width={10} borderRadius="50%" />
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+          {[1, 2, 3].map(i => (
+            <div key={i} className="card" style={{ display: 'flex', alignItems: 'center', gap: '0.85rem', padding: '1rem' }}>
+              <Skeleton height={64} width={80} borderRadius={10} style={{ flexShrink: 0 }} />
+              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <Skeleton height={14} width="50%" />
+                <Skeleton height={11} width="35%" />
+              </div>
+              <Skeleton height={36} width={80} borderRadius={10} style={{ flexShrink: 0 }} />
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
 
   // Already approved or pending — just show banner
   if (status?.kyc_status === 'approved' || status?.kyc_status === 'pending') {

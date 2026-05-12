@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
+import { Skeleton } from '../components/ui/Skeleton';
 import api from '../services/api';
 import { isStrongPassword, validateName, validatePasswordField } from '../utils/sanitize';
 import PasswordStrength from '../components/ui/PasswordStrength';
@@ -53,7 +54,7 @@ export default function AccountSettings() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [view, setView] = useState<View>((searchParams.get('view') as View) ?? 'main');
-  const [balance, setBalance] = useState<number>(0);
+  const [balance, setBalance] = useState<number | null>(null);
 
   const [pwForm, setPwForm]       = useState({ current: '', next: '' });
   const [pwTouched, setPwTouched] = useState({ current: false, next: false });
@@ -619,7 +620,9 @@ export default function AccountSettings() {
           </div>
           <div className={styles.profileBalance}>
             <p className={styles.balanceLabel}>Balance</p>
-            <p className={styles.balanceAmt}>₱ {Number(balance).toFixed(2)}</p>
+            {balance === null
+              ? <Skeleton height={18} width={70} style={{ marginTop: 4 }} />
+              : <p className={styles.balanceAmt}>₱ {Number(balance).toFixed(2)}</p>}
           </div>
           <span className={styles.profileChevron}><ChevronRight /></span>
         </div>
