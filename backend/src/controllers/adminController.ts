@@ -555,3 +555,16 @@ export async function listAuditLogs(req: Request, res: Response, next: NextFunct
     res.json({ logs: rows, total: Number(count.total), page, pages: Math.ceil(Number(count.total) / limit) });
   } catch (err) { next(err); }
 }
+
+// ─── Online users ─────────────────────────────────────────────────────────────
+export async function listOnlineUsers(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const threshold = new Date(Date.now() - 5 * 60 * 1000); // active in last 5 minutes
+    const rows = await db('users')
+      .where('last_active_at', '>=', threshold)
+      .select('id', 'name', 'email', 'plan', 'last_active_at')
+      .orderBy('last_active_at', 'desc');
+
+    res.json({ count: rows.length, users: rows });
+  } catch (err) { next(err); }
+}

@@ -1,13 +1,14 @@
 import { Router } from 'express';
 import authMiddleware from '../middleware/auth';
 import adminAuth from '../middleware/adminAuth';
-import { platformStats, listUsers, toggleUserActive, listWithdrawals, updateWithdrawalStatus, listAuditLogs, listTasks, createTask, updateTask, updateUserPlan, adjustBalance, broadcastEmail, revenueStats, bulkImportTasks, grantLeaderboardRewards } from '../controllers/adminController';
+import { platformStats, listUsers, toggleUserActive, listWithdrawals, updateWithdrawalStatus, listAuditLogs, listTasks, createTask, updateTask, updateUserPlan, adjustBalance, broadcastEmail, revenueStats, bulkImportTasks, grantLeaderboardRewards, listOnlineUsers } from '../controllers/adminController';
 
 const router = Router();
 
 router.use(authMiddleware, adminAuth);
 
 router.get('/stats', platformStats);
+router.get('/online', listOnlineUsers);
 router.get('/users', listUsers);
 router.patch('/users/:id/toggle-active', toggleUserActive);
 router.patch('/users/:id/plan', updateUserPlan);
