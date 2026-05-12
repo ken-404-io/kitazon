@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
+import { Skeleton } from '../components/ui/Skeleton';
 import api from '../services/api';
 import styles from './CheckIn.module.css';
 
@@ -82,7 +83,7 @@ export default function CheckIn() {
         <div className={styles.balanceRow}>
           <span className={styles.coinIcon}>🪙</span>
           <span className={styles.balanceAmt}>
-            {balance === null ? '—' : balance.toLocaleString('en-PH', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+            {balance === null ? <Skeleton height={32} width={120} /> : balance.toLocaleString('en-PH', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
           </span>
         </div>
         <Link to="/withdraw" className={styles.walletBtn}>

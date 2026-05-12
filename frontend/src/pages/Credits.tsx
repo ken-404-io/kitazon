@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useToast } from '../context/ToastContext';
+import { Skeleton } from '../components/ui/Skeleton';
 import api from '../services/api';
 
 const PHP_PER_CREDIT = 25;
@@ -58,10 +59,12 @@ export default function Credits() {
       <div style={{ background: 'linear-gradient(135deg, #1e3a5f 0%, #1a2e4a 100%)', borderRadius: 20, padding: '1.5rem', marginBottom: '1rem', textAlign: 'center' }}>
         <p style={{ fontSize: '0.72rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'rgba(255,255,255,0.5)', marginBottom: 6 }}>Credits Available</p>
         <p style={{ fontSize: '2.5rem', fontWeight: 800, color: '#60a5fa', lineHeight: 1 }}>
-          {credits === null ? '—' : credits.toLocaleString()}
+          {credits === null ? <Skeleton height={44} width={100} style={{ margin: '0 auto' }} /> : credits.toLocaleString()}
         </p>
         <p style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.4)', marginTop: 6 }}>
-          PHP Balance: ₱{balance === null ? '—' : Number(balance).toLocaleString('en-PH', { minimumFractionDigits: 2 })}
+          {balance === null
+            ? <Skeleton height={12} width={140} style={{ margin: '6px auto 0' }} />
+            : `PHP Balance: ₱${Number(balance).toLocaleString('en-PH', { minimumFractionDigits: 2 })}`}
         </p>
       </div>
 

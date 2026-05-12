@@ -4,6 +4,7 @@ import KycGate from '../components/KycGate';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import EarningsChart from '../components/dashboard/EarningsChart';
+import { Skeleton } from '../components/ui/Skeleton';
 import api from '../services/api';
 import { sanitizeInput, isValidEmail } from '../utils/sanitize';
 import { UserStats, Withdrawal, WithdrawalStatus, UserPlan } from '../types';
@@ -212,7 +213,9 @@ export default function Withdraw() {
               </svg>
             </div>
             <p className={styles.balanceCardLabel}>Total Balance</p>
-            <p className={styles.balanceCardVal}>₱{balance.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+            {stats === null
+              ? <Skeleton height={28} width={90} style={{ marginTop: 4 }} />
+              : <p className={styles.balanceCardVal}>₱{balance.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>}
           </div>
 
           <div className={`${styles.balanceCard} ${styles.creditsBalCard}`}>
@@ -224,7 +227,9 @@ export default function Withdraw() {
               </svg>
             </div>
             <p className={styles.balanceCardLabel}>Credits Available</p>
-            <p className={styles.balanceCardVal} style={{ color: '#60a5fa' }}>{(elig?.withdrawal_credits ?? 0).toLocaleString()}</p>
+            {elig === null
+              ? <Skeleton height={28} width={60} style={{ marginTop: 4 }} />
+              : <p className={styles.balanceCardVal} style={{ color: '#60a5fa' }}>{(elig?.withdrawal_credits ?? 0).toLocaleString()}</p>}
           </div>
         </div>
 
@@ -238,7 +243,9 @@ export default function Withdraw() {
         </button>
 
         <div className={styles.totalStrip}>
-          Total Lifetime Earnings — <strong>₱{totalAmt.toFixed(2)}</strong>
+          Total Lifetime Earnings — {stats === null
+            ? <Skeleton height={14} width={70} style={{ display: 'inline-block', verticalAlign: 'middle' }} />
+            : <strong>₱{totalAmt.toFixed(2)}</strong>}
         </div>
 
         {/* ── Withdrawal Credits convert card ── */}

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import TaskRow from '../components/tasks/TaskRow';
 import KycGate from '../components/KycGate';
+import { SkeletonTaskRow } from '../components/ui/Skeleton';
 import api from '../services/api';
 import { Task } from '../types';
 import styles from './Tasks.module.css';
@@ -116,7 +117,7 @@ export default function Tasks() {
 
       {/* Task list */}
       {loading ? (
-        <p className={styles.loading}>Loading tasks…</p>
+        <div>{Array.from({ length: 5 }).map((_, i) => <SkeletonTaskRow key={i} />)}</div>
       ) : filtered.length === 0 ? (
         <div className={styles.empty}>
           <div className={styles.emptyIcon}><TaskIcon /></div>
