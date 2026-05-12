@@ -4,7 +4,15 @@ import { useAuth } from '../context/AuthContext';
 import api from '../services/api';
 import { WithdrawalStatus, WithdrawalChannel } from '../types';
 
-type Tab = 'stats' | 'users' | 'withdrawals' | 'tasks' | 'logs' | 'revenue' | 'broadcast' | 'kyc';
+type Tab = 'stats' | 'users' | 'withdrawals' | 'tasks' | 'logs' | 'revenue' | 'broadcast' | 'kyc' | 'online';
+
+interface OnlineUser {
+  id: number;
+  name: string;
+  email: string;
+  plan: string;
+  last_active_at: string;
+}
 
 interface KycSubmission {
   id: number;
@@ -172,6 +180,11 @@ export default function Admin() {
   const [kycRejectId, setKycRejectId] = useState<number | null>(null);
   const [kycRejectReason, setKycRejectReason] = useState('');
 
+  // Online users
+  const [onlineUsers, setOnlineUsers] = useState<OnlineUser[]>([]);
+  const [onlineCount, setOnlineCount] = useState<number | null>(null);
+  const [onlineLoading, setOnlineLoading] = useState(false);
+
   // Leaderboard Rewards
   const [rewardsConfirming, setRewardsConfirming] = useState(false);
   const [rewardsLoading, setRewardsLoading] = useState(false);
@@ -249,6 +262,15 @@ export default function Admin() {
     } finally { setKycLoading(false); }
   }, []);
 
+  const loadOnline = useCallback(async () => {
+    setOnlineLoading(true);
+    try {
+      const res = await api.get<{ count: number; users: OnlineUser[] }>('/admin/online');
+      setOnlineCount(res.data.count);
+      setOnlineUsers(res.data.users);
+    } finally { setOnlineLoading(false); }
+  }, []);
+
   useEffect(() => {
     if (tab === 'stats' && !stats) loadStats();
     if (tab === 'users') loadUsers(userPage, userSearch);
@@ -257,7 +279,15 @@ export default function Admin() {
     if (tab === 'logs') loadLogs(logPage);
     if (tab === 'revenue' && !revenueStats) loadRevenue();
     if (tab === 'kyc') loadKyc(kycFilter);
-  }, [tab, userPage, wPage, wFilter, logPage, kycFilter, stats, revenueStats, loadStats, loadUsers, loadWithdrawals, loadTasks, loadLogs, loadRevenue, loadKyc]);
+    if (tab === 'online') loadOnline();
+  }, [tab, userPage, wPage, wFilter, logPage, kycFilter, stats, revenueStats, loadStats, loadUsers, loadWithdrawals, loadTasks, loadLogs, loadRevenue, loadKyc, loadOnline]);
+
+  // Auto-refresh online tab every 30 seconds
+  useEffect(() => {
+    if (tab !== 'online') return;
+    const interval = setInterval(loadOnline, 30_000);
+    return () => clearInterval(interval);
+  }, [tab, loadOnline]);
 
   const toggleActive = async (userId: number) => {
     await api.patch(`/admin/users/${userId}/toggle-active`);
@@ -326,9 +356,11 @@ export default function Admin() {
       )}
       <h2>Admin Panel</h2>
       <div style={{ display: 'flex', gap: 8, marginBottom: '1.5rem', flexWrap: 'wrap' }}>
-        {(['stats', 'revenue', 'users', 'withdrawals', 'tasks', 'kyc', 'logs', 'broadcast'] as Tab[]).map(t => (
+        {(['stats', 'revenue', 'users', 'withdrawals', 'tasks', 'kyc', 'online', 'logs', 'broadcast'] as Tab[]).map(t => (
           <button key={t} style={tabStyle(t)} onClick={() => setTab(t)}>
-            {t.charAt(0).toUpperCase() + t.slice(1)}
+            {t === 'online'
+              ? `🟢 Online${onlineCount !== null ? ` (${onlineCount})` : ''}`
+              : t.charAt(0).toUpperCase() + t.slice(1)}
           </button>
         ))}
       </div>
@@ -1002,6 +1034,73 @@ export default function Admin() {
               </div>
             );
           })}
+        </div>
+      )}
+
+      {tab === 'online' && (
+        <div>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
+            <div>
+              <h3 style={{ margin: 0 }}>
+                🟢 Online Users
+                <span style={{ marginLeft: 10, fontSize: 14, fontWeight: 400, color: 'var(--text-muted)' }}>
+                  active in the last 5 minutes · auto-refreshes every 30s
+                </span>
+              </h3>
+              <p style={{ margin: '4px 0 0', fontSize: 13, color: '#22c55e', fontWeight: 700 }}>
+                {onlineCount !== null ? `${onlineCount} user${onlineCount !== 1 ? 's' : ''} online` : 'Loading…'}
+              </p>
+            </div>
+            <button
+              onClick={loadOnline}
+              disabled={onlineLoading}
+              style={{ padding: '6px 14px', borderRadius: 6, border: '1px solid var(--gold)', background: 'transparent', color: 'var(--gold)', cursor: 'pointer', fontSize: 13 }}
+            >
+              {onlineLoading ? 'Refreshing…' : '↻ Refresh'}
+            </button>
+          </div>
+
+          {onlineLoading && onlineUsers.length === 0 ? (
+            <p style={{ color: 'var(--text-muted)', fontSize: 13 }}>Loading…</p>
+          ) : onlineUsers.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '3rem 1rem', color: 'var(--text-muted)' }}>
+              <p style={{ fontSize: 36, margin: '0 0 0.5rem' }}>😴</p>
+              <p style={{ fontSize: 15, fontWeight: 600 }}>No users online right now</p>
+              <p style={{ fontSize: 13 }}>Users become visible once they make an API request.</p>
+            </div>
+          ) : (
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+              <thead>
+                <tr style={{ borderBottom: '2px solid var(--border)' }}>
+                  <th style={{ textAlign: 'left', padding: '8px 10px' }}>User</th>
+                  <th style={{ textAlign: 'left', padding: '8px 10px' }}>Email</th>
+                  <th style={{ textAlign: 'left', padding: '8px 10px' }}>Plan</th>
+                  <th style={{ textAlign: 'left', padding: '8px 10px' }}>Last Active</th>
+                </tr>
+              </thead>
+              <tbody>
+                {onlineUsers.map(u => {
+                  const secsAgo = Math.floor((Date.now() - new Date(u.last_active_at).getTime()) / 1000);
+                  const ago = secsAgo < 60 ? `${secsAgo}s ago` : `${Math.floor(secsAgo / 60)}m ago`;
+                  return (
+                    <tr key={u.id} style={{ borderBottom: '1px solid var(--border)' }}>
+                      <td style={{ padding: '8px 10px' }}>
+                        <span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: '50%', background: '#22c55e', marginRight: 8 }} />
+                        {u.name}
+                      </td>
+                      <td style={{ padding: '8px 10px', color: 'var(--text-muted)' }}>{u.email}</td>
+                      <td style={{ padding: '8px 10px' }}>
+                        <span style={{ textTransform: 'capitalize', fontSize: 12, fontWeight: 600, padding: '2px 8px', borderRadius: 20, background: 'var(--surface)' }}>
+                          {u.plan}
+                        </span>
+                      </td>
+                      <td style={{ padding: '8px 10px', color: '#22c55e', fontWeight: 600 }}>{ago}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          )}
         </div>
       )}
     </div>
