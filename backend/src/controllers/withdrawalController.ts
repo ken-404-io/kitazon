@@ -17,12 +17,45 @@ async function getWithdrawalEligibility(userId: number, user: DbUser) {
   const reasons: string[] = [];
   if (!user.email_verified) reasons.push('email_not_verified');
 
+  // Daily limit: count non-failed withdrawals in the last 24 hours
+  const since24h = new Date(Date.now() - 24 * 3_600_000);
+  const dailyRows = await db('withdrawals')
+    .where({ user_id: userId })
+    .whereNotIn('status', ['failed'])
+    .where('created_at', '>', since24h)
+    .orderBy('created_at', 'asc')
+    .select('created_at');
+
+  const dailyCount = dailyRows.length;
+  const nextAvailableAt = dailyCount >= 2
+    ? new Date(new Date(dailyRows[0].created_at).getTime() + 24 * 3_600_000)
+    : null;
+
+  // 24h cooldown from most recent completed/processing withdrawal
+  const lastApproved = await db('withdrawals')
+    .where({ user_id: userId })
+    .whereIn('status', ['completed', 'processing'])
+    .orderBy('created_at', 'desc')
+    .select('created_at')
+    .first();
+
+  const cooldownUntil = lastApproved
+    ? new Date(new Date(lastApproved.created_at).getTime() + 24 * 3_600_000)
+    : null;
+  const inCooldown = cooldownUntil !== null && cooldownUntil > new Date();
+
+  if (dailyCount >= 2) reasons.push('daily_limit_reached');
+  if (inCooldown) reasons.push('cooldown_active');
+
   return {
     eligible: reasons.length === 0,
     email_verified: user.email_verified,
     is_first_withdrawal: isFirstWithdrawal,
     withdrawal_credits: Number(user.withdrawal_credits ?? 0),
     reasons,
+    daily_count: dailyCount,
+    daily_limit: 2,
+    next_available_at: nextAvailableAt ?? cooldownUntil ?? null,
   };
 }
 
@@ -96,6 +129,11 @@ export async function requestOtp(req: Request, res: Response, next: NextFunction
 
     const elig = await getWithdrawalEligibility(user.id, user);
     if (!elig.eligible) {
+      if (elig.reasons.includes('daily_limit_reached') || elig.reasons.includes('cooldown_active')) {
+        const until = elig.next_available_at ? new Date(elig.next_available_at).toLocaleString('en-PH', { timeZone: 'Asia/Manila', hour: '2-digit', minute: '2-digit', month: 'short', day: 'numeric' }) : 'later';
+        res.status(429).json({ message: `You have reached the daily withdrawal limit (2/day). You can withdraw again on ${until} (PHT).`, next_available_at: elig.next_available_at });
+        return;
+      }
       res.status(403).json({ message: 'Please verify your email before making withdrawals.' });
       return;
     }
@@ -180,6 +218,11 @@ export async function create(req: Request, res: Response, next: NextFunction): P
 
     const elig = await getWithdrawalEligibility(user.id, user);
     if (!elig.eligible) {
+      if (elig.reasons.includes('daily_limit_reached') || elig.reasons.includes('cooldown_active')) {
+        const until = elig.next_available_at ? new Date(elig.next_available_at).toLocaleString('en-PH', { timeZone: 'Asia/Manila', hour: '2-digit', minute: '2-digit', month: 'short', day: 'numeric' }) : 'later';
+        res.status(429).json({ message: `You have reached the daily withdrawal limit (2/day). You can withdraw again on ${until} (PHT).`, next_available_at: elig.next_available_at });
+        return;
+      }
       res.status(403).json({ message: 'Please verify your email before making withdrawals.' });
       return;
     }
@@ -226,12 +269,6 @@ export async function create(req: Request, res: Response, next: NextFunction): P
     const accountAge = Date.now() - new Date(user.created_at).getTime();
     if (accountAge < 10 * 60 * 1000) flags.push('new_account');
 
-    // Check 3: more than 3 withdrawals today
-    const todayWithdrawals = await db('withdrawals')
-      .where({ user_id: req.user!.id })
-      .where('created_at', '>', new Date(new Date().setHours(0, 0, 0, 0)))
-      .count('id as cnt').first();
-    if (Number((todayWithdrawals as any)?.cnt) >= 3) flags.push('excessive_daily_withdrawals');
 
     const isSuspicious = flags.length > 0;
     if (flags.length > 0) {
@@ -250,11 +287,7 @@ export async function create(req: Request, res: Response, next: NextFunction): P
       return;
     }
 
-    // Hard block: too many withdrawals today
-    if (flags.includes('excessive_daily_withdrawals')) {
-      res.status(403).json({ message: 'You have reached the maximum number of withdrawals for today. Please try again tomorrow.' });
-      return;
-    }
+
 
     const now = new Date();
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);

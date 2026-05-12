@@ -41,6 +41,9 @@ interface Eligibility {
   is_first_withdrawal: boolean;
   withdrawal_credits: number;
   reasons: string[];
+  daily_count: number;
+  daily_limit: number;
+  next_available_at: string | null;
 }
 
 export default function Withdraw() {
@@ -157,8 +160,27 @@ export default function Withdraw() {
           {plan === 'free' && <Link to="/plans" className={styles.upgradeLink}>Upgrade →</Link>}
         </div>
 
+        {/* ── Daily limit banner (cooldown / limit reached) ── */}
+        {elig && (elig.reasons.includes('daily_limit_reached') || elig.reasons.includes('cooldown_active')) && (
+          <div style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: 14, padding: '1rem 1.1rem', display: 'flex', gap: 12, alignItems: 'flex-start', marginBottom: '0.75rem' }}>
+            <span style={{ fontSize: 20, flexShrink: 0 }}>⏳</span>
+            <div>
+              <p style={{ fontWeight: 700, fontSize: '0.88rem', color: 'var(--red)', margin: '0 0 3px' }}>Daily withdrawal limit reached</p>
+              <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', margin: 0 }}>
+                You can make up to <strong>2 withdrawals per 24 hours</strong>.
+                {elig.next_available_at && (
+                  <> Next available: <strong style={{ color: 'var(--text)' }}>{new Date(elig.next_available_at).toLocaleString('en-PH', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</strong></>
+                )}
+              </p>
+              <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', margin: '4px 0 0' }}>
+                Today: {elig.daily_count ?? 0} / {elig.daily_limit ?? 2} withdrawals used
+              </p>
+            </div>
+          </div>
+        )}
+
         {/* ── Withdrawal requirements checklist ── */}
-        {elig && !elig.eligible && (
+        {elig && !elig.eligible && !elig.reasons.includes('daily_limit_reached') && !elig.reasons.includes('cooldown_active') && (
           <div className={styles.requirementsCard}>
             <p className={styles.reqTitle}>
               <LockIcon /> Complete these steps to unlock withdrawals
@@ -189,6 +211,14 @@ export default function Withdraw() {
 
             </div>
             <Link to="/tasks" className={styles.reqCta}>Go to Tasks →</Link>
+          </div>
+        )}
+
+        {/* ── Daily usage indicator (when eligible) ── */}
+        {elig && elig.eligible && (elig.daily_count ?? 0) > 0 && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '0.6rem 0.85rem', background: 'var(--surface)', borderRadius: 10, marginBottom: '0.5rem', fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+            <span>📊</span>
+            <span>Withdrawals today: <strong style={{ color: 'var(--text)' }}>{elig.daily_count} / {elig.daily_limit}</strong> · resets 24h after each withdrawal</span>
           </div>
         )}
 
@@ -239,7 +269,9 @@ export default function Withdraw() {
           disabled={elig !== null && !elig.eligible}
           style={elig !== null && !elig.eligible ? { opacity: 0.4, cursor: 'not-allowed' } : undefined}
         >
-          {elig !== null && !elig.eligible ? '🔒 Locked' : 'Fast Cash →'}
+          {elig !== null && !elig.eligible
+            ? (elig.reasons.includes('daily_limit_reached') || elig.reasons.includes('cooldown_active') ? '⏳ Cooldown' : '🔒 Locked')
+            : 'Fast Cash →'}
         </button>
 
         <div className={styles.totalStrip}>
