@@ -147,7 +147,7 @@ app.use('/api/withdrawals', withdrawalRoutes);
 app.use('/api/referrals', referralRoutes);
 app.use('/api/payouts', payoutRoutes);
 app.use('/api/account', accountRoutes);
-app.use('/api/admin', authLimiter, adminRoutes);
+app.use('/api/admin', adminRoutes);
 app.use('/api/totp', totpRoutes);
 app.use('/api/auth', googleAuthRoutes);
 app.use('/api/subscriptions', subscriptionRoutes);
