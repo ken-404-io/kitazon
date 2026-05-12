@@ -6,10 +6,10 @@ import api from '../services/api';
 import styles from './MathQuiz.module.css';
 
 const PLAN_LIMITS: Record<string, string> = {
-  free:    '₱10/day',
-  silver:  '₱50/day',
-  gold:    '₱100/day',
-  diamond: '₱300/day',
+  free:    '₱150/day',
+  silver:  '₱500/day',
+  gold:    '₱2,000/day',
+  diamond: '₱4,000/day',
 };
 
 const QUESTIONS_PER_ROUND = 10;
@@ -229,7 +229,7 @@ export default function MathQuiz() {
             </div>
             <div>
               <h1 className={styles.title}>Math Quiz</h1>
-              <p className={styles.subtitle}>₱0.50 per correct answer · Max {limitLabel}</p>
+              <p className={styles.subtitle}>₱1.00 per correct answer · Max {limitLabel}</p>
             </div>
           </div>
           <QuizInner />

@@ -230,12 +230,12 @@ export async function recentEarnings(req: Request, res: Response, next: NextFunc
   } catch (err) { next(err); }
 }
 
-const QUIZ_REWARD = 0.50;
+const QUIZ_REWARD = 1.00;
 const QUIZ_DAILY_LIMITS: Record<string, number> = {
-  free:    20,  // ₱10
-  silver:  100, // ₱50
-  gold:    200, // ₱100
-  diamond: 600, // ₱300
+  free:    150,  // ₱150
+  silver:  500,  // ₱500
+  gold:    2000, // ₱2000
+  diamond: 4000, // ₱4000
 };
 
 export async function quizCorrect(req: Request, res: Response, next: NextFunction): Promise<void> {
