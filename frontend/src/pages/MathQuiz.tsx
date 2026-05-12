@@ -54,18 +54,20 @@ function AdBreak({ onDone }: { onDone: () => void }) {
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    // Inject Adsterra banner script
-    if (containerRef.current) {
-      containerRef.current.innerHTML = '';
-      const inner = document.createElement('div');
-      inner.id = 'container-6eabcdaeb07c57f4f19da67d49052315';
-      containerRef.current.appendChild(inner);
-      const script = document.createElement('script');
-      script.async = true;
-      script.setAttribute('data-cfasync', 'false');
-      script.src = '//pl29417356.profitablecpmratenetwork.com/6eabcdaeb07c57f4f19da67d49052315/invoke.js';
-      containerRef.current.appendChild(script);
-    }
+    if (!containerRef.current) return;
+    containerRef.current.innerHTML = '';
+
+    // atOptions config script
+    const cfg = document.createElement('script');
+    cfg.type = 'text/javascript';
+    cfg.text = `atOptions = { 'key': '00611793b43988f6f1c486423ed8b687', 'format': 'iframe', 'height': 250, 'width': 300, 'params': {} };`;
+    containerRef.current.appendChild(cfg);
+
+    // invoke script
+    const invoke = document.createElement('script');
+    invoke.type = 'text/javascript';
+    invoke.src = 'https://www.highperformanceformat.com/00611793b43988f6f1c486423ed8b687/invoke.js';
+    containerRef.current.appendChild(invoke);
   }, []);
 
   useEffect(() => {
