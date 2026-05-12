@@ -36,6 +36,7 @@ import ReferralLanding from './pages/ReferralLanding';
 import Credits from './pages/Credits';
 import CheckIn from './pages/CheckIn';
 import KYC from './pages/KYC';
+import MathQuiz from './pages/MathQuiz';
 
 function PrivateRoute({ children }: { children: ReactNode }) {
   const { user, loading } = useAuth();
@@ -87,6 +88,7 @@ export default function App() {
           <Route path="/credits" element={<PrivateRoute><Credits /></PrivateRoute>} />
           <Route path="/checkin" element={<PrivateRoute><CheckIn /></PrivateRoute>} />
           <Route path="/kyc" element={<PrivateRoute><KYC /></PrivateRoute>} />
+          <Route path="/quiz" element={<PrivateRoute><MathQuiz /></PrivateRoute>} />
           <Route path="/ref/:code" element={<ReferralLanding />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
