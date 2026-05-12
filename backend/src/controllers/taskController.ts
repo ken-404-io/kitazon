@@ -231,12 +231,21 @@ export async function recentEarnings(req: Request, res: Response, next: NextFunc
 }
 
 const QUIZ_REWARD = 0.50;
-const QUIZ_DAILY_MAX = 20; // max 20 correct answers per day = ₱10
+const QUIZ_DAILY_LIMITS: Record<string, number> = {
+  free:    20,  // ₱10
+  silver:  100, // ₱50
+  gold:    200, // ₱100
+  diamond: 600, // ₱300
+};
 
 export async function quizCorrect(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
+
+    const userRow = await db('users').where({ id: req.user!.id }).select('plan').first();
+    const plan = (userRow?.plan ?? 'free') as string;
+    const dailyMax = QUIZ_DAILY_LIMITS[plan] ?? QUIZ_DAILY_LIMITS.free;
 
     const countToday = await db('earnings')
       .where({ user_id: req.user!.id, type: 'quiz' })
@@ -244,7 +253,7 @@ export async function quizCorrect(req: Request, res: Response, next: NextFunctio
       .count('id as n')
       .first();
 
-    if (Number((countToday as any)?.n ?? 0) >= QUIZ_DAILY_MAX) {
+    if (Number((countToday as any)?.n ?? 0) >= dailyMax) {
       res.status(429).json({ message: 'Daily quiz limit reached. Come back tomorrow!', amount: 0, capped: true });
       return;
     }
