@@ -1,8 +1,16 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 import KycGate from '../components/KycGate';
 import api from '../services/api';
 import styles from './MathQuiz.module.css';
+
+const PLAN_LIMITS: Record<string, string> = {
+  free:    '₱10/day',
+  silver:  '₱50/day',
+  gold:    '₱100/day',
+  diamond: '₱300/day',
+};
 
 const QUESTIONS_PER_ROUND = 10;
 const AD_SECONDS = 5;
@@ -205,6 +213,10 @@ function QuizInner() {
 }
 
 export default function MathQuiz() {
+  const { user } = useAuth();
+  const plan = (user as any)?.plan ?? 'free';
+  const limitLabel = PLAN_LIMITS[plan] ?? PLAN_LIMITS.free;
+
   return (
     <KycGate feature="tasks">
       <div className={styles.page}>
@@ -212,12 +224,12 @@ export default function MathQuiz() {
           <div className={styles.header}>
             <div className={styles.headerIcon}>
               <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+                <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/>
               </svg>
             </div>
             <div>
               <h1 className={styles.title}>Math Quiz</h1>
-              <p className={styles.subtitle}>₱0.50 per correct answer · Max ₱10/day</p>
+              <p className={styles.subtitle}>₱0.50 per correct answer · Max {limitLabel}</p>
             </div>
           </div>
           <QuizInner />

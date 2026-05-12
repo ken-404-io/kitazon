@@ -10,7 +10,7 @@ import styles from './Navbar.module.css';
 const sz = { width: 20, height: 20, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 2, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const };
 
 const HomeIcon    = () => <svg {...sz}><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>;
-const TaskIcon    = () => <svg {...sz}><rect x="9" y="3" width="6" height="4" rx="1"/><path d="M7 3H5a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2V5a2 2 0 00-2-2h-2"/><path d="M9 12l2 2 4-4"/></svg>;
+const QuizIcon    = () => <svg {...sz}><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>;
 const WalletIcon  = () => <svg {...sz}><rect x="1" y="4" width="22" height="16" rx="2"/><path d="M1 10h22"/><path d="M15 15h2"/></svg>;
 const UserIcon    = () => <svg {...sz}><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>;
 const BellIcon    = () => <svg {...sz}><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg>;
@@ -73,7 +73,7 @@ export default function Navbar() {
         {user ? (
           <nav className={styles.desktopLinks}>
             <Link to="/dashboard" className={isActive('/dashboard') ? styles.activeLink : ''}>Dashboard</Link>
-            <Link to="/tasks"     className={isActive('/tasks')     ? styles.activeLink : ''}>Tasks</Link>
+            <Link to="/quiz"      className={isActive('/quiz')      ? styles.activeLink : ''}>Quiz</Link>
             <Link to="/referral"  className={isActive('/referral')  ? styles.activeLink : ''}>Referral</Link>
             {user.is_admin && <Link to="/admin" className={isActive('/admin') ? styles.activeLink : ''}>Admin</Link>}
           </nav>
@@ -150,10 +150,10 @@ export default function Navbar() {
         {user ? (
           <>
             <NavTab to="/dashboard" label="Home"    icon={<HomeIcon />}   active={isActive('/dashboard')} />
-            <NavTab to="/tasks"     label="Tasks"   icon={<TaskIcon />}   active={isActive('/tasks')} />
-            <NavTab to="/withdraw"  label="Wallet"   icon={<WalletIcon />}  active={isActive('/withdraw')} />
-            <NavTab to="/plans"     label="Upgrade"  icon={<CrownIcon />}   active={isActive('/plans')} />
-            <NavTab to="/account"   label="Profile"  icon={<UserIcon />}    active={isActive('/account')}
+            <NavTab to="/quiz"      label="Quiz"    icon={<QuizIcon />}   active={isActive('/quiz')} />
+            <NavTab to="/withdraw"  label="Wallet"  icon={<WalletIcon />} active={isActive('/withdraw')} />
+            <NavTab to="/plans"     label="Upgrade" icon={<CrownIcon />}  active={isActive('/plans')} />
+            <NavTab to="/account"   label="Profile" icon={<UserIcon />}   active={isActive('/account')}
               badge={!user.email_verified ? '!' : undefined} />
           </>
         ) : (
