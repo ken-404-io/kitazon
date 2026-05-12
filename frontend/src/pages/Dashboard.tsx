@@ -24,6 +24,7 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'Credits',  to: '/credits',                       icon: <svg {...sz18}><circle cx="12" cy="12" r="10"/><path d="M15 9.5a3.5 3.5 0 1 0-3 5.5"/></svg> },
   { label: 'Plans',    to: '/plans',                         icon: <svg {...sz18}><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg> },
   { label: 'History',  to: '/withdraw?view=history',         icon: <svg {...sz18}><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg> },
+  { label: 'Quiz',     to: '/quiz',                          icon: <svg {...sz18}><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg> },
   { label: 'KYC',      to: '/kyc',                           icon: <svg {...sz18}><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/><polyline points="9 11 12 14 22 4"/></svg> },
 ];
 

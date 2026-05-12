@@ -229,3 +229,37 @@ export async function recentEarnings(req: Request, res: Response, next: NextFunc
     res.json({ earnings, total: Number(count.total), page, pages: Math.ceil(Number(count.total) / limit) });
   } catch (err) { next(err); }
 }
+
+const QUIZ_REWARD = 0.50;
+const QUIZ_DAILY_MAX = 20; // max 20 correct answers per day = ₱10
+
+export async function quizCorrect(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const countToday = await db('earnings')
+      .where({ user_id: req.user!.id, type: 'quiz' })
+      .where('created_at', '>=', today)
+      .count('id as n')
+      .first();
+
+    if (Number((countToday as any)?.n ?? 0) >= QUIZ_DAILY_MAX) {
+      res.status(429).json({ message: 'Daily quiz limit reached. Come back tomorrow!', amount: 0, capped: true });
+      return;
+    }
+
+    await db.transaction(async (trx) => {
+      await trx('earnings').insert({
+        user_id: req.user!.id,
+        task_id: null,
+        amount: QUIZ_REWARD,
+        type: 'quiz',
+        description: 'Math quiz correct answer',
+      });
+      await trx('users').where({ id: req.user!.id }).increment('balance', QUIZ_REWARD);
+    });
+
+    res.json({ amount: QUIZ_REWARD, capped: false });
+  } catch (err) { next(err); }
+}
