@@ -67,6 +67,10 @@ export interface DbWithdrawal {
   ip_address?: string | null;
   is_flagged?: boolean;
   metadata?: Record<string, unknown> | null;
+  paypal_batch_id?: string | null;
+  paypal_payout_item_id?: string | null;
+  payout_attempted_at?: Date | null;
+  payout_error?: string | null;
   created_at: Date;
 }
 

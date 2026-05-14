@@ -337,6 +337,24 @@ export default function Admin() {
     loadWithdrawals(wPage, wFilter);
   };
 
+  const [payoutBusyId, setPayoutBusyId] = useState<number | null>(null);
+  const triggerPayout = async (id: number) => {
+    if (!window.confirm('Send this PayPal payout now? This will transfer real funds to the user\'s PayPal account.')) return;
+    setPayoutBusyId(id);
+    try {
+      const res = await api.post<{ message: string; paypal_batch_id?: string }>(`/admin/withdrawals/${id}/payout`);
+      setToast(`Payout sent. Batch: ${res.data.paypal_batch_id ?? 'pending'}`);
+      setTimeout(() => setToast(''), 4000);
+      loadWithdrawals(wPage, wFilter);
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { message?: string } } }).response?.data?.message ?? 'Payout failed.';
+      setToast(msg);
+      setTimeout(() => setToast(''), 5000);
+    } finally {
+      setPayoutBusyId(null);
+    }
+  };
+
   const tabStyle = (t: Tab) => ({
     padding: '8px 18px',
     background: tab === t ? 'var(--gold)' : 'transparent',
@@ -605,7 +623,7 @@ export default function Admin() {
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
                 <thead>
                   <tr style={{ borderBottom: '2px solid #e5e7eb', background: '#f9fafb' }}>
-                    {['ID', 'User', 'Amount', 'Net', 'Channel', 'Account', 'Status', 'Date', 'Update Status'].map(h => (
+                    {['ID', 'User', 'Amount', 'Net', 'Channel', 'Account', 'Status', 'Date', 'Update Status', 'Auto Payout'].map(h => (
                       <th key={h} style={{ padding: '8px 10px', textAlign: 'left', whiteSpace: 'nowrap' }}>{h}</th>
                     ))}
                   </tr>
@@ -641,6 +659,20 @@ export default function Admin() {
                           <option value="completed">Completed</option>
                           <option value="failed">Failed</option>
                         </select>
+                      </td>
+                      <td style={{ padding: '8px 10px' }}>
+                        {w.channel === 'paypal' && w.status === 'pending' ? (
+                          <button
+                            className="btn-outline"
+                            disabled={payoutBusyId === w.id}
+                            onClick={() => triggerPayout(w.id)}
+                            style={{ fontSize: 12, padding: '4px 10px', whiteSpace: 'nowrap' }}
+                          >
+                            {payoutBusyId === w.id ? 'Sending…' : 'Pay out via PayPal'}
+                          </button>
+                        ) : (
+                          <span style={{ color: '#9ca3af', fontSize: 12 }}>—</span>
+                        )}
                       </td>
                     </tr>
                   ))}

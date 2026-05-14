@@ -1,44 +1,15 @@
 import { Request, Response, NextFunction } from 'express';
 import db from '../../config/database';
-import { DbUser, UserPlan } from '../types';
+import { DbUser, UserPlan, DbWithdrawal, WithdrawalStatus } from '../types';
 import { logAudit } from '../services/audit';
-import { sendPlanUpgradeEmail } from '../services/email';
+import { sendPlanUpgradeEmail, sendWithdrawalStatusEmail } from '../services/email';
+import { paypalBase, getPayPalToken } from '../services/paypal';
 
 const PLAN_PRICES: Record<Exclude<UserPlan, 'free'>, { amount: string; label: string }> = {
   silver:  { amount: '499.00', label: 'Kitazon Silver Plan' },
   gold:    { amount: '1299.00', label: 'Kitazon Gold Plan' },
   diamond: { amount: '1999.00', label: 'Kitazon Diamond Plan' },
 };
-
-function paypalBase(): string {
-  return process.env.PAYPAL_MODE === 'sandbox'
-    ? 'https://api-m.sandbox.paypal.com'
-    : 'https://api-m.paypal.com';
-}
-
-async function getPayPalToken(): Promise<string> {
-  const base  = paypalBase();
-  const creds = Buffer.from(
-    `${process.env.PAYPAL_CLIENT_ID}:${process.env.PAYPAL_CLIENT_SECRET}`
-  ).toString('base64');
-
-  console.log(`[PayPal] getToken mode=${process.env.PAYPAL_MODE ?? 'production'} base=${base}`);
-
-  const res = await fetch(`${base}/v1/oauth2/token`, {
-    method: 'POST',
-    headers: { Authorization: `Basic ${creds}`, 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: 'grant_type=client_credentials',
-  });
-
-  if (!res.ok) {
-    const body = await res.text();
-    console.error(`[PayPal] token error ${res.status}:`, body);
-    throw new Error(`PayPal auth failed (${res.status}): ${body}`);
-  }
-
-  const data = await res.json() as { access_token: string };
-  return data.access_token;
-}
 
 /* ── POST /api/subscriptions/create ─────────────────────────────────────────── */
 export async function createOrder(req: Request, res: Response, next: NextFunction): Promise<void> {
@@ -188,7 +159,14 @@ export async function paypalWebhook(req: Request, res: Response, next: NextFunct
   try {
     const event = req.body as {
       event_type?: string;
-      resource?: { custom_id?: string };
+      resource?: {
+        custom_id?: string;
+        sender_item_id?: string;
+        payout_item_id?: string;
+        payout_batch_id?: string;
+        transaction_status?: string;
+        errors?: { message?: string; name?: string };
+      };
     };
 
     if (event.event_type === 'PAYMENT.CAPTURE.COMPLETED') {
@@ -216,6 +194,57 @@ export async function paypalWebhook(req: Request, res: Response, next: NextFunct
           } catch (updateErr) {
             console.error('[PayPal Webhook] Failed to update user plan:', updateErr);
           }
+        }
+      }
+    }
+
+    // ─── Automated payout events ──────────────────────────────────────────
+    // sender_item_id is set to "withdrawal:<id>" when we initiate a payout.
+    if (
+      event.event_type === 'PAYMENT.PAYOUTS-ITEM.SUCCEEDED' ||
+      event.event_type === 'PAYMENT.PAYOUTS-ITEM.FAILED' ||
+      event.event_type === 'PAYMENT.PAYOUTS-ITEM.DENIED' ||
+      event.event_type === 'PAYMENT.PAYOUTS-ITEM.RETURNED' ||
+      event.event_type === 'PAYMENT.PAYOUTS-ITEM.UNCLAIMED'
+    ) {
+      const senderItemId = event.resource?.sender_item_id ?? '';
+      const m = /^withdrawal:(\d+)$/.exec(senderItemId);
+      if (m) {
+        const withdrawalId = Number(m[1]);
+        const succeeded = event.event_type === 'PAYMENT.PAYOUTS-ITEM.SUCCEEDED';
+        const newStatus: WithdrawalStatus = succeeded ? 'completed' : 'failed';
+
+        try {
+          const withdrawal = await db<DbWithdrawal>('withdrawals').where({ id: withdrawalId }).first();
+          if (withdrawal && withdrawal.status !== newStatus) {
+            await db.transaction(async (trx) => {
+              const updates: Record<string, unknown> = { status: newStatus };
+              try {
+                updates.payout_error = succeeded ? null : (event.resource?.errors?.message ?? event.event_type);
+                await trx('withdrawals').where({ id: withdrawalId }).update(updates);
+              } catch {
+                // payout_error column not yet migrated — fall back
+                await trx('withdrawals').where({ id: withdrawalId }).update({ status: newStatus });
+              }
+
+              // Refund balance on failure (only if not already failed)
+              if (!succeeded && withdrawal.status !== 'failed') {
+                await trx('users').where({ id: withdrawal.user_id }).increment('balance', Number(withdrawal.amount));
+              }
+            });
+
+            const owner = await db<DbUser>('users').where({ id: withdrawal.user_id }).select('email', 'name').first();
+            if (owner) {
+              sendWithdrawalStatusEmail(
+                owner.email, owner.name, newStatus,
+                Number(withdrawal.amount), withdrawal.channel, Number(withdrawal.net_amount)
+              ).catch(() => {});
+            }
+
+            console.log(`[PayPal Webhook] Payout ${newStatus}: withdrawal_id=${withdrawalId} event=${event.event_type}`);
+          }
+        } catch (payoutErr) {
+          console.error('[PayPal Webhook] Failed to update payout status:', payoutErr);
         }
       }
     }

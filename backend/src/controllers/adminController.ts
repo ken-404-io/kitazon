@@ -3,6 +3,7 @@ import db from '../../config/database';
 import { DbUser, DbWithdrawal, WithdrawalStatus, UserPlan } from '../types';
 import { logAudit } from '../services/audit';
 import { sendWithdrawalStatusEmail, sendBroadcastEmail } from '../services/email';
+import { sendPayout, paypalConfigured } from '../services/paypal';
 
 const VALID_STATUSES: WithdrawalStatus[] = ['pending', 'processing', 'completed', 'failed'];
 
@@ -154,6 +155,101 @@ export async function updateWithdrawalStatus(req: Request, res: Response, next: 
     }
 
     res.json({ message: 'Withdrawal status updated.', status });
+  } catch (err) { next(err); }
+}
+
+// ─── Automated payout (PayPal Payouts API) ───────────────────────────────────
+export async function triggerPayout(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const withdrawalId = Number(req.params.id);
+    if (!Number.isInteger(withdrawalId) || withdrawalId <= 0) {
+      res.status(400).json({ message: 'Invalid withdrawal id.' });
+      return;
+    }
+    if (!paypalConfigured()) {
+      res.status(503).json({ message: 'PayPal credentials are not configured. Set PAYPAL_CLIENT_ID and PAYPAL_CLIENT_SECRET.' });
+      return;
+    }
+
+    const withdrawal = await db<DbWithdrawal>('withdrawals').where({ id: withdrawalId }).first();
+    if (!withdrawal) { res.status(404).json({ message: 'Withdrawal not found.' }); return; }
+    if (withdrawal.channel !== 'paypal') {
+      res.status(400).json({ message: 'Only PayPal withdrawals can be paid out automatically.' });
+      return;
+    }
+    if (withdrawal.status !== 'pending') {
+      res.status(400).json({ message: `Cannot pay out a withdrawal that is ${withdrawal.status}.` });
+      return;
+    }
+
+    // Atomically claim the withdrawal so a double-click can't fire two payouts
+    const claimed = await db('withdrawals')
+      .where({ id: withdrawalId, status: 'pending' })
+      .update({ status: 'processing' });
+    if (claimed === 0) {
+      res.status(409).json({ message: 'Withdrawal is no longer pending.' });
+      return;
+    }
+
+    const owner = await db<DbUser>('users').where({ id: withdrawal.user_id }).select('email', 'name').first();
+
+    try {
+      const result = await sendPayout({
+        receiverEmail: String(withdrawal.account_number).trim(),
+        amountPhp: Number(withdrawal.net_amount),
+        senderItemId: `withdrawal:${withdrawal.id}`,
+        note: `Kitazon withdrawal #${withdrawal.id}`,
+        emailSubject: 'You have a payout from Kitazon',
+      });
+
+      // Record PayPal identifiers (savepoint-style fallback if columns are not migrated)
+      try {
+        await db('withdrawals').where({ id: withdrawalId }).update({
+          paypal_batch_id: result.batchId,
+          paypal_payout_item_id: result.payoutItemId ?? null,
+          payout_attempted_at: new Date(),
+        });
+      } catch {
+        // Columns not yet migrated — status was already set to 'processing'.
+      }
+
+      await logAudit(req.user!.id, 'admin_trigger_payout', req, {
+        amount: Number(withdrawal.amount),
+        metadata: {
+          withdrawal_id: withdrawalId,
+          paypal_batch_id: result.batchId,
+          paypal_payout_item_id: result.payoutItemId,
+          batch_status: result.batchStatus,
+        },
+      });
+
+      res.json({
+        message: 'Payout initiated.',
+        status: 'processing',
+        paypal_batch_id: result.batchId,
+        paypal_payout_item_id: result.payoutItemId,
+        batch_status: result.batchStatus,
+      });
+    } catch (payoutErr) {
+      // Roll back: revert status to pending and record the error
+      try {
+        await db('withdrawals').where({ id: withdrawalId }).update({
+          status: 'pending',
+          payout_error: String((payoutErr as Error).message ?? payoutErr).slice(0, 500),
+        });
+      } catch {
+        await db('withdrawals').where({ id: withdrawalId }).update({ status: 'pending' });
+      }
+
+      console.error('[Admin Payout] error', payoutErr);
+      await logAudit(req.user!.id, 'admin_trigger_payout_failed', req, {
+        amount: Number(withdrawal.amount),
+        metadata: { withdrawal_id: withdrawalId, error: String((payoutErr as Error).message ?? payoutErr) },
+      });
+
+      if (owner) { /* no email — withdrawal is back to pending for retry */ }
+      res.status(502).json({ message: `PayPal payout failed: ${(payoutErr as Error).message ?? 'unknown error'}` });
+    }
   } catch (err) { next(err); }
 }
 
