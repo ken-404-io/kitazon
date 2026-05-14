@@ -69,12 +69,44 @@ export async function eligibility(req: Request, res: Response, next: NextFunctio
 
 export async function savedAccount(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const last = await db('withdrawals')
-      .where({ user_id: req.user!.id })
-      .orderBy('created_at', 'desc')
-      .select('account_number', 'channel')
-      .first();
+    // Ignore withdrawals from before the user cleared their saved payment method
+    let clearedAt: Date | null = null;
+    try {
+      const u = await db<DbUser>('users').where({ id: req.user!.id }).select('payment_method_cleared_at').first();
+      clearedAt = (u?.payment_method_cleared_at as Date | null | undefined) ?? null;
+    } catch { /* column not migrated yet */ }
+
+    let q = db('withdrawals').where({ user_id: req.user!.id });
+    if (clearedAt) q = q.where('created_at', '>', clearedAt);
+
+    const last = await q.orderBy('created_at', 'desc').select('account_number', 'channel').first();
     res.json(last ? { account_number: last.account_number, channel: last.channel } : null);
+  } catch (err) { next(err); }
+}
+
+export async function clearPaymentMethod(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    // Block if there's a pending or processing withdrawal — must settle first
+    const hasPending = await db('withdrawals')
+      .where({ user_id: req.user!.id })
+      .whereIn('status', ['pending', 'processing'])
+      .first();
+    if (hasPending) {
+      res.status(400).json({ message: 'You have a withdrawal in progress. Wait for it to be processed before changing your payment method.' });
+      return;
+    }
+
+    try {
+      await db('users').where({ id: req.user!.id }).update({ payment_method_cleared_at: new Date() });
+    } catch (err) {
+      // Column not yet migrated
+      console.error('[clearPaymentMethod] update failed (is migration 021 applied?):', err);
+      res.status(503).json({ message: 'Payment method removal is not available yet. Please contact support.' });
+      return;
+    }
+
+    await logAudit(req.user!.id, 'payment_method_cleared', req, {});
+    res.json({ message: 'Payment method removed. You can register a new PayPal account on your next withdrawal.' });
   } catch (err) { next(err); }
 }
 
@@ -157,11 +189,20 @@ export async function create(req: Request, res: Response, next: NextFunction): P
       return;
     }
 
-    // Also block if this user's own previous PayPal doesn't match (enforce 1 PayPal per user)
-    const ownPrevious = await db('withdrawals')
+    // Also block if this user's own previous PayPal doesn't match (enforce 1 PayPal per user).
+    // Withdrawals from before payment_method_cleared_at are ignored — the user explicitly
+    // removed their saved method and is starting fresh.
+    let clearedAt: Date | null = null;
+    try {
+      const u = await db<DbUser>('users').where({ id: req.user!.id }).select('payment_method_cleared_at').first();
+      clearedAt = (u?.payment_method_cleared_at as Date | null | undefined) ?? null;
+    } catch { /* column not migrated yet */ }
+
+    let ownPreviousQuery = db('withdrawals')
       .where({ user_id: req.user!.id })
-      .whereNot('account_number', account_number.trim().toLowerCase())
-      .first();
+      .whereNot('account_number', account_number.trim().toLowerCase());
+    if (clearedAt) ownPreviousQuery = ownPreviousQuery.where('created_at', '>', clearedAt);
+    const ownPrevious = await ownPreviousQuery.first();
     if (ownPrevious) {
       res.status(409).json({
         message: `You have already linked PayPal account "${maskAccount(ownPrevious.account_number)}" to your Kitazon account. Only one PayPal account is allowed per user.`,

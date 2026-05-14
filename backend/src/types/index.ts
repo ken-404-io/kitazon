@@ -34,6 +34,7 @@ export interface DbUser {
   plan_expires_at: Date | null;
   avatar_url: string | null;
   withdrawal_credits: number;
+  payment_method_cleared_at?: Date | null;
   kyc_status: KycStatus;
   kyc_submitted_at: Date | null;
   kyc_reviewed_at: Date | null;

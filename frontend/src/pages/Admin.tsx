@@ -342,8 +342,8 @@ export default function Admin() {
     if (!window.confirm('Send this PayPal payout now? This will transfer real funds to the user\'s PayPal account.')) return;
     setPayoutBusyId(id);
     try {
-      const res = await api.post<{ message: string; paypal_batch_id?: string }>(`/admin/withdrawals/${id}/payout`);
-      setToast(`Payout sent. Batch: ${res.data.paypal_batch_id ?? 'pending'}`);
+      const res = await api.post<{ message: string; status?: string; paypal_batch_id?: string }>(`/admin/withdrawals/${id}/payout`);
+      setToast(`Payout sent — withdrawal marked ${res.data.status ?? 'completed'}. Batch: ${res.data.paypal_batch_id ?? '—'}`);
       setTimeout(() => setToast(''), 4000);
       loadWithdrawals(wPage, wFilter);
     } catch (err: unknown) {
