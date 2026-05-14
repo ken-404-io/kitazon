@@ -1,4 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
+import { FACEBOOK_PAGE_URL } from '../FacebookFab';
 import styles from './Footer.module.css';
 
 export default function Footer() {
@@ -17,6 +18,8 @@ export default function Footer() {
         <Link to="/privacy">Privacy</Link>
         <span>&middot;</span>
         <Link to="/leaderboard">Leaderboard</Link>
+        <span>&middot;</span>
+        <a href={FACEBOOK_PAGE_URL} target="_blank" rel="noopener noreferrer">Facebook</a>
       </div>
     </footer>
   );

@@ -10,6 +10,14 @@
   padding: 1.25rem 0 1rem;
 }
 
+.greetingRow {
+  display: grid;
+  grid-template-columns: minmax(0, auto) minmax(0, 1fr);
+  align-items: center;
+  gap: 1rem;
+  padding: 1.25rem 0 1rem;
+}
+
 .greetSub {
   font-size: 0.78rem;
   color: var(--text-muted);
@@ -17,11 +25,172 @@
 }
 
 .greetName {
-  font-size: 1.5rem;
+  font-size: 1.65rem;
   font-weight: 800;
   color: var(--text);
   line-height: 1.1;
 }
+
+/* ── Facebook page card (inline next to greeting) ─────────────────────── */
+.fbCard {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 0.7rem 0.85rem;
+  text-decoration: none;
+  color: var(--text);
+  transition: border-color 0.15s, transform 0.1s;
+}
+.fbCard:hover { border-color: rgba(24,119,242,0.5); text-decoration: none; }
+.fbCard:active { transform: scale(0.99); }
+
+.fbCardIcon {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.fbCardText {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+}
+.fbCardText strong {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--text);
+  line-height: 1.2;
+}
+.fbCardText span {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+}
+
+/* ── Stay Connected promo banner ───────────────────────────────────────── */
+.promoBanner {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  background: rgba(249,115,22,0.06);
+  border: 1px solid rgba(249,115,22,0.35);
+  border-radius: 16px;
+  padding: 1rem 1.1rem;
+  margin-bottom: 1.25rem;
+  text-decoration: none;
+  color: var(--text);
+  transition: background 0.15s;
+}
+.promoBanner:hover { background: rgba(249,115,22,0.1); text-decoration: none; }
+
+.promoIcon {
+  width: 52px;
+  height: 52px;
+  border-radius: 14px;
+  border: 1.5px solid rgba(249,115,22,0.4);
+  color: #f97316;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.promoText {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+  gap: 2px;
+}
+.promoText strong {
+  font-size: 0.92rem;
+  font-weight: 700;
+  color: var(--text);
+}
+.promoText span {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  line-height: 1.35;
+}
+
+.promoBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1.5px solid #f97316;
+  color: #f97316;
+  background: transparent;
+  font-size: 0.78rem;
+  font-weight: 700;
+  padding: 0.5rem 0.9rem;
+  border-radius: 10px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+/* ── Connect & Follow card ─────────────────────────────────────────────── */
+.connectCard {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 1rem 1.1rem;
+  text-decoration: none;
+  color: var(--text);
+  margin-bottom: 1rem;
+  transition: border-color 0.15s;
+}
+.connectCard:hover { border-color: rgba(24,119,242,0.5); text-decoration: none; }
+
+.connectIcon {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.connectText {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+  gap: 2px;
+}
+.connectText strong {
+  font-size: 0.92rem;
+  font-weight: 700;
+  color: var(--text);
+}
+.connectText span {
+  font-size: 0.74rem;
+  color: var(--text-muted);
+}
+
+.connectBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1.5px solid #1877F2;
+  color: #1877F2;
+  background: transparent;
+  font-size: 0.78rem;
+  font-weight: 700;
+  padding: 0.5rem 0.9rem;
+  border-radius: 10px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.connectChev { color: var(--text-muted); flex-shrink: 0; }
 
 .avatarBtn {
   width: 40px;
@@ -51,7 +220,7 @@
 /* ── Navigation grid ───────────────────────────────────────────────────── */
 .navGrid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(5, 1fr);
   gap: 0.65rem;
   margin-bottom: 1.5rem;
 }
@@ -107,7 +276,7 @@
 .balanceCard {
   background: linear-gradient(135deg, #1a2e1a 0%, #1e3a20 60%, #2d5a2d 100%);
   border-radius: 20px;
-  padding: 1.4rem 1.4rem 0;
+  padding: 1.4rem;
   margin-bottom: 1rem;
   overflow: hidden;
   position: relative;
@@ -169,10 +338,9 @@
 .balanceStats {
   display: flex;
   gap: 0;
-  margin-bottom: 1rem;
   background: rgba(255,255,255,0.08);
   border-radius: 12px;
-  padding: 0.75rem 0;
+  padding: 0.85rem 0;
 }
 
 .balanceStat {
@@ -292,16 +460,26 @@
 }
 
 /* ── Responsive ─────────────────────────────────────────────────────────── */
+@media (max-width: 600px) {
+  .greetingRow { grid-template-columns: 1fr; }
+  .promoText strong { font-size: 0.85rem; }
+  .promoText span { font-size: 0.72rem; }
+}
+
 @media (max-width: 480px) {
-  .navIconWrap { width: 46px; height: 46px; border-radius: 14px; }
-  .navLabel    { font-size: 0.62rem; }
+  .navIconWrap { width: 44px; height: 44px; border-radius: 14px; }
+  .navLabel    { font-size: 0.6rem; }
   .subCards    { grid-template-columns: 1fr; }
-  .balanceCard { padding: 1.2rem 1.2rem 0; }
+  .balanceCard { padding: 1.2rem; }
+  .promoBanner { gap: 0.75rem; padding: 0.85rem; }
+  .promoIcon   { width: 44px; height: 44px; }
+  .promoBtn    { padding: 0.4rem 0.7rem; font-size: 0.72rem; }
+  .connectBtn  { padding: 0.4rem 0.7rem; font-size: 0.72rem; }
 }
 
 @media (max-width: 360px) {
-  .navGrid     { gap: 0.5rem; }
-  .navIconWrap { width: 42px; height: 42px; }
+  .navGrid     { gap: 0.45rem; }
+  .navIconWrap { width: 40px; height: 40px; }
 }
 
 /* ── KYC banner ─────────────────────────────────────────────────────────── */

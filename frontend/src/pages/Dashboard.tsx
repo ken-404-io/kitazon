@@ -3,11 +3,31 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import SpinWheel from '../components/dashboard/SpinWheel';
-import EarningsChart from '../components/dashboard/EarningsChart';
 import { SkeletonRow } from '../components/ui/Skeleton';
 import api from '../services/api';
 import { UserStats, Earning } from '../types';
+import { FACEBOOK_PAGE_URL } from '../components/FacebookFab';
 import styles from './Dashboard.module.css';
+
+const FacebookIcon = ({ size = 22 }: { size?: number }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="#1877F2" aria-hidden="true">
+    <path d="M24 12c0-6.627-5.373-12-12-12S0 5.373 0 12c0 5.99 4.388 10.954 10.125 11.854V15.47H7.078V12h3.047V9.356c0-3.007 1.792-4.668 4.533-4.668 1.312 0 2.686.234 2.686.234v2.953H15.83c-1.491 0-1.956.925-1.956 1.874V12h3.328l-.532 3.47h-2.796v8.385C19.612 22.954 24 17.99 24 12z"/>
+  </svg>
+);
+
+const MegaphoneIcon = () => (
+  <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M3 11l18-8v18l-18-8z"/>
+    <path d="M11.6 16.8a3 3 0 1 1-5.8-1.6"/>
+  </svg>
+);
+
+const ThumbsUpIcon = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M7 10v12"/>
+    <path d="M15 5.88L14 10h5.83a2 2 0 0 1 1.92 2.56l-2.33 8A2 2 0 0 1 17.5 22H7V10l4.34-9a1.93 1.93 0 0 1 1.66 1c.34.59.5 1.27.5 2v1.88z"/>
+  </svg>
+);
 
 /* ─── Nav shortcut icons ─────────────────────────────────────────────────── */
 const sz18 = { width: 20, height: 20, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 2, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const };
@@ -104,13 +124,43 @@ export default function Dashboard() {
           </Link>
         )}
 
-        {/* ── Greeting ── */}
-        <div className={styles.greeting}>
+        {/* ── Greeting + Facebook page card ── */}
+        <div className={styles.greetingRow}>
           <div>
-            <p className={styles.greetSub}>Welcome back</p>
+            <p className={styles.greetSub}>Welcome back,</p>
             <h1 className={styles.greetName}>{user?.name?.split(' ')[0] ?? 'User'}</h1>
           </div>
+          <a
+            href={FACEBOOK_PAGE_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            className={styles.fbCard}
+          >
+            <span className={styles.fbCardIcon}><FacebookIcon /></span>
+            <span className={styles.fbCardText}>
+              <strong>Like our Facebook Page</strong>
+              <span>to connect &amp; get updates</span>
+            </span>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+          </a>
         </div>
+
+        {/* ── Stay Connected promo banner ── */}
+        <a
+          href={FACEBOOK_PAGE_URL}
+          target="_blank"
+          rel="noopener noreferrer"
+          className={styles.promoBanner}
+        >
+          <span className={styles.promoIcon}><MegaphoneIcon /></span>
+          <span className={styles.promoText}>
+            <strong>Stay Connected. Stay Updated.</strong>
+            <span>Like our Facebook Page to get the latest announcements, features, and important updates.</span>
+          </span>
+          <span className={styles.promoBtn}>
+            <ThumbsUpIcon /> Like Page
+          </span>
+        </a>
 
         {/* ── Navigation grid ── */}
         <p className={styles.sectionLabel}>Navigation</p>
@@ -176,10 +226,27 @@ export default function Dashboard() {
             </div>
           </div>
 
-          <div className={styles.chartWrap}>
-            <EarningsChart />
-          </div>
         </div>
+
+        {/* ── Connect & Follow ── */}
+        <p className={styles.sectionLabel} style={{ marginTop: '1.5rem' }}>Connect &amp; Follow</p>
+        <p className={styles.overviewSub} style={{ marginBottom: '0.85rem' }}>Follow us to never miss an update!</p>
+        <a
+          href={FACEBOOK_PAGE_URL}
+          target="_blank"
+          rel="noopener noreferrer"
+          className={styles.connectCard}
+        >
+          <span className={styles.connectIcon}><FacebookIcon size={36} /></span>
+          <span className={styles.connectText}>
+            <strong>Kitazon Official</strong>
+            <span>Announcements, updates, promos &amp; more!</span>
+          </span>
+          <span className={styles.connectBtn}>
+            <ThumbsUpIcon /> Like Page
+          </span>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className={styles.connectChev}><polyline points="9 18 15 12 9 6"/></svg>
+        </a>
 
         {/* ── Sub cards row ── */}
         <div className={styles.subCards}>
