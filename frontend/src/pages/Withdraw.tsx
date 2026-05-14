@@ -40,6 +40,8 @@ interface Eligibility {
   email_verified: boolean;
   is_first_withdrawal: boolean;
   withdrawal_credits: number;
+  quizzes_completed?: number;
+  quizzes_required?: number;
   reasons: string[];
 }
 
@@ -187,6 +189,27 @@ export default function Withdraw() {
                   ? <span className={styles.reqBadge}>Done</span>
                   : <span className={styles.reqCountdown}>{elig.withdrawal_credits} credits</span>}
               </div>
+
+              {/* Math-quiz gate */}
+              {elig.quizzes_required !== undefined && (() => {
+                const done = (elig.quizzes_completed ?? 0);
+                const need = elig.quizzes_required ?? 20;
+                const met = done >= need;
+                return (
+                  <div className={`${styles.reqRow} ${met ? styles.reqDone : styles.reqPending}`}>
+                    <span className={styles.reqIcon}>{met ? <CheckIcon /> : <span className={styles.reqNum}>3</span>}</span>
+                    <div className={styles.reqText}>
+                      <span>Answer {need} math quiz questions</span>
+                      <span className={styles.reqSub}>
+                        {done}/{need} answered {elig.is_first_withdrawal ? 'so far' : 'since your last withdrawal'} · each correct answer = ₱3
+                      </span>
+                    </div>
+                    {met
+                      ? <span className={styles.reqBadge}>Done</span>
+                      : <Link to="/quiz" className={styles.reqCountdown} style={{ textDecoration: 'none' }}>Play Quiz →</Link>}
+                  </div>
+                );
+              })()}
 
             </div>
             <Link to="/tasks" className={styles.reqCta}>Go to Tasks →</Link>
