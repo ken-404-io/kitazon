@@ -4,6 +4,12 @@ export function paypalBase(): string {
     : 'https://api-m.paypal.com';
 }
 
+// "live" unless PAYPAL_MODE=sandbox. Surfaced in logs/errors so 403s can be
+// disambiguated from credentials/mode mismatches.
+function paypalMode(): 'sandbox' | 'live' {
+  return process.env.PAYPAL_MODE === 'sandbox' ? 'sandbox' : 'live';
+}
+
 export function paypalConfigured(): boolean {
   return Boolean(process.env.PAYPAL_CLIENT_ID && process.env.PAYPAL_CLIENT_SECRET);
 }
@@ -113,11 +119,25 @@ export async function sendPayoutBatch(items: BatchPayoutItem[], senderBatchId: s
     items?: Array<{ sender_item_id?: string; payout_item_id?: string; transaction_status?: string }>;
     name?: string;
     message?: string;
+    debug_id?: string;
+    details?: Array<{ field?: string; issue?: string; description?: string }>;
   };
 
   if (!res.ok || !body.batch_header?.payout_batch_id) {
-    console.error('[PayPal Payouts batch] error', res.status, body);
-    throw new Error(`PayPal payout batch failed: ${body.message ?? body.name ?? res.statusText}`);
+    console.error('[PayPal Payouts batch] error', res.status, {
+      mode: paypalMode(),
+      name: body.name,
+      message: body.message,
+      debug_id: body.debug_id,
+      details: body.details,
+    });
+    const detail = body.details?.[0]?.issue ?? body.details?.[0]?.description;
+    throw new Error(
+      `PayPal payout batch failed (${res.status} ${body.name ?? res.statusText}` +
+      `${body.debug_id ? `, debug_id=${body.debug_id}` : ''}): ` +
+      `${body.message ?? body.name ?? res.statusText}` +
+      `${detail ? ` — ${detail}` : ''}`
+    );
   }
 
   return {
@@ -181,11 +201,25 @@ export async function sendPayout(opts: {
     items?: Array<{ payout_item_id?: string; transaction_status?: string }>;
     name?: string;
     message?: string;
+    debug_id?: string;
+    details?: Array<{ field?: string; issue?: string; description?: string }>;
   };
 
   if (!res.ok || !body.batch_header?.payout_batch_id) {
-    console.error('[PayPal Payouts] error', res.status, body);
-    throw new Error(`PayPal payout failed: ${body.message ?? body.name ?? res.statusText}`);
+    console.error('[PayPal Payouts] error', res.status, {
+      mode: paypalMode(),
+      name: body.name,
+      message: body.message,
+      debug_id: body.debug_id,
+      details: body.details,
+    });
+    const detail = body.details?.[0]?.issue ?? body.details?.[0]?.description;
+    throw new Error(
+      `PayPal payout failed (${res.status} ${body.name ?? res.statusText}` +
+      `${body.debug_id ? `, debug_id=${body.debug_id}` : ''}): ` +
+      `${body.message ?? body.name ?? res.statusText}` +
+      `${detail ? ` — ${detail}` : ''}`
+    );
   }
 
   return {
