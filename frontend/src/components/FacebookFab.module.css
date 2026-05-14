@@ -1,0 +1,75 @@
+.fab {
+  position: fixed;
+  right: 1rem;
+  bottom: 5.5rem;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: #1877F2;
+  color: #fff;
+  box-shadow: 0 6px 18px rgba(24, 119, 242, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+  z-index: 60;
+  transition: transform 0.15s, box-shadow 0.15s;
+}
+
+.fab:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 24px rgba(24, 119, 242, 0.55);
+  text-decoration: none;
+}
+
+.fab:active {
+  transform: scale(0.95);
+}
+
+.fab svg {
+  width: 26px;
+  height: 26px;
+  fill: #fff;
+}
+
+.tooltip {
+  position: absolute;
+  right: calc(100% + 10px);
+  top: 50%;
+  transform: translateY(-50%);
+  background: var(--card-bg, #1a1a1a);
+  color: var(--text, #fff);
+  border: 1px solid var(--border, rgba(255,255,255,0.1));
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 0.4rem 0.7rem;
+  border-radius: 8px;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s;
+}
+
+.fab:hover .tooltip {
+  opacity: 1;
+}
+
+@media (min-width: 769px) {
+  .fab {
+    bottom: 1.5rem;
+    right: 1.5rem;
+    width: 56px;
+    height: 56px;
+  }
+  .fab svg { width: 28px; height: 28px; }
+}
+
+@media (max-width: 480px) {
+  .fab {
+    bottom: 5rem;
+    width: 48px;
+    height: 48px;
+  }
+  .fab svg { width: 24px; height: 24px; }
+  .tooltip { display: none; }
+}

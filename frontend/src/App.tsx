@@ -26,6 +26,7 @@ import ErrorBoundary from './components/ErrorBoundary';
 import PWAInstallPrompt from './components/PWAInstallPrompt';
 import AuthTransitionOverlay from './components/AuthTransitionOverlay';
 import AdBlockDetector from './components/AdBlockDetector';
+import FacebookFab from './components/FacebookFab';
 import Terms from './pages/Terms';
 import Privacy from './pages/Privacy';
 import Plans from './pages/Plans';
@@ -93,6 +94,7 @@ export default function App() {
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
         <Footer />
+        <FacebookFab />
       </BrowserRouter>
       </ToastProvider>
     </AuthProvider>
