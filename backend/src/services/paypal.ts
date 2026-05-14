@@ -39,6 +39,98 @@ export interface PayoutResult {
   itemStatus?: string;
 }
 
+export interface BatchPayoutItem {
+  receiverEmail: string;
+  amountPhp: number;
+  senderItemId: string;   // unique id, e.g. "withdrawal:123"
+  note?: string;
+}
+
+export interface BatchPayoutItemResult {
+  senderItemId: string;
+  payoutItemId?: string;
+  transactionStatus?: string;
+}
+
+export interface BatchPayoutResult {
+  batchId: string;
+  batchStatus: string;
+  items: BatchPayoutItemResult[];
+}
+
+// Send up to 500 PayPal payouts in a single API call.
+// PayPal allows up to 15,000 items per batch; we cap at 500 to keep timing predictable.
+export const PAYOUT_BATCH_MAX = 500;
+
+export async function sendPayoutBatch(items: BatchPayoutItem[], senderBatchId: string): Promise<BatchPayoutResult> {
+  if (!paypalConfigured()) {
+    throw new Error('PayPal credentials are not configured.');
+  }
+  if (items.length === 0) {
+    throw new Error('No payout items provided.');
+  }
+  if (items.length > PAYOUT_BATCH_MAX) {
+    throw new Error(`Batch too large: ${items.length} items (max ${PAYOUT_BATCH_MAX}).`);
+  }
+  if (!USD_TO_PHP || USD_TO_PHP <= 0) {
+    throw new Error('USD_TO_PHP_RATE is not configured.');
+  }
+
+  const paypalItems = items.map(it => {
+    const usdAmount = (it.amountPhp / USD_TO_PHP).toFixed(2);
+    if (Number(usdAmount) <= 0) {
+      throw new Error(`Payout amount too small after FX conversion (sender_item_id=${it.senderItemId}).`);
+    }
+    return {
+      recipient_type: 'EMAIL',
+      receiver: it.receiverEmail,
+      sender_item_id: it.senderItemId,
+      amount: { value: usdAmount, currency: 'USD' },
+      note: it.note ?? 'Kitazon withdrawal',
+    };
+  });
+
+  const token = await getPayPalToken();
+  const res = await fetch(`${paypalBase()}/v1/payments/payouts`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+      'PayPal-Request-Id': senderBatchId,
+    },
+    body: JSON.stringify({
+      sender_batch_header: {
+        sender_batch_id: senderBatchId,
+        email_subject: 'You have a payout from Kitazon',
+        email_message: 'Your Kitazon withdrawal has been processed.',
+      },
+      items: paypalItems,
+    }),
+  });
+
+  const body = await res.json() as {
+    batch_header?: { payout_batch_id?: string; batch_status?: string };
+    items?: Array<{ sender_item_id?: string; payout_item_id?: string; transaction_status?: string }>;
+    name?: string;
+    message?: string;
+  };
+
+  if (!res.ok || !body.batch_header?.payout_batch_id) {
+    console.error('[PayPal Payouts batch] error', res.status, body);
+    throw new Error(`PayPal payout batch failed: ${body.message ?? body.name ?? res.statusText}`);
+  }
+
+  return {
+    batchId: body.batch_header.payout_batch_id,
+    batchStatus: body.batch_header.batch_status ?? 'PENDING',
+    items: (body.items ?? []).map(it => ({
+      senderItemId: String(it.sender_item_id ?? ''),
+      payoutItemId: it.payout_item_id,
+      transactionStatus: it.transaction_status,
+    })),
+  };
+}
+
 // Send a single PayPal payout. Uses USD; converts PHP at USD_TO_PHP_RATE.
 export async function sendPayout(opts: {
   receiverEmail: string;
