@@ -26,6 +26,7 @@ const HelpIcon     = () => <svg {...sz}><circle cx="12" cy="12" r="10"/><path d=
 const TrashIcon    = () => <svg {...sz}><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 011-1h4a1 1 0 011 1v2"/></svg>;
 const LogoutIcon   = () => <svg {...sz}><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>;
 const AlertSmIcon  = () => <svg {...sz} width={14} height={14}><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>;
+const CardIcon     = () => <svg {...sz}><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>;
 
 /* ─── types ───────────────────────────────────────────────────────────────── */
 interface TotpSetup { secret: string; qr: string; }
@@ -36,7 +37,7 @@ interface LoginEvent {
   user_agent: string | null;
   created_at: string;
 }
-type View = 'main' | 'edit-profile' | 'change-password' | '2fa' | 'login-history' | 'devices' | 'notifications' | 'help' | 'delete' | 'checkin';
+type View = 'main' | 'edit-profile' | 'change-password' | '2fa' | 'login-history' | 'devices' | 'notifications' | 'help' | 'delete' | 'checkin' | 'payment-methods';
 
 /* ─── helpers ─────────────────────────────────────────────────────────────── */
 function initials(name?: string) {
@@ -86,6 +87,35 @@ export default function AccountSettings() {
   const [avatarError, setAvatarError]     = useState('');
 
   const profileNameErr = profileTouched ? validateName(profileName) : null;
+
+  // Payment methods (PayPal only for now)
+  const [savedAcct, setSavedAcct]         = useState<string | null>(null);
+  const [savedAcctLoading, setSavedAcctLoading] = useState(false);
+  const [savedAcctMsg, setSavedAcctMsg]   = useState('');
+  const [savedAcctErr, setSavedAcctErr]   = useState('');
+  const [removingAcct, setRemovingAcct]   = useState(false);
+  const loadSavedAcct = async () => {
+    setSavedAcctLoading(true);
+    setSavedAcctMsg(''); setSavedAcctErr('');
+    try {
+      const r = await api.get<{ account_number: string } | null>('/withdrawals/saved-account');
+      setSavedAcct(r.data?.account_number ?? null);
+    } catch {
+      setSavedAcct(null);
+    } finally { setSavedAcctLoading(false); }
+  };
+  const removeSavedAcct = async () => {
+    if (!window.confirm('Remove your saved PayPal account? You\'ll be able to register a different PayPal on your next withdrawal.')) return;
+    setRemovingAcct(true);
+    setSavedAcctMsg(''); setSavedAcctErr('');
+    try {
+      await api.delete('/withdrawals/saved-account');
+      setSavedAcct(null);
+      setSavedAcctMsg('Payment method removed. You can register a new PayPal on your next withdrawal.');
+    } catch (err: unknown) {
+      setSavedAcctErr((err as { response?: { data?: { message?: string } } }).response?.data?.message ?? 'Failed to remove payment method.');
+    } finally { setRemovingAcct(false); }
+  };
 
   const [sessionMsg, setSessionMsg]   = useState('');
   const [sessionLoad, setSessionLoad] = useState(false);
@@ -431,6 +461,65 @@ export default function AccountSettings() {
     </div>
   );
 
+  /* ── Payment Methods view ────────────────────────────────────────────────── */
+  if (view === 'payment-methods') return (
+    <div className="page-container">
+      <SubView title="Payment Methods">
+        <div className={styles.formCard}>
+          <p style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: '1rem' }}>
+            One PayPal account is allowed per user. To add a payment method, request a withdrawal — your PayPal email is saved when your first withdrawal is submitted.
+          </p>
+
+          {savedAcctLoading ? (
+            <Skeleton height={56} />
+          ) : savedAcct ? (
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, background: 'var(--surface)', border: '1.5px solid var(--border)', borderRadius: 10, padding: '0.75rem 0.9rem' }}>
+                <span style={{ width: 10, height: 10, borderRadius: '50%', background: '#003087', display: 'inline-block' }} />
+                <div style={{ flex: 1 }}>
+                  <p style={{ margin: 0, fontSize: 12, color: 'var(--text-muted)' }}>PayPal</p>
+                  <p style={{ margin: 0, fontSize: 14, color: 'var(--text)', wordBreak: 'break-all' }}>{savedAcct}</p>
+                </div>
+                <span style={{ fontSize: 11, fontWeight: 700, color: '#22c55e', background: 'rgba(34,197,94,0.1)', padding: '2px 8px', borderRadius: 20, whiteSpace: 'nowrap' }}>Saved</span>
+              </div>
+              <button
+                type="button"
+                disabled={removingAcct}
+                onClick={removeSavedAcct}
+                style={{
+                  marginTop: 12, width: '100%',
+                  background: 'transparent', border: '1px solid var(--red)',
+                  color: 'var(--red)', borderRadius: 10, padding: '0.6rem 1rem',
+                  fontSize: 13, fontWeight: 600,
+                  cursor: removingAcct ? 'not-allowed' : 'pointer',
+                  opacity: removingAcct ? 0.6 : 1,
+                }}
+              >
+                {removingAcct ? 'Removing…' : 'Remove Payment Method'}
+              </button>
+            </div>
+          ) : (
+            <div style={{ textAlign: 'center', padding: '1.5rem 0.5rem', color: 'var(--text-muted)' }}>
+              <CardIcon />
+              <p style={{ marginTop: 10, fontSize: 14 }}>No payment method on file.</p>
+              <button
+                type="button"
+                onClick={() => navigate('/withdraw?view=form')}
+                className="btn-primary"
+                style={{ marginTop: 12, fontSize: 13, padding: '0.55rem 1.1rem', borderRadius: 10 }}
+              >
+                Set up via Withdraw
+              </button>
+            </div>
+          )}
+
+          {savedAcctMsg && <p style={{ marginTop: 12, fontSize: 12, color: '#22c55e' }}>{savedAcctMsg}</p>}
+          {savedAcctErr && <p style={{ marginTop: 12, fontSize: 12, color: 'var(--red)' }}>{savedAcctErr}</p>}
+        </div>
+      </SubView>
+    </div>
+  );
+
   /* ── Notifications view ───────────────────────────────────────────────────── */
   if (view === 'notifications') return (
     <div className="page-container">
@@ -703,6 +792,11 @@ export default function AccountSettings() {
         {/* Account section */}
         <p className={styles.sectionLabel}>Account</p>
         <div className={styles.settingsCard}>
+          <div className={styles.settingRow} onClick={() => { setView('payment-methods'); loadSavedAcct(); }}>
+            <span className={styles.settingIcon}><CardIcon /></span>
+            <span className={styles.settingLabel}>Payment Methods</span>
+            <span className={styles.chevron}><ChevronRight /></span>
+          </div>
           <div className={styles.settingRow} onClick={() => setView('notifications')}>
             <span className={styles.settingIcon}><BellIcon /></span>
             <span className={styles.settingLabel}>Notification Preferences</span>
