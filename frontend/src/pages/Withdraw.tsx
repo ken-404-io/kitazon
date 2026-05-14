@@ -63,6 +63,7 @@ export default function Withdraw() {
   const [otpErr,      setOtpErr]      = useState('');
   const [otpLoad,     setOtpLoad]     = useState(false);
   const [acctTouched, setAcctTouched] = useState(false);
+  const [removingAcct, setRemovingAcct] = useState(false);
 
   const loadData = () => {
     api.get<UserStats>('/auth/me/stats').then(r => setStats(r.data)).catch(() => {});
@@ -402,10 +403,44 @@ export default function Withdraw() {
             <div className={styles.sectionCard}>
               <h4>PayPal Email Address</h4>
               {savedAcct ? (
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10, background: 'var(--surface)', border: '1.5px solid var(--border)', borderRadius: 10, padding: '0.65rem 0.9rem' }}>
-                  <LockIcon />
-                  <span style={{ flex: 1, fontSize: '0.9rem', color: 'var(--text)' }}>{savedAcct}</span>
-                  <span style={{ fontSize: '0.7rem', fontWeight: 700, color: '#22c55e', background: 'rgba(34,197,94,0.1)', padding: '2px 8px', borderRadius: 20 }}>Saved</span>
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, background: 'var(--surface)', border: '1.5px solid var(--border)', borderRadius: 10, padding: '0.65rem 0.9rem' }}>
+                    <LockIcon />
+                    <span style={{ flex: 1, fontSize: '0.9rem', color: 'var(--text)' }}>{savedAcct}</span>
+                    <span style={{ fontSize: '0.7rem', fontWeight: 700, color: '#22c55e', background: 'rgba(34,197,94,0.1)', padding: '2px 8px', borderRadius: 20 }}>Saved</span>
+                  </div>
+                  <button
+                    type="button"
+                    disabled={removingAcct}
+                    onClick={async () => {
+                      if (!window.confirm('Remove this saved PayPal account? You\'ll be able to enter a different PayPal email on your next withdrawal.')) return;
+                      setRemovingAcct(true);
+                      try {
+                        await api.delete('/withdrawals/saved-account');
+                        setSavedAcct(null);
+                        setAccount('');
+                        setAcctTouched(false);
+                        showToast('Payment method removed.', 'success');
+                      } catch (err: unknown) {
+                        showToast((err as { response?: { data?: { message?: string } } }).response?.data?.message ?? 'Failed to remove payment method.', 'error');
+                      } finally {
+                        setRemovingAcct(false);
+                      }
+                    }}
+                    style={{
+                      marginTop: 8,
+                      background: 'transparent',
+                      border: 'none',
+                      color: 'var(--red)',
+                      fontSize: '0.78rem',
+                      fontWeight: 600,
+                      cursor: removingAcct ? 'not-allowed' : 'pointer',
+                      opacity: removingAcct ? 0.6 : 1,
+                      padding: '4px 0',
+                    }}
+                  >
+                    {removingAcct ? 'Removing…' : 'Remove payment method'}
+                  </button>
                 </div>
               ) : (
                 <input

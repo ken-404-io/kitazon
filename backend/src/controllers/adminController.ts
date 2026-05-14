@@ -202,15 +202,27 @@ export async function triggerPayout(req: Request, res: Response, next: NextFunct
         emailSubject: 'You have a payout from Kitazon',
       });
 
-      // Record PayPal identifiers (savepoint-style fallback if columns are not migrated)
+      // PayPal accepted the payout request → mark the withdrawal completed immediately.
+      // If PayPal later flips the item to FAILED/DENIED/RETURNED/UNCLAIMED, the webhook
+      // handler will revert this withdrawal to 'failed' AND refund the user balance.
       try {
         await db('withdrawals').where({ id: withdrawalId }).update({
+          status: 'completed',
           paypal_batch_id: result.batchId,
           paypal_payout_item_id: result.payoutItemId ?? null,
           payout_attempted_at: new Date(),
         });
       } catch {
-        // Columns not yet migrated — status was already set to 'processing'.
+        // Columns from migration 020 not yet applied — at least update the status.
+        await db('withdrawals').where({ id: withdrawalId }).update({ status: 'completed' });
+      }
+
+      // Notify the user that their withdrawal is completed (fire-and-forget)
+      if (owner) {
+        sendWithdrawalStatusEmail(
+          owner.email, owner.name, 'completed',
+          Number(withdrawal.amount), withdrawal.channel, Number(withdrawal.net_amount)
+        ).catch(() => {});
       }
 
       await logAudit(req.user!.id, 'admin_trigger_payout', req, {
@@ -224,8 +236,8 @@ export async function triggerPayout(req: Request, res: Response, next: NextFunct
       });
 
       res.json({
-        message: 'Payout initiated.',
-        status: 'processing',
+        message: 'Payout sent successfully.',
+        status: 'completed',
         paypal_batch_id: result.batchId,
         paypal_payout_item_id: result.payoutItemId,
         batch_status: result.batchStatus,
