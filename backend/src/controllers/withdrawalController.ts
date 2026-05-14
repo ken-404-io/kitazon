@@ -209,11 +209,30 @@ export async function create(req: Request, res: Response, next: NextFunction): P
       return;
     }
 
-    // PayPal account uniqueness: one PayPal per user, not shared across accounts
-    const takenBy = await db('withdrawals')
-      .where('account_number', account_number.trim().toLowerCase())
-      .whereNot({ user_id: req.user!.id })
-      .first();
+    // PayPal account uniqueness: one PayPal per user, not shared across accounts.
+    // BUT: if the conflicting owner has removed their saved payment method
+    // (payment_method_cleared_at IS set and >= the conflicting withdrawal's date),
+    // the email is considered free again and we ignore that row.
+    let takenBy: { id: number } | undefined;
+    try {
+      takenBy = await db('withdrawals as w')
+        .leftJoin('users as u', 'w.user_id', 'u.id')
+        .where('w.account_number', account_number.trim().toLowerCase())
+        .whereNot({ 'w.user_id': req.user!.id })
+        .where((b) => {
+          b.whereNull('u.payment_method_cleared_at')
+           .orWhereRaw('u.payment_method_cleared_at < w.created_at');
+        })
+        .select('w.id')
+        .first();
+    } catch {
+      // payment_method_cleared_at column not migrated — fall back to the strict check
+      takenBy = await db('withdrawals')
+        .where('account_number', account_number.trim().toLowerCase())
+        .whereNot({ user_id: req.user!.id })
+        .select('id')
+        .first();
+    }
     if (takenBy) {
       res.status(409).json({ message: 'This PayPal account is already registered to another account. Each PayPal address can only be linked to one Kitazon account.' });
       return;

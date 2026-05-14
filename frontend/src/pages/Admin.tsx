@@ -136,6 +136,8 @@ export default function Admin() {
   const [wPages, setWPages] = useState(1);
   const [wFilter, setWFilter] = useState('');
   const [wLoading, setWLoading] = useState(false);
+  const [selectedW, setSelectedW] = useState<Set<number>>(new Set());
+  const [batchBusy, setBatchBusy] = useState(false);
 
   // Tasks
   const [tasks, setTasks] = useState<AdminTask[]>([]);
@@ -335,6 +337,54 @@ export default function Admin() {
   const updateWStatus = async (id: number, status: string) => {
     await api.patch(`/admin/withdrawals/${id}/status`, { status });
     loadWithdrawals(wPage, wFilter);
+  };
+
+  const selectablePaypalPending = withdrawals.filter(w => w.channel === 'paypal' && w.status === 'pending');
+  const toggleSelectW = (id: number) => {
+    setSelectedW(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+  const toggleSelectAllVisible = () => {
+    setSelectedW(prev => {
+      const allIds = selectablePaypalPending.map(w => w.id);
+      const allSelected = allIds.length > 0 && allIds.every(id => prev.has(id));
+      if (allSelected) {
+        const next = new Set(prev);
+        allIds.forEach(id => next.delete(id));
+        return next;
+      }
+      const next = new Set(prev);
+      allIds.forEach(id => next.add(id));
+      return next;
+    });
+  };
+  const selectedRows = withdrawals.filter(w => selectedW.has(w.id) && w.channel === 'paypal' && w.status === 'pending');
+  const selectedTotal = selectedRows.reduce((s, w) => s + Number(w.net_amount), 0);
+
+  const triggerBatchPayout = async () => {
+    if (selectedRows.length === 0) return;
+    if (!window.confirm(`Send ${selectedRows.length} PayPal payout${selectedRows.length === 1 ? '' : 's'} in a single batch (₱${selectedTotal.toFixed(2)} total)? This transfers real funds.`)) return;
+    setBatchBusy(true);
+    try {
+      const res = await api.post<{ message: string; paid_count: number; paypal_batch_id?: string; skipped_ids?: number[] }>(
+        '/admin/withdrawals/payout-batch',
+        { withdrawal_ids: selectedRows.map(w => w.id) },
+      );
+      const skippedNote = res.data.skipped_ids && res.data.skipped_ids.length > 0 ? ` · ${res.data.skipped_ids.length} skipped` : '';
+      setToast(`Batch sent — ${res.data.paid_count} paid${skippedNote}. Batch: ${res.data.paypal_batch_id ?? '—'}`);
+      setTimeout(() => setToast(''), 5000);
+      setSelectedW(new Set());
+      loadWithdrawals(wPage, wFilter);
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { message?: string } } }).response?.data?.message ?? 'Batch payout failed.';
+      setToast(msg);
+      setTimeout(() => setToast(''), 5000);
+    } finally {
+      setBatchBusy(false);
+    }
   };
 
   const [payoutBusyId, setPayoutBusyId] = useState<number | null>(null);
@@ -608,7 +658,7 @@ export default function Admin() {
             <label style={{ fontSize: 13 }}>Filter by status:</label>
             <select
               value={wFilter}
-              onChange={e => { setWFilter(e.target.value); setWPage(1); }}
+              onChange={e => { setWFilter(e.target.value); setWPage(1); setSelectedW(new Set()); }}
               style={{ padding: '6px 10px', borderRadius: 6, border: '1px solid #e5e7eb' }}
             >
               <option value="">All</option>
@@ -618,19 +668,73 @@ export default function Admin() {
               <option value="failed">Failed</option>
             </select>
           </div>
+
+          {/* Batch payout action bar */}
+          <div style={{
+            display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap',
+            marginBottom: '1rem', padding: '10px 14px',
+            background: selectedRows.length > 0 ? 'rgba(245,158,11,0.08)' : '#f9fafb',
+            border: `1px solid ${selectedRows.length > 0 ? 'var(--gold, #f59e0b)' : '#e5e7eb'}`,
+            borderRadius: 8,
+          }}>
+            <span style={{ fontSize: 13, fontWeight: 600 }}>
+              {selectedRows.length > 0
+                ? `${selectedRows.length} selected · ₱${selectedTotal.toFixed(2)} total`
+                : 'Select pending PayPal withdrawals to pay out in a single batch (max 500 per batch)'}
+            </span>
+            <span style={{ flex: 1 }} />
+            <button
+              className="btn-outline"
+              disabled={selectablePaypalPending.length === 0 || batchBusy}
+              onClick={toggleSelectAllVisible}
+              style={{ fontSize: 12, padding: '4px 10px' }}
+            >
+              {selectablePaypalPending.length > 0 && selectablePaypalPending.every(w => selectedW.has(w.id))
+                ? 'Deselect all visible'
+                : 'Select all pending PayPal'}
+            </button>
+            <button
+              className="btn-primary"
+              disabled={selectedRows.length === 0 || batchBusy}
+              onClick={triggerBatchPayout}
+              style={{ fontSize: 12, padding: '6px 14px', whiteSpace: 'nowrap' }}
+            >
+              {batchBusy ? 'Sending…' : `Pay Selected (${selectedRows.length})`}
+            </button>
+          </div>
           {wLoading ? <p>Loading...</p> : (
             <div style={{ overflowX: 'auto' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
                 <thead>
                   <tr style={{ borderBottom: '2px solid #e5e7eb', background: '#f9fafb' }}>
+                    <th style={{ padding: '8px 10px', textAlign: 'left' }}>
+                      <input
+                        type="checkbox"
+                        disabled={selectablePaypalPending.length === 0}
+                        checked={selectablePaypalPending.length > 0 && selectablePaypalPending.every(w => selectedW.has(w.id))}
+                        onChange={toggleSelectAllVisible}
+                        aria-label="Select all visible pending PayPal"
+                      />
+                    </th>
                     {['ID', 'User', 'Amount', 'Net', 'Channel', 'Account', 'Status', 'Date', 'Update Status', 'Auto Payout'].map(h => (
                       <th key={h} style={{ padding: '8px 10px', textAlign: 'left', whiteSpace: 'nowrap' }}>{h}</th>
                     ))}
                   </tr>
                 </thead>
                 <tbody>
-                  {withdrawals.map(w => (
-                    <tr key={w.id} style={{ borderBottom: '1px solid #f3f4f6' }}>
+                  {withdrawals.map(w => {
+                    const selectable = w.channel === 'paypal' && w.status === 'pending';
+                    return (
+                    <tr key={w.id} style={{ borderBottom: '1px solid #f3f4f6', background: selectedW.has(w.id) ? 'rgba(245,158,11,0.06)' : undefined }}>
+                      <td style={{ padding: '8px 10px' }}>
+                        <input
+                          type="checkbox"
+                          disabled={!selectable}
+                          checked={selectedW.has(w.id)}
+                          onChange={() => toggleSelectW(w.id)}
+                          aria-label={`Select withdrawal ${w.id}`}
+                        />
+                      </td>
                       <td style={{ padding: '8px 10px' }}>{w.id}</td>
                       <td style={{ padding: '8px 10px' }}>
                         <div>{w.user_name}</div>
@@ -675,7 +779,8 @@ export default function Admin() {
                         )}
                       </td>
                     </tr>
-                  ))}
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
