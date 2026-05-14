@@ -8,20 +8,41 @@ import { logAudit } from '../services/audit';
 
 const VALID_CHANNELS: WithdrawalChannel[] = ['paypal'];
 const ACCOUNT_PATTERN = /^[a-zA-Z0-9@.\-\s]{5,60}$/;
+const QUIZ_GATE_REQUIRED = 20;
+
+// Count correct quiz answers since the user's most recent withdrawal (any status).
+// First-ever withdrawal counts all-time correct quiz answers.
+async function countQuizzesSinceLastWithdrawal(userId: number): Promise<number> {
+  const lastWithdrawal = await db('withdrawals')
+    .where({ user_id: userId })
+    .orderBy('created_at', 'desc')
+    .select('created_at')
+    .first();
+
+  let q = db('earnings').where({ user_id: userId, type: 'quiz' });
+  if (lastWithdrawal) q = q.where('created_at', '>', lastWithdrawal.created_at);
+  const row = await q.count('id as n').first();
+  return Number((row as { n?: unknown } | undefined)?.n ?? 0);
+}
 
 // ─── Shared eligibility helper ────────────────────────────────────────────────
 async function getWithdrawalEligibility(userId: number, user: DbUser) {
   const prevWithdrawal = await db('withdrawals').where({ user_id: userId }).first();
   const isFirstWithdrawal = !prevWithdrawal;
 
+  const quizzesCompleted = await countQuizzesSinceLastWithdrawal(userId);
+
   const reasons: string[] = [];
   if (!user.email_verified) reasons.push('email_not_verified');
+  if (quizzesCompleted < QUIZ_GATE_REQUIRED) reasons.push('quiz_gate_not_met');
 
   return {
     eligible: reasons.length === 0,
     email_verified: user.email_verified,
     is_first_withdrawal: isFirstWithdrawal,
     withdrawal_credits: Number(user.withdrawal_credits ?? 0),
+    quizzes_completed: quizzesCompleted,
+    quizzes_required: QUIZ_GATE_REQUIRED,
     reasons,
   };
 }
@@ -128,6 +149,15 @@ export async function requestOtp(req: Request, res: Response, next: NextFunction
 
     const elig = await getWithdrawalEligibility(user.id, user);
     if (!elig.eligible) {
+      if (elig.reasons.includes('quiz_gate_not_met')) {
+        res.status(403).json({
+          message: `Answer ${elig.quizzes_required} math quiz questions before requesting a withdrawal. You have completed ${elig.quizzes_completed}/${elig.quizzes_required}.`,
+          reason: 'quiz_gate_not_met',
+          quizzes_completed: elig.quizzes_completed,
+          quizzes_required: elig.quizzes_required,
+        });
+        return;
+      }
       res.status(403).json({ message: 'Please verify your email before making withdrawals.' });
       return;
     }
@@ -221,6 +251,15 @@ export async function create(req: Request, res: Response, next: NextFunction): P
 
     const elig = await getWithdrawalEligibility(user.id, user);
     if (!elig.eligible) {
+      if (elig.reasons.includes('quiz_gate_not_met')) {
+        res.status(403).json({
+          message: `Answer ${elig.quizzes_required} math quiz questions before requesting a withdrawal. You have completed ${elig.quizzes_completed}/${elig.quizzes_required}.`,
+          reason: 'quiz_gate_not_met',
+          quizzes_completed: elig.quizzes_completed,
+          quizzes_required: elig.quizzes_required,
+        });
+        return;
+      }
       res.status(403).json({ message: 'Please verify your email before making withdrawals.' });
       return;
     }
