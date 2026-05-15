@@ -229,7 +229,7 @@ export default function Withdraw() {
               {/* Math-quiz gate */}
               {elig.quizzes_required !== undefined && (() => {
                 const done = (elig.quizzes_completed ?? 0);
-                const need = elig.quizzes_required ?? 20;
+                const need = elig.quizzes_required ?? 30;
                 const met = done >= need;
                 return (
                   <div className={`${styles.reqRow} ${met ? styles.reqDone : styles.reqPending}`}>
