@@ -92,7 +92,7 @@ export async function listWithdrawals(req: Request, res: Response, next: NextFun
       .join('users as u', 'w.user_id', 'u.id')
       .select(
         'w.id', 'w.amount', 'w.fee', 'w.net_amount', 'w.channel',
-        'w.account_number', 'w.account_name', 'w.status', 'w.created_at',
+        'w.account_number', 'w.status', 'w.created_at',
         'u.id as user_id', 'u.name as user_name', 'u.email as user_email'
       )
       .orderBy('w.created_at', 'desc')
