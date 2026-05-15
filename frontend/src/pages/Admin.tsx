@@ -828,12 +828,15 @@ export default function Admin() {
                       <td style={{ padding: '8px 10px', textAlign: 'center' }}>
                         <span style={{
                           display: 'inline-block',
-                          padding: '2px 10px',
+                          minWidth: 28,
+                          padding: '3px 10px',
                           borderRadius: 12,
                           fontWeight: 700,
                           fontSize: 13,
-                          background: w.daily_completed_count === 0 ? '#374151' : w.daily_completed_count >= 3 ? '#7f1d1d' : '#14532d',
-                          color: w.daily_completed_count === 0 ? '#9ca3af' : w.daily_completed_count >= 3 ? '#fca5a5' : '#86efac',
+                          textAlign: 'center',
+                          backgroundColor: w.daily_completed_count === 0 ? '#1f2937' : w.daily_completed_count >= 3 ? '#7f1d1d' : '#14532d',
+                          color: w.daily_completed_count === 0 ? '#d1d5db' : w.daily_completed_count >= 3 ? '#fca5a5' : '#86efac',
+                          border: `1px solid ${w.daily_completed_count === 0 ? '#374151' : w.daily_completed_count >= 3 ? '#991b1b' : '#166534'}`,
                         }}>
                           {w.daily_completed_count}
                         </span>
