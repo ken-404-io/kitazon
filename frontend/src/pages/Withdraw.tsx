@@ -42,6 +42,7 @@ interface Eligibility {
   withdrawal_credits: number;
   quizzes_completed?: number;
   quizzes_required?: number;
+  quiz_gate_frozen?: boolean;
   reasons: string[];
 }
 
@@ -228,16 +229,19 @@ export default function Withdraw() {
 
               {/* Math-quiz gate */}
               {elig.quizzes_required !== undefined && (() => {
-                const done = (elig.quizzes_completed ?? 0);
-                const need = elig.quizzes_required ?? 30;
-                const met = done >= need;
+                const frozen = elig.quiz_gate_frozen ?? false;
+                const done   = elig.quizzes_completed ?? 0;
+                const need   = elig.quizzes_required ?? 30;
+                const met    = !frozen && done >= need;
                 return (
                   <div className={`${styles.reqRow} ${met ? styles.reqDone : styles.reqPending}`}>
                     <span className={styles.reqIcon}>{met ? <CheckIcon /> : <span className={styles.reqNum}>3</span>}</span>
                     <div className={styles.reqText}>
                       <span>Answer {need} math quiz questions</span>
                       <span className={styles.reqSub}>
-                        {done}/{need} answered {elig.is_first_withdrawal ? 'so far' : 'since your last withdrawal'} · each correct answer = ₱3
+                        {frozen
+                          ? 'Quiz gate starts after your pending withdrawal is completed · each correct answer = ₱3'
+                          : `${done}/${need} answered since your last completed withdrawal · each correct answer = ₱3`}
                       </span>
                     </div>
                     {met
