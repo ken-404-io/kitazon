@@ -6,7 +6,7 @@ import { useToast } from '../context/ToastContext';
 import EarningsChart from '../components/dashboard/EarningsChart';
 import { Skeleton } from '../components/ui/Skeleton';
 import api from '../services/api';
-import { sanitizeInput, isValidEmail } from '../utils/sanitize';
+import { sanitizeInput } from '../utils/sanitize';
 import { UserStats, Withdrawal, WithdrawalStatus, UserPlan } from '../types';
 import styles from './Withdraw.module.css';
 
@@ -88,9 +88,13 @@ export default function Withdraw() {
   // Free plan: fixed ₱5. VIP plans: chosen preset (default to dailyLimit).
   const amount = plan === 'free' ? 5 : (preset ?? planCfg.dailyLimit);
 
+  // Philippine mobile: 11 digits starting with 09 (e.g. 09171234567)
+  // Also accept +63 prefix.
   const validateAccount = (val: string): string | null => {
-    if (!val.trim()) return 'PayPal email address is required.';
-    if (!isValidEmail(val.trim())) return 'Enter a valid PayPal email address.';
+    const digits = val.replace(/[^\d+]/g, '');
+    const normalized = digits.startsWith('+63') && digits.length === 13 ? '0' + digits.slice(3) : digits;
+    if (!normalized) return 'GCash mobile number is required.';
+    if (!/^09\d{9}$/.test(normalized)) return 'Enter a valid GCash number (11 digits starting with 09).';
     return null;
   };
 
@@ -130,7 +134,7 @@ export default function Withdraw() {
     setOtpErr('');
     setOtpLoad(true);
     try {
-      await api.post('/withdrawals', { amount: String(amount), channel: 'paypal', account_number: sanitizeInput(account), otp });
+      await api.post('/withdrawals', { amount: String(amount), channel: 'gcash', account_number: sanitizeInput(account), otp });
       setShowOtp(false);
       setPreset(null); setAccount(''); setOtp('');
       setView('overview');
@@ -329,7 +333,7 @@ export default function Withdraw() {
               {history.slice(0, 3).map(w => (
                 <div key={w.id} className={styles.historyRow}>
                   <div className={styles.historyLeft}>
-                    <p className={styles.historyChannel}>PayPal</p>
+                    <p className={styles.historyChannel}>GCash</p>
                     <p className={styles.historyAccount}>{w.account_number}</p>
                     <p className={styles.historyTime}>{new Date(w.created_at).toLocaleString('en-PH')}</p>
                   </div>
@@ -363,7 +367,7 @@ export default function Withdraw() {
             {history.map(w => (
               <div key={w.id} className={styles.historyRow}>
                 <div className={styles.historyLeft}>
-                  <p className={styles.historyChannel}>PayPal</p>
+                  <p className={styles.historyChannel}>GCash</p>
                   <p className={styles.historyAccount}>{w.account_number}</p>
                   <p className={styles.historyTime}>{new Date(w.created_at).toLocaleString('en-PH')}</p>
                 </div>
@@ -412,19 +416,19 @@ export default function Withdraw() {
         {emailOk ? (
           <form onSubmit={requestOtp}>
 
-            {/* Payment method — PayPal only */}
+            {/* Payment method — GCash only */}
             <div className={styles.sectionCard}>
               <h4>Payment Method</h4>
               <div className={styles.paypalBadge}>
-                <span className={styles.channelDotFilled} style={{ width: 10, height: 10, borderRadius: '50%', background: '#003087', display: 'inline-block' }} />
-                <span style={{ fontWeight: 700 }}>PayPal</span>
+                <span className={styles.channelDotFilled} style={{ width: 10, height: 10, borderRadius: '50%', background: '#0070e0', display: 'inline-block' }} />
+                <span style={{ fontWeight: 700 }}>GCash</span>
                 <span className={styles.channelSub} style={{ display: 'inline', marginLeft: 6 }}>1–24 hrs</span>
               </div>
             </div>
 
-            {/* PayPal email */}
+            {/* GCash mobile number */}
             <div className={styles.sectionCard}>
-              <h4>PayPal Email Address</h4>
+              <h4>GCash Mobile Number</h4>
               {savedAcct ? (
                 <div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10, background: 'var(--surface)', border: '1.5px solid var(--border)', borderRadius: 10, padding: '0.65rem 0.9rem' }}>
@@ -436,7 +440,7 @@ export default function Withdraw() {
                     type="button"
                     disabled={removingAcct}
                     onClick={async () => {
-                      if (!window.confirm('Remove this saved PayPal account? You\'ll be able to enter a different PayPal email on your next withdrawal.')) return;
+                      if (!window.confirm('Remove this saved GCash number? You\'ll be able to register a different GCash number on your next withdrawal.')) return;
                       setRemovingAcct(true);
                       try {
                         await api.delete('/withdrawals/saved-account');
@@ -467,21 +471,22 @@ export default function Withdraw() {
                 </div>
               ) : (
                 <input
-                  type="email"
+                  type="tel"
+                  inputMode="tel"
                   value={account}
                   onChange={e => { setAccount(e.target.value); setAcctTouched(false); }}
                   onBlur={() => setAcctTouched(true)}
                   className={acctTouched ? (acctErr ? 'field-invalid' : 'field-valid') : ''}
-                  placeholder="yourname@email.com"
-                  maxLength={80}
-                  autoComplete="email"
+                  placeholder="09171234567"
+                  maxLength={13}
+                  autoComplete="tel"
                   required
                 />
               )}
               {acctErr && !savedAcct && <p className="field-hint hint-invalid">{acctErr}</p>}
               {!savedAcct && (
                 <p style={{ fontSize: '0.71rem', color: 'var(--text-muted)', marginTop: 6 }}>
-                  ⚠️ Once used, this PayPal account will be permanently linked to your profile.
+                  ⚠️ Once used, this GCash number will be permanently linked to your profile.
                 </p>
               )}
             </div>
@@ -549,7 +554,7 @@ export default function Withdraw() {
         <div className={styles.modalOverlay} onClick={() => setShowOtp(false)}>
           <div className={styles.modalSheet} onClick={e => e.stopPropagation()}>
             <p className={styles.modalTitle}>Confirm Withdrawal</p>
-            <p className={styles.modalSub}>Enter the 6-digit OTP sent to your email to confirm ₱{amount} via PayPal.</p>
+            <p className={styles.modalSub}>Enter the 6-digit OTP sent to your email to confirm ₱{amount} via GCash.</p>
             <div className="form-group">
               <label>OTP Code</label>
               <input

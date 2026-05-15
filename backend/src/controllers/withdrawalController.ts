@@ -6,9 +6,17 @@ import { createOtp } from '../services/otp';
 import { sendWithdrawalOtp, sendWithdrawalSubmittedEmail, sendSuspiciousWithdrawalEmail } from '../services/email';
 import { logAudit } from '../services/audit';
 
-const VALID_CHANNELS: WithdrawalChannel[] = ['paypal'];
-const ACCOUNT_PATTERN = /^[a-zA-Z0-9@.\-\s]{5,60}$/;
+const VALID_CHANNELS: WithdrawalChannel[] = ['gcash'];
+// Philippine mobile number: 11 digits starting with 09 (e.g. 09171234567)
+// Also accept +63 prefix form (e.g. +639171234567)
+const ACCOUNT_PATTERN = /^(09\d{9}|\+639\d{9})$/;
 const QUIZ_GATE_REQUIRED = 20;
+
+function normalizeGcashNumber(raw: string): string {
+  const digits = raw.replace(/[^\d+]/g, '');
+  if (digits.startsWith('+63') && digits.length === 13) return '0' + digits.slice(3);
+  return digits;
+}
 
 // Count correct quiz answers since the user's most recent withdrawal (any status).
 // First-ever withdrawal counts all-time correct quiz answers.
@@ -127,7 +135,7 @@ export async function clearPaymentMethod(req: Request, res: Response, next: Next
     }
 
     await logAudit(req.user!.id, 'payment_method_cleared', req, {});
-    res.json({ message: 'Payment method removed. You can register a new PayPal account on your next withdrawal.' });
+    res.json({ message: 'Payment method removed. You can register a new GCash number on your next withdrawal.' });
   } catch (err) { next(err); }
 }
 
@@ -200,8 +208,9 @@ export async function create(req: Request, res: Response, next: NextFunction): P
       res.status(400).json({ message: 'Invalid payment channel.' });
       return;
     }
-    if (!account_number || !ACCOUNT_PATTERN.test(account_number)) {
-      res.status(400).json({ message: 'Invalid account number format.' });
+    const normalizedAccount = account_number ? normalizeGcashNumber(account_number) : '';
+    if (!normalizedAccount || !ACCOUNT_PATTERN.test(normalizedAccount)) {
+      res.status(400).json({ message: 'Invalid GCash mobile number. Use 11 digits starting with 09 (e.g. 09171234567).' });
       return;
     }
     if (!otp || typeof otp !== 'string' || !/^\d{6}$/.test(otp.trim())) {
@@ -209,7 +218,7 @@ export async function create(req: Request, res: Response, next: NextFunction): P
       return;
     }
 
-    // PayPal account uniqueness: one PayPal per user, not shared across accounts.
+    // GCash account uniqueness: one GCash per user, not shared across accounts.
     // BUT: if the conflicting owner has removed their saved payment method
     // (payment_method_cleared_at IS set and >= the conflicting withdrawal's date),
     // the email is considered free again and we ignore that row.
@@ -217,7 +226,7 @@ export async function create(req: Request, res: Response, next: NextFunction): P
     try {
       takenBy = await db('withdrawals as w')
         .leftJoin('users as u', 'w.user_id', 'u.id')
-        .where('w.account_number', account_number.trim().toLowerCase())
+        .where('w.account_number', normalizedAccount)
         .whereNot({ 'w.user_id': req.user!.id })
         .where((b) => {
           b.whereNull('u.payment_method_cleared_at')
@@ -228,17 +237,17 @@ export async function create(req: Request, res: Response, next: NextFunction): P
     } catch {
       // payment_method_cleared_at column not migrated — fall back to the strict check
       takenBy = await db('withdrawals')
-        .where('account_number', account_number.trim().toLowerCase())
+        .where('account_number', normalizedAccount)
         .whereNot({ user_id: req.user!.id })
         .select('id')
         .first();
     }
     if (takenBy) {
-      res.status(409).json({ message: 'This PayPal account is already registered to another account. Each PayPal address can only be linked to one Kitazon account.' });
+      res.status(409).json({ message: 'This GCash number is already registered to another account. Each GCash number can only be linked to one Kitazon account.' });
       return;
     }
 
-    // Also block if this user's own previous PayPal doesn't match (enforce 1 PayPal per user).
+    // Also block if this user's own previous GCash number doesn't match (enforce 1 GCash per user).
     // Withdrawals from before payment_method_cleared_at are ignored — the user explicitly
     // removed their saved method and is starting fresh.
     let clearedAt: Date | null = null;
@@ -249,13 +258,13 @@ export async function create(req: Request, res: Response, next: NextFunction): P
 
     let ownPreviousQuery = db('withdrawals')
       .where({ user_id: req.user!.id })
-      .whereNot('account_number', account_number.trim().toLowerCase());
+      .whereNot('account_number', normalizedAccount);
     if (clearedAt) ownPreviousQuery = ownPreviousQuery.where('created_at', '>', clearedAt);
     const ownPrevious = await ownPreviousQuery.first();
     if (ownPrevious) {
       res.status(409).json({
-        message: `You have already linked PayPal account "${maskAccount(ownPrevious.account_number)}" to your Kitazon account. Only one PayPal account is allowed per user.`,
-        reason: 'paypal_locked',
+        message: `You have already linked GCash number "${maskAccount(ownPrevious.account_number)}" to your Kitazon account. Only one GCash number is allowed per user.`,
+        reason: 'gcash_locked',
         saved_account: ownPrevious.account_number,
       });
       return;
@@ -403,7 +412,7 @@ export async function create(req: Request, res: Response, next: NextFunction): P
       try {
         await trx('withdrawals').insert({
           user_id: req.user!.id, amount: parsed, fee, net_amount: netAmount,
-          channel, account_number, status: 'pending',
+          channel, account_number: normalizedAccount, status: 'pending',
           ip_address: ip || null,
           is_flagged: isSuspicious,
           is_first_withdrawal: elig.is_first_withdrawal,
@@ -414,7 +423,7 @@ export async function create(req: Request, res: Response, next: NextFunction): P
         await trx.raw('ROLLBACK TO SAVEPOINT sp_withdrawal');
         await trx('withdrawals').insert({
           user_id: req.user!.id, amount: parsed, fee, net_amount: netAmount,
-          channel, account_number, status: 'pending',
+          channel, account_number: normalizedAccount, status: 'pending',
         });
       }
     });

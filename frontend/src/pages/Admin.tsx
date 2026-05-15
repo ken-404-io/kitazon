@@ -335,11 +335,24 @@ export default function Admin() {
   };
 
   const updateWStatus = async (id: number, status: string) => {
-    await api.patch(`/admin/withdrawals/${id}/status`, { status });
+    // When approving (completed) or marking failed, give the admin a chance to
+    // attach a message that the user will see in their notification email.
+    let message: string | undefined;
+    if (status === 'completed' || status === 'failed') {
+      const prompted = window.prompt(
+        `Optional message to include in the user's ${status} notification email. Leave blank to skip.`,
+        ''
+      );
+      if (prompted === null) return; // admin cancelled
+      const trimmed = prompted.trim();
+      if (trimmed) message = trimmed.slice(0, 1000);
+    }
+    await api.patch(`/admin/withdrawals/${id}/status`, message ? { status, message } : { status });
     loadWithdrawals(wPage, wFilter);
   };
 
-  const selectablePaypalPending = withdrawals.filter(w => w.channel === 'paypal' && w.status === 'pending');
+  // Pending and processing rows are eligible for bulk approve.
+  const selectableApprovable = withdrawals.filter(w => w.status === 'pending' || w.status === 'processing');
   const toggleSelectW = (id: number) => {
     setSelectedW(prev => {
       const next = new Set(prev);
@@ -349,7 +362,7 @@ export default function Admin() {
   };
   const toggleSelectAllVisible = () => {
     setSelectedW(prev => {
-      const allIds = selectablePaypalPending.map(w => w.id);
+      const allIds = selectableApprovable.map(w => w.id);
       const allSelected = allIds.length > 0 && allIds.every(id => prev.has(id));
       if (allSelected) {
         const next = new Set(prev);
@@ -361,47 +374,42 @@ export default function Admin() {
       return next;
     });
   };
-  const selectedRows = withdrawals.filter(w => selectedW.has(w.id) && w.channel === 'paypal' && w.status === 'pending');
+  const selectedRows = withdrawals.filter(w => selectedW.has(w.id) && (w.status === 'pending' || w.status === 'processing'));
   const selectedTotal = selectedRows.reduce((s, w) => s + Number(w.net_amount), 0);
 
-  const triggerBatchPayout = async () => {
+  const [approveMessage, setApproveMessage] = useState('');
+
+  const triggerBulkApprove = async () => {
     if (selectedRows.length === 0) return;
-    if (!window.confirm(`Send ${selectedRows.length} PayPal payout${selectedRows.length === 1 ? '' : 's'} in a single batch (₱${selectedTotal.toFixed(2)} total)? This transfers real funds.`)) return;
+    const messagePreview = approveMessage.trim() ? `\n\nUser will see this message in their email:\n"${approveMessage.trim()}"` : '';
+    if (!window.confirm(
+      `Approve ${selectedRows.length} withdrawal${selectedRows.length === 1 ? '' : 's'} (₱${selectedTotal.toFixed(2)} total)?\n\n` +
+      `Each user will be notified by email. Sending is throttled to one email every 5 seconds.${messagePreview}`
+    )) return;
     setBatchBusy(true);
     try {
-      const res = await api.post<{ message: string; paid_count: number; paypal_batch_id?: string; skipped_ids?: number[] }>(
-        '/admin/withdrawals/payout-batch',
-        { withdrawal_ids: selectedRows.map(w => w.id) },
+      const res = await api.post<{ message: string; approved_count: number; approved_ids: number[]; skipped_ids?: number[] }>(
+        '/admin/withdrawals/bulk-approve',
+        {
+          withdrawal_ids: selectedRows.map(w => w.id),
+          message: approveMessage.trim() || undefined,
+        },
       );
       const skippedNote = res.data.skipped_ids && res.data.skipped_ids.length > 0 ? ` · ${res.data.skipped_ids.length} skipped` : '';
-      setToast(`Batch sent — ${res.data.paid_count} paid${skippedNote}. Batch: ${res.data.paypal_batch_id ?? '—'}`);
-      setTimeout(() => setToast(''), 5000);
+      const emailNote = res.data.approved_count > 0
+        ? ` · emails sending over ~${Math.max(0, res.data.approved_count - 1) * 5}s`
+        : '';
+      setToast(`Approved ${res.data.approved_count}${skippedNote}.${emailNote}`);
+      setTimeout(() => setToast(''), 6000);
       setSelectedW(new Set());
+      setApproveMessage('');
       loadWithdrawals(wPage, wFilter);
     } catch (err: unknown) {
-      const msg = (err as { response?: { data?: { message?: string } } }).response?.data?.message ?? 'Batch payout failed.';
+      const msg = (err as { response?: { data?: { message?: string } } }).response?.data?.message ?? 'Bulk approve failed.';
       setToast(msg);
       setTimeout(() => setToast(''), 5000);
     } finally {
       setBatchBusy(false);
-    }
-  };
-
-  const [payoutBusyId, setPayoutBusyId] = useState<number | null>(null);
-  const triggerPayout = async (id: number) => {
-    if (!window.confirm('Send this PayPal payout now? This will transfer real funds to the user\'s PayPal account.')) return;
-    setPayoutBusyId(id);
-    try {
-      const res = await api.post<{ message: string; status?: string; paypal_batch_id?: string }>(`/admin/withdrawals/${id}/payout`);
-      setToast(`Payout sent — withdrawal marked ${res.data.status ?? 'completed'}. Batch: ${res.data.paypal_batch_id ?? '—'}`);
-      setTimeout(() => setToast(''), 4000);
-      loadWithdrawals(wPage, wFilter);
-    } catch (err: unknown) {
-      const msg = (err as { response?: { data?: { message?: string } } }).response?.data?.message ?? 'Payout failed.';
-      setToast(msg);
-      setTimeout(() => setToast(''), 5000);
-    } finally {
-      setPayoutBusyId(null);
     }
   };
 
@@ -669,38 +677,53 @@ export default function Admin() {
             </select>
           </div>
 
-          {/* Batch payout action bar */}
+          {/* Bulk approve action bar */}
           <div style={{
             display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap',
-            marginBottom: '1rem', padding: '10px 14px',
-            background: selectedRows.length > 0 ? 'rgba(245,158,11,0.08)' : '#f9fafb',
-            border: `1px solid ${selectedRows.length > 0 ? 'var(--gold, #f59e0b)' : '#e5e7eb'}`,
+            marginBottom: '0.5rem', padding: '10px 14px',
+            background: selectedRows.length > 0 ? 'rgba(34,197,94,0.08)' : '#f9fafb',
+            border: `1px solid ${selectedRows.length > 0 ? '#22c55e' : '#e5e7eb'}`,
             borderRadius: 8,
           }}>
             <span style={{ fontSize: 13, fontWeight: 600 }}>
               {selectedRows.length > 0
                 ? `${selectedRows.length} selected · ₱${selectedTotal.toFixed(2)} total`
-                : 'Select pending PayPal withdrawals to pay out in a single batch (max 500 per batch)'}
+                : 'Select pending/processing withdrawals to approve in bulk (max 100). User emails are throttled at 5s each.'}
             </span>
             <span style={{ flex: 1 }} />
             <button
               className="btn-outline"
-              disabled={selectablePaypalPending.length === 0 || batchBusy}
+              disabled={selectableApprovable.length === 0 || batchBusy}
               onClick={toggleSelectAllVisible}
               style={{ fontSize: 12, padding: '4px 10px' }}
             >
-              {selectablePaypalPending.length > 0 && selectablePaypalPending.every(w => selectedW.has(w.id))
+              {selectableApprovable.length > 0 && selectableApprovable.every(w => selectedW.has(w.id))
                 ? 'Deselect all visible'
-                : 'Select all pending PayPal'}
+                : 'Select all approvable'}
             </button>
             <button
               className="btn-primary"
               disabled={selectedRows.length === 0 || batchBusy}
-              onClick={triggerBatchPayout}
-              style={{ fontSize: 12, padding: '6px 14px', whiteSpace: 'nowrap' }}
+              onClick={triggerBulkApprove}
+              style={{ fontSize: 12, padding: '6px 14px', whiteSpace: 'nowrap', background: '#16a34a', borderColor: '#16a34a' }}
             >
-              {batchBusy ? 'Sending…' : `Pay Selected (${selectedRows.length})`}
+              {batchBusy ? 'Approving…' : `✓ Approve Selected (${selectedRows.length})`}
             </button>
+          </div>
+
+          {/* Optional message to include in the approval email */}
+          <div style={{ marginBottom: '1rem' }}>
+            <label style={{ fontSize: 12, fontWeight: 600, color: '#6b7280', display: 'block', marginBottom: 4 }}>
+              Optional message to include in the approval email ({approveMessage.length}/1000)
+            </label>
+            <textarea
+              value={approveMessage}
+              onChange={e => setApproveMessage(e.target.value.slice(0, 1000))}
+              placeholder="e.g. Your GCash transfer has been completed. Reference: ABC123."
+              rows={2}
+              style={{ width: '100%', padding: '8px 10px', borderRadius: 6, border: '1px solid #e5e7eb', fontSize: 13, resize: 'vertical', fontFamily: 'inherit' }}
+              disabled={batchBusy}
+            />
           </div>
           {wLoading ? <p>Loading...</p> : (
             <div style={{ overflowX: 'auto' }}>
@@ -710,22 +733,22 @@ export default function Admin() {
                     <th style={{ padding: '8px 10px', textAlign: 'left' }}>
                       <input
                         type="checkbox"
-                        disabled={selectablePaypalPending.length === 0}
-                        checked={selectablePaypalPending.length > 0 && selectablePaypalPending.every(w => selectedW.has(w.id))}
+                        disabled={selectableApprovable.length === 0}
+                        checked={selectableApprovable.length > 0 && selectableApprovable.every(w => selectedW.has(w.id))}
                         onChange={toggleSelectAllVisible}
-                        aria-label="Select all visible pending PayPal"
+                        aria-label="Select all approvable withdrawals"
                       />
                     </th>
-                    {['ID', 'User', 'Amount', 'Net', 'Channel', 'Account', 'Status', 'Date', 'Update Status', 'Auto Payout'].map(h => (
+                    {['ID', 'User', 'Amount', 'Net', 'Channel', 'Account', 'Status', 'Date', 'Update Status'].map(h => (
                       <th key={h} style={{ padding: '8px 10px', textAlign: 'left', whiteSpace: 'nowrap' }}>{h}</th>
                     ))}
                   </tr>
                 </thead>
                 <tbody>
                   {withdrawals.map(w => {
-                    const selectable = w.channel === 'paypal' && w.status === 'pending';
+                    const selectable = w.status === 'pending' || w.status === 'processing';
                     return (
-                    <tr key={w.id} style={{ borderBottom: '1px solid #f3f4f6', background: selectedW.has(w.id) ? 'rgba(245,158,11,0.06)' : undefined }}>
+                    <tr key={w.id} style={{ borderBottom: '1px solid #f3f4f6', background: selectedW.has(w.id) ? 'rgba(34,197,94,0.06)' : undefined }}>
                       <td style={{ padding: '8px 10px' }}>
                         <input
                           type="checkbox"
@@ -763,20 +786,6 @@ export default function Admin() {
                           <option value="completed">Completed</option>
                           <option value="failed">Failed</option>
                         </select>
-                      </td>
-                      <td style={{ padding: '8px 10px' }}>
-                        {w.channel === 'paypal' && w.status === 'pending' ? (
-                          <button
-                            className="btn-outline"
-                            disabled={payoutBusyId === w.id}
-                            onClick={() => triggerPayout(w.id)}
-                            style={{ fontSize: 12, padding: '4px 10px', whiteSpace: 'nowrap' }}
-                          >
-                            {payoutBusyId === w.id ? 'Sending…' : 'Pay out via PayPal'}
-                          </button>
-                        ) : (
-                          <span style={{ color: '#9ca3af', fontSize: 12 }}>—</span>
-                        )}
                       </td>
                     </tr>
                     );

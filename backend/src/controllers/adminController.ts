@@ -3,7 +3,12 @@ import db from '../../config/database';
 import { DbUser, DbWithdrawal, WithdrawalStatus, UserPlan } from '../types';
 import { logAudit } from '../services/audit';
 import { sendWithdrawalStatusEmail, sendBroadcastEmail } from '../services/email';
-import { sendPayout, sendPayoutBatch, paypalConfigured, PAYOUT_BATCH_MAX, BatchPayoutItem } from '../services/paypal';
+
+// Maximum withdrawals approvable in a single bulk approve call. Throttling at
+// 5s per email means a batch of 100 takes ~8 minutes, so keep the cap modest.
+const BULK_APPROVE_MAX = 100;
+const BULK_APPROVE_EMAIL_GAP_MS = 5000;
+const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
 const VALID_STATUSES: WithdrawalStatus[] = ['pending', 'processing', 'completed', 'failed'];
 
@@ -112,7 +117,11 @@ export async function listWithdrawals(req: Request, res: Response, next: NextFun
 export async function updateWithdrawalStatus(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     const withdrawalId = Number(req.params.id);
-    const { status } = req.body as { status: string };
+    const { status, message } = req.body as { status: string; message?: string };
+    const adminMessage =
+      typeof message === 'string' && message.trim()
+        ? message.trim().slice(0, 1000)
+        : null;
 
     if (!VALID_STATUSES.includes(status as WithdrawalStatus)) {
       res.status(400).json({ message: 'Invalid status.' });
@@ -149,7 +158,8 @@ export async function updateWithdrawalStatus(req: Request, res: Response, next: 
       if (owner) {
         sendWithdrawalStatusEmail(
           owner.email, owner.name, status,
-          Number(withdrawal.amount), withdrawal.channel, Number(withdrawal.net_amount)
+          Number(withdrawal.amount), withdrawal.channel, Number(withdrawal.net_amount),
+          adminMessage,
         ).catch(() => {});
       }
     }
@@ -158,256 +168,102 @@ export async function updateWithdrawalStatus(req: Request, res: Response, next: 
   } catch (err) { next(err); }
 }
 
-// ─── Automated payout (PayPal Payouts API) ───────────────────────────────────
-export async function triggerPayout(req: Request, res: Response, next: NextFunction): Promise<void> {
+// ─── Bulk approve withdrawals ─────────────────────────────────────────────────
+// Body: { withdrawal_ids: number[] }
+// Approves (marks completed) every listed pending/processing withdrawal in a
+// single transaction, then notifies each user by email with a 5-second gap
+// between sends so Resend's rate limiter doesn't reject the run.
+export async function bulkApproveWithdrawals(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const withdrawalId = Number(req.params.id);
-    if (!Number.isInteger(withdrawalId) || withdrawalId <= 0) {
-      res.status(400).json({ message: 'Invalid withdrawal id.' });
-      return;
-    }
-    if (!paypalConfigured()) {
-      res.status(503).json({ message: 'PayPal credentials are not configured. Set PAYPAL_CLIENT_ID and PAYPAL_CLIENT_SECRET.' });
-      return;
-    }
+    const { withdrawal_ids: rawIds, message } = req.body as { withdrawal_ids?: unknown; message?: unknown };
+    const adminMessage =
+      typeof message === 'string' && message.trim()
+        ? message.trim().slice(0, 1000)
+        : null;
 
-    const withdrawal = await db<DbWithdrawal>('withdrawals').where({ id: withdrawalId }).first();
-    if (!withdrawal) { res.status(404).json({ message: 'Withdrawal not found.' }); return; }
-    if (withdrawal.channel !== 'paypal') {
-      res.status(400).json({ message: 'Only PayPal withdrawals can be paid out automatically.' });
-      return;
-    }
-    if (withdrawal.status !== 'pending') {
-      res.status(400).json({ message: `Cannot pay out a withdrawal that is ${withdrawal.status}.` });
-      return;
-    }
-
-    // Atomically claim the withdrawal so a double-click can't fire two payouts
-    const claimed = await db('withdrawals')
-      .where({ id: withdrawalId, status: 'pending' })
-      .update({ status: 'processing' });
-    if (claimed === 0) {
-      res.status(409).json({ message: 'Withdrawal is no longer pending.' });
-      return;
-    }
-
-    const owner = await db<DbUser>('users').where({ id: withdrawal.user_id }).select('email', 'name').first();
-
-    try {
-      const result = await sendPayout({
-        receiverEmail: String(withdrawal.account_number).trim(),
-        amountPhp: Number(withdrawal.net_amount),
-        senderItemId: `withdrawal:${withdrawal.id}`,
-        note: `Kitazon withdrawal #${withdrawal.id}`,
-        emailSubject: 'You have a payout from Kitazon',
-      });
-
-      // PayPal accepted the payout request → mark the withdrawal completed immediately.
-      // If PayPal later flips the item to FAILED/DENIED/RETURNED/UNCLAIMED, the webhook
-      // handler will revert this withdrawal to 'failed' AND refund the user balance.
-      try {
-        await db('withdrawals').where({ id: withdrawalId }).update({
-          status: 'completed',
-          paypal_batch_id: result.batchId,
-          paypal_payout_item_id: result.payoutItemId ?? null,
-          payout_attempted_at: new Date(),
-        });
-      } catch {
-        // Columns from migration 020 not yet applied — at least update the status.
-        await db('withdrawals').where({ id: withdrawalId }).update({ status: 'completed' });
-      }
-
-      // Notify the user that their withdrawal is completed (fire-and-forget)
-      if (owner) {
-        sendWithdrawalStatusEmail(
-          owner.email, owner.name, 'completed',
-          Number(withdrawal.amount), withdrawal.channel, Number(withdrawal.net_amount)
-        ).catch(() => {});
-      }
-
-      await logAudit(req.user!.id, 'admin_trigger_payout', req, {
-        amount: Number(withdrawal.amount),
-        metadata: {
-          withdrawal_id: withdrawalId,
-          paypal_batch_id: result.batchId,
-          paypal_payout_item_id: result.payoutItemId,
-          batch_status: result.batchStatus,
-        },
-      });
-
-      res.json({
-        message: 'Payout sent successfully.',
-        status: 'completed',
-        paypal_batch_id: result.batchId,
-        paypal_payout_item_id: result.payoutItemId,
-        batch_status: result.batchStatus,
-      });
-    } catch (payoutErr) {
-      // Roll back: revert status to pending and record the error
-      try {
-        await db('withdrawals').where({ id: withdrawalId }).update({
-          status: 'pending',
-          payout_error: String((payoutErr as Error).message ?? payoutErr).slice(0, 500),
-        });
-      } catch {
-        await db('withdrawals').where({ id: withdrawalId }).update({ status: 'pending' });
-      }
-
-      console.error('[Admin Payout] error', payoutErr);
-      await logAudit(req.user!.id, 'admin_trigger_payout_failed', req, {
-        amount: Number(withdrawal.amount),
-        metadata: { withdrawal_id: withdrawalId, error: String((payoutErr as Error).message ?? payoutErr) },
-      });
-
-      if (owner) { /* no email — withdrawal is back to pending for retry */ }
-      res.status(502).json({ message: `PayPal payout failed: ${(payoutErr as Error).message ?? 'unknown error'}` });
-    }
-  } catch (err) { next(err); }
-}
-
-// ─── Batch payout (PayPal Payouts API) ────────────────────────────────────────
-// Body: { withdrawal_ids?: number[]; all_pending?: boolean }
-// If all_pending=true, claims every pending PayPal withdrawal (up to PAYOUT_BATCH_MAX).
-// Otherwise pays only the listed IDs (must be pending PayPal withdrawals).
-export async function triggerPayoutBatch(req: Request, res: Response, next: NextFunction): Promise<void> {
-  try {
-    if (!paypalConfigured()) {
-      res.status(503).json({ message: 'PayPal credentials are not configured. Set PAYPAL_CLIENT_ID and PAYPAL_CLIENT_SECRET.' });
-      return;
-    }
-
-    const { withdrawal_ids: rawIds, all_pending: allPending } = req.body as {
-      withdrawal_ids?: unknown; all_pending?: unknown;
-    };
-
-    let ids: number[] = [];
-    if (allPending === true) {
-      const rows = await db('withdrawals')
-        .where({ status: 'pending', channel: 'paypal' })
-        .orderBy('created_at', 'asc')
-        .limit(PAYOUT_BATCH_MAX)
-        .select('id');
-      ids = rows.map(r => Number(r.id));
-    } else if (Array.isArray(rawIds)) {
-      ids = rawIds
-        .map(v => Number(v))
-        .filter(n => Number.isInteger(n) && n > 0);
-    }
-
-    if (ids.length === 0) {
+    if (!Array.isArray(rawIds) || rawIds.length === 0) {
       res.status(400).json({ message: 'No withdrawals selected.' });
       return;
     }
-    if (ids.length > PAYOUT_BATCH_MAX) {
-      res.status(400).json({ message: `Batch too large. Maximum is ${PAYOUT_BATCH_MAX} withdrawals per batch.` });
+    const ids = rawIds
+      .map((v) => Number(v))
+      .filter((n) => Number.isInteger(n) && n > 0);
+    if (ids.length === 0) {
+      res.status(400).json({ message: 'No valid withdrawal ids provided.' });
+      return;
+    }
+    if (ids.length > BULK_APPROVE_MAX) {
+      res.status(400).json({ message: `Cannot approve more than ${BULK_APPROVE_MAX} withdrawals at once.` });
       return;
     }
 
-    // Atomic claim: only flip rows that are still pending PayPal. Anything not pending or
-    // not PayPal is silently skipped.
-    const claimedRows = await db('withdrawals')
+    // Atomically flip status from pending/processing → completed for the
+    // listed ids. Withdrawals that are already completed/failed are skipped.
+    const claimed = await db('withdrawals')
       .whereIn('id', ids)
-      .where({ status: 'pending', channel: 'paypal' })
-      .update({ status: 'processing' })
-      .returning(['id', 'user_id', 'amount', 'net_amount', 'account_number']);
+      .whereIn('status', ['pending', 'processing'])
+      .update({ status: 'completed' })
+      .returning(['id', 'user_id', 'amount', 'net_amount', 'channel']);
 
-    if (!claimedRows || claimedRows.length === 0) {
-      res.status(409).json({ message: 'No selected withdrawals are pending — they may have been processed by another admin.' });
-      return;
-    }
+    const approvedRows = (claimed ?? []) as Array<{
+      id: number;
+      user_id: number;
+      amount: number | string;
+      net_amount: number | string;
+      channel: string;
+    }>;
+    const approvedIds = approvedRows.map((r) => r.id);
+    const skipped = ids.filter((id) => !approvedIds.includes(id));
 
-    const claimedIds = claimedRows.map((r: { id: number }) => Number(r.id));
-    const skipped = ids.filter(id => !claimedIds.includes(id));
-
-    const senderBatchId = `kitazon-batch-${Date.now()}-${req.user!.id}`;
-    const items: BatchPayoutItem[] = claimedRows.map((r: { id: number; net_amount: number | string; account_number: string }) => ({
-      receiverEmail: String(r.account_number).trim(),
-      amountPhp: Number(r.net_amount),
-      senderItemId: `withdrawal:${r.id}`,
-      note: `Kitazon withdrawal #${r.id}`,
-    }));
-
-    try {
-      const result = await sendPayoutBatch(items, senderBatchId);
-
-      // PayPal accepted the batch → mark all claimed withdrawals completed.
-      // Webhook will revert any items PayPal later flips to FAILED/DENIED/RETURNED/UNCLAIMED
-      // and refund the affected user balance.
-      try {
-        await db('withdrawals')
-          .whereIn('id', claimedIds)
-          .update({
-            status: 'completed',
-            paypal_batch_id: result.batchId,
-            payout_attempted_at: new Date(),
-          });
-
-        // Best-effort: record the per-item payout_item_id for traceability
-        for (const it of result.items) {
-          const m = /^withdrawal:(\d+)$/.exec(it.senderItemId);
-          if (!m || !it.payoutItemId) continue;
-          const wId = Number(m[1]);
-          try {
-            await db('withdrawals').where({ id: wId }).update({ paypal_payout_item_id: it.payoutItemId });
-          } catch { /* column missing — skip */ }
-        }
-      } catch {
-        // Optional columns missing — at least flip status.
-        await db('withdrawals').whereIn('id', claimedIds).update({ status: 'completed' });
-      }
-
-      // Fire-and-forget completion emails
-      const owners = await db<DbUser>('users')
-        .whereIn('id', claimedRows.map((r: { user_id: number }) => r.user_id))
-        .select('id', 'email', 'name');
-      const ownerById = new Map(owners.map(u => [u.id, u]));
-      for (const r of claimedRows) {
-        const owner = ownerById.get(r.user_id);
-        if (owner) {
-          sendWithdrawalStatusEmail(
-            owner.email, owner.name, 'completed',
-            Number(r.amount), 'paypal', Number(r.net_amount)
-          ).catch(() => {});
-        }
-      }
-
-      await logAudit(req.user!.id, 'admin_trigger_payout_batch', req, {
-        amount: claimedRows.reduce((sum: number, r: { amount: number | string }) => sum + Number(r.amount), 0),
-        metadata: {
-          paypal_batch_id: result.batchId,
-          batch_status: result.batchStatus,
-          withdrawal_ids: claimedIds,
-          skipped_ids: skipped,
-          item_count: claimedIds.length,
-        },
-      });
-
-      res.json({
-        message: `Batch of ${claimedIds.length} payout${claimedIds.length === 1 ? '' : 's'} sent successfully.`,
-        paypal_batch_id: result.batchId,
-        batch_status: result.batchStatus,
-        paid_count: claimedIds.length,
-        paid_ids: claimedIds,
+    if (approvedRows.length === 0) {
+      res.status(409).json({
+        message: 'None of the selected withdrawals are pending or processing.',
         skipped_ids: skipped,
       });
-    } catch (batchErr) {
-      // PayPal rejected the entire batch — revert all claimed rows back to pending
-      try {
-        await db('withdrawals').whereIn('id', claimedIds).update({
-          status: 'pending',
-          payout_error: String((batchErr as Error).message ?? batchErr).slice(0, 500),
-        });
-      } catch {
-        await db('withdrawals').whereIn('id', claimedIds).update({ status: 'pending' });
-      }
-
-      console.error('[Admin Batch Payout] error', batchErr);
-      await logAudit(req.user!.id, 'admin_trigger_payout_batch_failed', req, {
-        metadata: { withdrawal_ids: claimedIds, error: String((batchErr as Error).message ?? batchErr) },
-      });
-
-      res.status(502).json({ message: `PayPal batch payout failed: ${(batchErr as Error).message ?? 'unknown error'}` });
+      return;
     }
+
+    await logAudit(req.user!.id, 'admin_bulk_approve_withdrawals', req, {
+      amount: approvedRows.reduce((s, r) => s + Number(r.amount), 0),
+      metadata: { withdrawal_ids: approvedIds, skipped_ids: skipped, has_message: !!adminMessage },
+    });
+
+    // Respond immediately — emails are sent in the background with a 5s gap
+    // between each user to stay under the Resend per-second limit.
+    res.json({
+      message: `Approved ${approvedRows.length} withdrawal${approvedRows.length === 1 ? '' : 's'}.`,
+      approved_count: approvedRows.length,
+      approved_ids: approvedIds,
+      skipped_ids: skipped,
+    });
+
+    void (async () => {
+      const owners = await db<DbUser>('users')
+        .whereIn('id', approvedRows.map((r) => r.user_id))
+        .select('id', 'email', 'name');
+      const ownerById = new Map(owners.map((u) => [u.id, u]));
+
+      for (let i = 0; i < approvedRows.length; i++) {
+        const row = approvedRows[i];
+        const owner = ownerById.get(row.user_id);
+        if (owner) {
+          try {
+            await sendWithdrawalStatusEmail(
+              owner.email,
+              owner.name,
+              'completed',
+              Number(row.amount),
+              row.channel,
+              Number(row.net_amount),
+              adminMessage,
+            );
+          } catch (emailErr) {
+            console.error('[Bulk Approve] email send failed', { withdrawal_id: row.id, error: (emailErr as Error).message });
+          }
+        }
+        if (i < approvedRows.length - 1) await sleep(BULK_APPROVE_EMAIL_GAP_MS);
+      }
+    })();
   } catch (err) { next(err); }
 }
 

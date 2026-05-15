@@ -4,7 +4,7 @@ import styles from './ReferralLanding.module.css';
 const BENEFITS = [
   { emoji: '💰', text: 'Earn ₱15–₱500 per task' },
   { emoji: '🎁', text: '₱50 signup bonus just for joining' },
-  { emoji: '💳', text: 'Withdraw instantly via PayPal' },
+  { emoji: '💳', text: 'Withdraw instantly via GCash' },
 ];
 
 export default function ReferralLanding() {

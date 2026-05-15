@@ -118,13 +118,31 @@ export async function sendSuspiciousWithdrawalEmail(to: string, name: string, am
   `));
 }
 
-export async function sendWithdrawalStatusEmail(to: string, name: string, status: 'completed' | 'failed', amount: number, channel: string, netAmount: number): Promise<void> {
+function escapeHtml(s: string): string {
+  return s
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function adminNoteBlock(message: string): string {
+  const safe = escapeHtml(message).replace(/\n/g, '<br>');
+  return `<div style="background:rgba(249,115,22,0.08);border:1px solid rgba(249,115,22,0.25);border-left:4px solid #f97316;border-radius:10px;padding:14px 16px;margin:16px 0;">
+    <p style="margin:0 0 6px;font-size:11px;color:#9ca3af;text-transform:uppercase;letter-spacing:1px;font-weight:700;">Message from Kitazon Admin</p>
+    <p style="margin:0;font-size:14px;color:#e8e8e8;line-height:1.6;">${safe}</p>
+  </div>`;
+}
+
+export async function sendWithdrawalStatusEmail(to: string, name: string, status: 'completed' | 'failed', amount: number, channel: string, netAmount: number, adminMessage?: string | null): Promise<void> {
   const isCompleted = status === 'completed';
   const subject = isCompleted ? 'Your Kitazon withdrawal is complete!' : 'Kitazon withdrawal could not be processed';
   const title   = isCompleted ? 'Withdrawal Complete' : 'Withdrawal Failed';
   const icon    = isCompleted ? '✅' : '❌';
   const color   = isCompleted ? '#22c55e' : '#ef4444';
   const supportLink = `${BASE}/account`;
+  const noteHtml = adminMessage && adminMessage.trim() ? adminNoteBlock(adminMessage.trim()) : '';
   await send(to, subject, layout(title, `
     ${h2(`${icon} ${isCompleted ? 'Your withdrawal was processed!' : 'Withdrawal could not be processed'}`)}
     ${p(`Hi ${name.split(' ')[0]}, ${isCompleted
@@ -137,6 +155,7 @@ export async function sendWithdrawalStatusEmail(to: string, name: string, status
       row('Channel', channel.toUpperCase()) +
       row('Status', `<span style="color:${color};font-weight:800;">${status.toUpperCase()}</span>`)
     )}
+    ${noteHtml}
     ${isCompleted
       ? p('Thank you for using Kitazon. Keep earning!')
       : p(`Your balance has been restored. If you have questions, <a href="${supportLink}" style="color:#f97316;">contact support</a>.`)

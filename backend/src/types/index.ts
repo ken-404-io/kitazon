@@ -53,7 +53,7 @@ export interface DbTask {
 }
 
 export type WithdrawalStatus = 'pending' | 'processing' | 'completed' | 'failed';
-export type WithdrawalChannel = 'paypal';
+export type WithdrawalChannel = 'gcash';
 export type UserPlan = 'free' | 'silver' | 'gold' | 'diamond';
 
 export interface DbWithdrawal {
