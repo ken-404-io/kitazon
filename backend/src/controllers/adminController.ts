@@ -92,7 +92,7 @@ export async function listWithdrawals(req: Request, res: Response, next: NextFun
       .join('users as u', 'w.user_id', 'u.id')
       .select(
         'w.id', 'w.amount', 'w.fee', 'w.net_amount', 'w.channel',
-        'w.account_number', 'w.status', 'w.created_at',
+        'w.account_number', 'w.account_name', 'w.status', 'w.created_at',
         'u.id as user_id', 'u.name as user_name', 'u.email as user_email'
       )
       .orderBy('w.created_at', 'desc')
@@ -110,7 +110,36 @@ export async function listWithdrawals(req: Request, res: Response, next: NextFun
       }),
     ]);
 
-    res.json({ withdrawals: rows, total: Number(count.total), page, pages: Math.ceil(Number(count.total) / limit) });
+    // Compute daily completed withdrawal count per user, resetting at midnight PH time (UTC+8).
+    const userIds = [...new Set((rows as Array<{ user_id: number }>).map((r) => r.user_id))];
+    let dailyCountMap = new Map<number, number>();
+    if (userIds.length > 0) {
+      // Start of today in PH time expressed as a UTC Date
+      const nowUtc = new Date();
+      const phOffsetMs = 8 * 60 * 60 * 1000;
+      const nowPh = new Date(nowUtc.getTime() + phOffsetMs);
+      const todayPhDateStr = nowPh.toISOString().slice(0, 10); // 'YYYY-MM-DD'
+      const todayPhStartUtc = new Date(`${todayPhDateStr}T00:00:00+08:00`);
+
+      const dailyCounts = await db('withdrawals')
+        .whereIn('user_id', userIds)
+        .where('status', 'completed')
+        .where('created_at', '>=', todayPhStartUtc)
+        .groupBy('user_id')
+        .select('user_id', db.raw('count(*) as daily_completed_count'));
+
+      dailyCountMap = new Map(
+        (dailyCounts as Array<{ user_id: number; daily_completed_count: string | number }>)
+          .map((r) => [r.user_id, Number(r.daily_completed_count)])
+      );
+    }
+
+    const enrichedRows = (rows as Array<Record<string, unknown>>).map((r) => ({
+      ...r,
+      daily_completed_count: dailyCountMap.get(r.user_id as number) ?? 0,
+    }));
+
+    res.json({ withdrawals: enrichedRows, total: Number(count.total), page, pages: Math.ceil(Number(count.total) / limit) });
   } catch (err) { next(err); }
 }
 

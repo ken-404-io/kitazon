@@ -88,11 +88,13 @@ interface AdminWithdrawal {
   net_amount: number | string;
   channel: WithdrawalChannel;
   account_number: string;
+  account_name: string | null;
   status: WithdrawalStatus;
   created_at: string;
   user_id: number;
   user_name: string;
   user_email: string;
+  daily_completed_count: number;
 }
 
 interface AdminTask {
@@ -785,7 +787,7 @@ export default function Admin() {
                         aria-label="Select all approvable withdrawals"
                       />
                     </th>
-                    {['ID', 'User', 'Amount', 'Net', 'Channel', 'Account', 'Status', 'Date', 'Update Status'].map(h => (
+                    {['ID', 'User', 'Amount', 'Net', 'Channel', 'Account', 'Status', 'Requested At', 'Daily Success', 'Update Status'].map(h => (
                       <th key={h} style={{ padding: '8px 10px', textAlign: 'left', whiteSpace: 'nowrap' }}>{h}</th>
                     ))}
                   </tr>
@@ -819,7 +821,23 @@ export default function Admin() {
                         </span>
                       </td>
                       <td style={{ padding: '8px 10px', whiteSpace: 'nowrap' }}>
-                        {new Date(w.created_at).toLocaleDateString()}
+                        <div>{new Date(w.created_at).toLocaleDateString('en-PH', { timeZone: 'Asia/Manila' })}</div>
+                        <div style={{ fontSize: 11, color: '#9ca3af' }}>
+                          {new Date(w.created_at).toLocaleTimeString('en-PH', { timeZone: 'Asia/Manila', hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                        </div>
+                      </td>
+                      <td style={{ padding: '8px 10px', textAlign: 'center' }}>
+                        <span style={{
+                          display: 'inline-block',
+                          padding: '2px 10px',
+                          borderRadius: 12,
+                          fontWeight: 700,
+                          fontSize: 13,
+                          background: w.daily_completed_count === 0 ? '#f3f4f6' : w.daily_completed_count >= 3 ? '#fee2e2' : '#dcfce7',
+                          color: w.daily_completed_count === 0 ? '#6b7280' : w.daily_completed_count >= 3 ? '#dc2626' : '#16a34a',
+                        }}>
+                          {w.daily_completed_count}
+                        </span>
                       </td>
                       <td style={{ padding: '8px 10px' }}>
                         <select
