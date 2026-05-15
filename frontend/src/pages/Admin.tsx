@@ -88,6 +88,7 @@ interface AdminWithdrawal {
   net_amount: number | string;
   channel: WithdrawalChannel;
   account_number: string;
+  account_name: string | null;
   status: WithdrawalStatus;
   created_at: string;
   user_id: number;
@@ -125,6 +126,11 @@ interface RevenueStats {
 }
 
 const fmt = (n: number | string) => Number(n).toFixed(2);
+const fmtPhone = (num: string) => {
+  const d = num.replace(/\D/g, '');
+  if (d.length === 11) return `${d.slice(0, 4)} ${d.slice(4, 7)} ${d.slice(7)}`;
+  return num;
+};
 const STATUS_COLORS: Record<string, string> = {
   pending: '#d97706', processing: '#2563eb', completed: '#16a34a', failed: '#dc2626',
 };
@@ -813,7 +819,10 @@ export default function Admin() {
                       <td style={{ padding: '8px 10px' }}>₱{fmt(w.amount)}</td>
                       <td style={{ padding: '8px 10px' }}>₱{fmt(w.net_amount)}</td>
                       <td style={{ padding: '8px 10px' }}>{w.channel.toUpperCase()}</td>
-                      <td style={{ padding: '8px 10px' }}>{w.account_number}</td>
+                      <td style={{ padding: '8px 10px' }}>
+                        <div style={{ fontWeight: 600, letterSpacing: '0.5px' }}>{fmtPhone(w.account_number)}</div>
+                        {w.account_name && <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 2 }}>{w.account_name}</div>}
+                      </td>
                       <td style={{ padding: '8px 10px' }}>
                         <span style={{ color: STATUS_COLORS[w.status] ?? '#374151', fontWeight: 600 }}>
                           {w.status.toUpperCase()}
