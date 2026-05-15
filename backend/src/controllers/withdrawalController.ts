@@ -35,19 +35,29 @@ function normalizeGcashNumber(raw: string): string {
   return digits;
 }
 
-// Count correct quiz answers since the user's most recent withdrawal (any status).
-// First-ever withdrawal counts all-time correct quiz answers.
-async function countQuizzesSinceLastWithdrawal(userId: number): Promise<number> {
-  const lastWithdrawal = await db('withdrawals')
+// Count correct quiz answers available toward the next withdrawal gate.
+// - Returns 0 if the user has any pending/processing withdrawal (gate is frozen).
+// - Otherwise counts from the updated_at of the last completed/failed withdrawal.
+// - If no settled withdrawal exists, counts all-time (first-ever withdrawal path).
+async function countQuizzesForNextGate(userId: number): Promise<{ count: number; frozen: boolean }> {
+  const pending = await db('withdrawals')
     .where({ user_id: userId })
-    .orderBy('created_at', 'desc')
-    .select('created_at')
+    .whereIn('status', ['pending', 'processing'])
+    .first();
+
+  if (pending) return { count: 0, frozen: true };
+
+  const lastSettled = await db('withdrawals')
+    .where({ user_id: userId })
+    .whereIn('status', ['completed', 'failed'])
+    .orderBy('updated_at', 'desc')
+    .select('updated_at')
     .first();
 
   let q = db('earnings').where({ user_id: userId, type: 'quiz' });
-  if (lastWithdrawal) q = q.where('created_at', '>', lastWithdrawal.created_at);
+  if (lastSettled) q = q.where('created_at', '>', lastSettled.updated_at);
   const row = await q.count('id as n').first();
-  return Number((row as { n?: unknown } | undefined)?.n ?? 0);
+  return { count: Number((row as { n?: unknown } | undefined)?.n ?? 0), frozen: false };
 }
 
 // ─── Shared eligibility helper ────────────────────────────────────────────────
@@ -55,11 +65,12 @@ async function getWithdrawalEligibility(userId: number, user: DbUser) {
   const prevWithdrawal = await db('withdrawals').where({ user_id: userId }).first();
   const isFirstWithdrawal = !prevWithdrawal;
 
-  const quizzesCompleted = await countQuizzesSinceLastWithdrawal(userId);
+  const { count: quizzesCompleted, frozen: quizGateFrozen } = await countQuizzesForNextGate(userId);
 
   const reasons: string[] = [];
   if (!user.email_verified) reasons.push('email_not_verified');
-  if (quizzesCompleted < QUIZ_GATE_REQUIRED) reasons.push('quiz_gate_not_met');
+  if (quizGateFrozen) reasons.push('quiz_gate_frozen');
+  else if (quizzesCompleted < QUIZ_GATE_REQUIRED) reasons.push('quiz_gate_not_met');
 
   return {
     eligible: reasons.length === 0,
@@ -68,6 +79,7 @@ async function getWithdrawalEligibility(userId: number, user: DbUser) {
     withdrawal_credits: Number(user.withdrawal_credits ?? 0),
     quizzes_completed: quizzesCompleted,
     quizzes_required: QUIZ_GATE_REQUIRED,
+    quiz_gate_frozen: quizGateFrozen,
     reasons,
   };
 }
