@@ -35,7 +35,7 @@ export interface Earning {
 }
 
 export type WithdrawalStatus = 'pending' | 'processing' | 'completed' | 'failed';
-export type WithdrawalChannel = 'paypal';
+export type WithdrawalChannel = 'gcash';
 
 export interface Withdrawal {
   id: number;

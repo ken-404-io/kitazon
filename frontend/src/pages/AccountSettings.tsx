@@ -88,7 +88,7 @@ export default function AccountSettings() {
 
   const profileNameErr = profileTouched ? validateName(profileName) : null;
 
-  // Payment methods (PayPal only for now)
+  // Payment methods (GCash only)
   const [savedAcct, setSavedAcct]         = useState<string | null>(null);
   const [savedAcctLoading, setSavedAcctLoading] = useState(false);
   const [savedAcctMsg, setSavedAcctMsg]   = useState('');
@@ -105,13 +105,13 @@ export default function AccountSettings() {
     } finally { setSavedAcctLoading(false); }
   };
   const removeSavedAcct = async () => {
-    if (!window.confirm('Remove your saved PayPal account? You\'ll be able to register a different PayPal on your next withdrawal.')) return;
+    if (!window.confirm('Remove your saved GCash number? You\'ll be able to register a different GCash number on your next withdrawal.')) return;
     setRemovingAcct(true);
     setSavedAcctMsg(''); setSavedAcctErr('');
     try {
       await api.delete('/withdrawals/saved-account');
       setSavedAcct(null);
-      setSavedAcctMsg('Payment method removed. You can register a new PayPal on your next withdrawal.');
+      setSavedAcctMsg('Payment method removed. You can register a new GCash number on your next withdrawal.');
     } catch (err: unknown) {
       setSavedAcctErr((err as { response?: { data?: { message?: string } } }).response?.data?.message ?? 'Failed to remove payment method.');
     } finally { setRemovingAcct(false); }
@@ -467,7 +467,7 @@ export default function AccountSettings() {
       <SubView title="Payment Methods">
         <div className={styles.formCard}>
           <p style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: '1rem' }}>
-            One PayPal account is allowed per user. To add a payment method, request a withdrawal — your PayPal email is saved when your first withdrawal is submitted.
+            One GCash number is allowed per user. To add a payment method, request a withdrawal — your GCash number is saved when your first withdrawal is submitted.
           </p>
 
           {savedAcctLoading ? (
@@ -475,9 +475,9 @@ export default function AccountSettings() {
           ) : savedAcct ? (
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, background: 'var(--surface)', border: '1.5px solid var(--border)', borderRadius: 10, padding: '0.75rem 0.9rem' }}>
-                <span style={{ width: 10, height: 10, borderRadius: '50%', background: '#003087', display: 'inline-block' }} />
+                <span style={{ width: 10, height: 10, borderRadius: '50%', background: '#0070e0', display: 'inline-block' }} />
                 <div style={{ flex: 1 }}>
-                  <p style={{ margin: 0, fontSize: 12, color: 'var(--text-muted)' }}>PayPal</p>
+                  <p style={{ margin: 0, fontSize: 12, color: 'var(--text-muted)' }}>GCash</p>
                   <p style={{ margin: 0, fontSize: 14, color: 'var(--text)', wordBreak: 'break-all' }}>{savedAcct}</p>
                 </div>
                 <span style={{ fontSize: 11, fontWeight: 700, color: '#22c55e', background: 'rgba(34,197,94,0.1)', padding: '2px 8px', borderRadius: 20, whiteSpace: 'nowrap' }}>Saved</span>

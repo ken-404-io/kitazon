@@ -8,7 +8,7 @@ const PRICING_PLANS = [
     name: 'Free',
     price: 'Free',
     color: 'var(--text-muted)',
-    features: ['₱5/day withdrawal limit', 'PayPal withdrawals', 'Task earnings', 'Referral bonuses'],
+    features: ['₱5/day withdrawal limit', 'GCash withdrawals', 'Task earnings', 'Referral bonuses'],
     cta: 'Get Started',
     highlight: false,
   },
@@ -63,10 +63,10 @@ export default function Home() {
     <main>
       <section className={styles.hero}>
         <h1>Earn Real Money Online</h1>
-        <p className={styles.tagline}>Complete simple tasks and get paid — directly to your PayPal account.</p>
+        <p className={styles.tagline}>Complete simple tasks and get paid — directly to your GCash account.</p>
         <div className={styles.heroBadges}>
           <span className="badge badge-gold">Min ₱5 Withdrawal</span>
-          <span className="badge badge-green">Cashout via PayPal</span>
+          <span className="badge badge-green">Cashout via GCash</span>
           <span className="badge badge-gold">₱15 – ₱500 per Task</span>
         </div>
 

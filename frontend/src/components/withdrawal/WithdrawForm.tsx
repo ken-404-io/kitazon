@@ -30,8 +30,11 @@ export default function WithdrawForm({ balance, emailVerified = true, onSuccess 
   const requestOtp = async (e: React.FormEvent): Promise<void> => {
     e.preventDefault();
     setError(''); setSuccess('');
-    const account_number = sanitizeInput(form.account_number);
-    if (!account_number) return setError('PayPal email address is required.');
+    const raw = sanitizeInput(form.account_number);
+    const digits = raw.replace(/[^\d+]/g, '');
+    const account_number = digits.startsWith('+63') && digits.length === 13 ? '0' + digits.slice(3) : digits;
+    if (!account_number) return setError('GCash mobile number is required.');
+    if (!/^09\d{9}$/.test(account_number)) return setError('Enter a valid GCash number (11 digits starting with 09).');
     if (parseFloat(form.amount) < 5) return setError('Minimum withdrawal is ₱5.');
     if (parseFloat(form.amount) > numBalance) return setError('Insufficient balance.');
     setLoading(true);
@@ -46,9 +49,11 @@ export default function WithdrawForm({ balance, emailVerified = true, onSuccess 
 
   const confirmWithdrawal = async (otp: string): Promise<void> => {
     setOtpError('');
-    const account_number = sanitizeInput(form.account_number);
+    const raw = sanitizeInput(form.account_number);
+    const digits = raw.replace(/[^\d+]/g, '');
+    const account_number = digits.startsWith('+63') && digits.length === 13 ? '0' + digits.slice(3) : digits;
     try {
-      await api.post('/withdrawals', { amount: form.amount, channel: 'paypal', account_number, otp });
+      await api.post('/withdrawals', { amount: form.amount, channel: 'gcash', account_number, otp });
       setSuccess(`Withdrawal of ₱${form.amount} submitted! Processing within 24 hours.`);
       setForm({ amount: '', account_number: '' });
       setShowOtp(false);
@@ -78,8 +83,8 @@ export default function WithdrawForm({ balance, emailVerified = true, onSuccess 
           <input type="number" min="5" max="50000" value={form.amount} onChange={set('amount')} required />
         </div>
         <div className="form-group">
-          <label>PayPal Email Address</label>
-          <input type="email" value={form.account_number} onChange={set('account_number')} required placeholder="yourname@email.com" maxLength={80} autoComplete="email" />
+          <label>GCash Mobile Number</label>
+          <input type="tel" inputMode="tel" value={form.account_number} onChange={set('account_number')} required placeholder="09171234567" maxLength={13} autoComplete="tel" />
         </div>
         {error && <p className="error-msg">{error}</p>}
         {success && <p className={styles.success}>{success}</p>}
