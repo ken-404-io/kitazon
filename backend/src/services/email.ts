@@ -56,6 +56,16 @@ const row = (label: string, value: string) =>
 const table = (rows: string) =>
   `<table width="100%" cellpadding="0" cellspacing="0" style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:12px;padding:12px 16px;margin:16px 0;">${rows}</table>`;
 
+function channelBadge(channel: string): string {
+  if (channel.toLowerCase() === 'gcash') {
+    return `<span style="display:inline-block;vertical-align:middle;line-height:1;">
+      <span style="display:inline-block;vertical-align:middle;background:#0073e6;color:#ffffff;width:20px;height:20px;border-radius:50%;text-align:center;font-weight:900;font-size:13px;font-family:Arial,Helvetica,sans-serif;line-height:20px;">G</span>
+      <span style="display:inline-block;vertical-align:middle;margin-left:6px;color:#0073e6;font-weight:800;font-size:13px;letter-spacing:0.2px;">GCash</span>
+    </span>`;
+  }
+  return channel.toUpperCase();
+}
+
 /* ─── emails ─────────────────────────────────────────────────────────────────── */
 export async function sendVerificationEmail(to: string, name: string, token: string): Promise<void> {
   const link = `${BASE}/verify-email?token=${token}`;
@@ -152,7 +162,7 @@ export async function sendWithdrawalStatusEmail(to: string, name: string, status
     ${table(
       row('Amount', `₱${amount.toFixed(2)}`) +
       row('You received', `₱${netAmount.toFixed(2)}`) +
-      row('Channel', channel.toUpperCase()) +
+      row('Channel', channelBadge(channel)) +
       row('Status', `<span style="color:${color};font-weight:800;">${status.toUpperCase()}</span>`)
     )}
     ${noteHtml}
@@ -171,7 +181,7 @@ export async function sendWithdrawalSubmittedEmail(to: string, name: string, amo
       row('Amount', `₱${amount.toFixed(2)}`) +
       row('Fee', fee > 0 ? `₱${fee.toFixed(2)}` : 'None') +
       row('You receive', `₱${netAmount.toFixed(2)}`) +
-      row('Channel', channel.toUpperCase())
+      row('Channel', channelBadge(channel))
     )}
     ${p('Processing takes 1–24 hours depending on your payment channel.')}
     ${p('If you did <strong style="color:#e8e8e8;">not</strong> request this withdrawal, contact support immediately.')}
