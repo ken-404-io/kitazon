@@ -12,6 +12,23 @@ const VALID_CHANNELS: WithdrawalChannel[] = ['gcash'];
 const ACCOUNT_PATTERN = /^(09\d{9}|\+639\d{9})$/;
 const QUIZ_GATE_REQUIRED = 20;
 
+// GCash account-name validation:
+//  - Required (so we can match against the user's GCash registration).
+//  - Reject anything that looks like an email (e.g. user@gmail.com).
+//  - Reject "paypal" — GCash withdrawals must use a real GCash account name.
+function validateAccountName(raw: string): string | null {
+  const trimmed = (raw ?? '').trim();
+  if (!trimmed) return 'GCash account name is required.';
+  if (trimmed.length < 2 || trimmed.length > 100) return 'GCash account name must be 2–100 characters.';
+  if (/@/.test(trimmed) || /\S+@\S+\.\S+/.test(trimmed)) {
+    return 'Account name cannot be an email address. Enter the full name on your GCash account.';
+  }
+  if (/paypal/i.test(trimmed)) {
+    return 'PayPal is not a supported withdrawal method. Enter the full name on your GCash account.';
+  }
+  return null;
+}
+
 function normalizeGcashNumber(raw: string): string {
   const digits = raw.replace(/[^\d+]/g, '');
   if (digits.startsWith('+63') && digits.length === 13) return '0' + digits.slice(3);
@@ -108,8 +125,14 @@ export async function savedAccount(req: Request, res: Response, next: NextFuncti
     let q = db('withdrawals').where({ user_id: req.user!.id });
     if (clearedAt) q = q.where('created_at', '>', clearedAt);
 
-    const last = await q.orderBy('created_at', 'desc').select('account_number', 'channel').first();
-    res.json(last ? { account_number: last.account_number, channel: last.channel } : null);
+    let last: { account_number: string; channel: string; account_name?: string | null } | undefined;
+    try {
+      last = await q.clone().orderBy('created_at', 'desc').select('account_number', 'channel', 'account_name').first();
+    } catch {
+      // account_name column not yet migrated — fall back without it
+      last = await q.orderBy('created_at', 'desc').select('account_number', 'channel').first();
+    }
+    res.json(last ? { account_number: last.account_number, channel: last.channel, account_name: last.account_name ?? null } : null);
   } catch (err) { next(err); }
 }
 
@@ -191,8 +214,8 @@ export async function requestOtp(req: Request, res: Response, next: NextFunction
 
 export async function create(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const { amount, channel, account_number, otp } = req.body as {
-      amount: string | number; channel: string; account_number: string; otp: string;
+    const { amount, channel, account_number, account_name, otp } = req.body as {
+      amount: string | number; channel: string; account_number: string; account_name?: string; otp: string;
     };
     const parsed = parseFloat(String(amount));
 
@@ -211,6 +234,12 @@ export async function create(req: Request, res: Response, next: NextFunction): P
     const normalizedAccount = account_number ? normalizeGcashNumber(account_number) : '';
     if (!normalizedAccount || !ACCOUNT_PATTERN.test(normalizedAccount)) {
       res.status(400).json({ message: 'Invalid GCash mobile number. Use 11 digits starting with 09 (e.g. 09171234567).' });
+      return;
+    }
+    const accountNameTrimmed = (account_name ?? '').trim();
+    const acctNameErr = validateAccountName(accountNameTrimmed);
+    if (acctNameErr) {
+      res.status(400).json({ message: acctNameErr });
       return;
     }
     if (!otp || typeof otp !== 'string' || !/^\d{6}$/.test(otp.trim())) {
@@ -412,7 +441,7 @@ export async function create(req: Request, res: Response, next: NextFunction): P
       try {
         await trx('withdrawals').insert({
           user_id: req.user!.id, amount: parsed, fee, net_amount: netAmount,
-          channel, account_number: normalizedAccount, status: 'pending',
+          channel, account_number: normalizedAccount, account_name: accountNameTrimmed, status: 'pending',
           ip_address: ip || null,
           is_flagged: isSuspicious,
           is_first_withdrawal: elig.is_first_withdrawal,
@@ -421,10 +450,21 @@ export async function create(req: Request, res: Response, next: NextFunction): P
         await trx.raw('RELEASE SAVEPOINT sp_withdrawal');
       } catch {
         await trx.raw('ROLLBACK TO SAVEPOINT sp_withdrawal');
-        await trx('withdrawals').insert({
-          user_id: req.user!.id, amount: parsed, fee, net_amount: netAmount,
-          channel, account_number: normalizedAccount, status: 'pending',
-        });
+        await trx.raw('SAVEPOINT sp_withdrawal_min');
+        try {
+          await trx('withdrawals').insert({
+            user_id: req.user!.id, amount: parsed, fee, net_amount: netAmount,
+            channel, account_number: normalizedAccount, account_name: accountNameTrimmed, status: 'pending',
+          });
+          await trx.raw('RELEASE SAVEPOINT sp_withdrawal_min');
+        } catch {
+          await trx.raw('ROLLBACK TO SAVEPOINT sp_withdrawal_min');
+          // account_name column not yet migrated — final fallback without it
+          await trx('withdrawals').insert({
+            user_id: req.user!.id, amount: parsed, fee, net_amount: netAmount,
+            channel, account_number: normalizedAccount, status: 'pending',
+          });
+        }
       }
     });
 

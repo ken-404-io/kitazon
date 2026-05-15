@@ -64,6 +64,7 @@ export interface DbWithdrawal {
   net_amount: number;
   channel: WithdrawalChannel;
   account_number: string;
+  account_name?: string | null;
   status: WithdrawalStatus;
   ip_address?: string | null;
   is_flagged?: boolean;

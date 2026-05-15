@@ -44,6 +44,7 @@ export interface Withdrawal {
   net_amount: number | string;
   channel: WithdrawalChannel;
   account_number: string;
+  account_name?: string | null;
   status: WithdrawalStatus;
   created_at: string;
 }
