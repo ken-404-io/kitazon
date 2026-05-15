@@ -228,3 +228,30 @@ export async function sendReferralEarnedEmail(to: string, name: string, referred
     <div style="text-align:center;margin:24px 0;">${btn(dashboardLink, 'View My Balance')}</div>
   `));
 }
+
+export async function sendGcashPaymentNotificationEmail(
+  adminEmail: string,
+  userName: string,
+  userEmail: string,
+  userId: number,
+  plan: string,
+  amount: string,
+  reference: string,
+): Promise<void> {
+  const adminLink = `${BASE}/admin`;
+  const planLabel = plan.charAt(0).toUpperCase() + plan.slice(1);
+  await send(adminEmail, `GCash Payment Submitted – ${userName} wants ${planLabel} Plan`, layout('GCash Payment Received', `
+    ${h2('GCash Payment Submitted 📥')}
+    ${p('A user has submitted a GCash payment and is waiting for their plan to be activated.')}
+    ${table(
+      row('User', userName) +
+      row('Email', userEmail) +
+      row('User ID', `#${userId}`) +
+      row('Plan Requested', `<strong style="color:#f97316;">${planLabel}</strong>`) +
+      row('Amount', `<strong style="color:#22c55e;">₱${amount}</strong>`) +
+      row('GCash Reference #', `<strong style="color:#e8e8e8;">${reference}</strong>`)
+    )}
+    ${p("Please verify the payment in GCash and then update the user's plan in the admin panel.")}
+    <div style="text-align:center;margin:24px 0;">${btn(adminLink, 'Go to Admin Panel')}</div>
+  `));
+}

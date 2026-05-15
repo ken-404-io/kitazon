@@ -2,7 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import db from '../../config/database';
 import { DbUser, UserPlan, DbWithdrawal, WithdrawalStatus } from '../types';
 import { logAudit } from '../services/audit';
-import { sendPlanUpgradeEmail, sendWithdrawalStatusEmail } from '../services/email';
+import { sendPlanUpgradeEmail, sendWithdrawalStatusEmail, sendGcashPaymentNotificationEmail } from '../services/email';
 import { paypalBase, getPayPalToken } from '../services/paypal';
 
 const PLAN_PRICES: Record<Exclude<UserPlan, 'free'>, { amount: string; label: string }> = {
@@ -255,4 +255,40 @@ export async function paypalWebhook(req: Request, res: Response, next: NextFunct
     console.error('[PayPal Webhook] Unexpected error:', err);
     res.status(200).json({ received: true });
   }
+}
+
+/* ── POST /api/subscriptions/gcash-submit ───────────────────────────────────── */
+export async function submitGcashPayment(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const { plan, reference } = req.body as { plan?: string; reference?: string };
+
+    if (!plan || !(plan in PLAN_PRICES)) {
+      res.status(400).json({ message: 'Invalid plan selected.' });
+      return;
+    }
+    const ref = typeof reference === 'string' ? reference.trim() : '';
+    if (ref.length < 5) {
+      res.status(400).json({ message: 'Please enter a valid GCash reference number (at least 5 characters).' });
+      return;
+    }
+
+    const cfg = PLAN_PRICES[plan as Exclude<UserPlan, 'free'>];
+
+    await logAudit(req.user!.id, 'gcash_payment_submitted', req, {
+      metadata: { plan, reference: ref, amount: cfg.amount },
+    });
+
+    // Notify admin (fire-and-forget)
+    const adminEmail = process.env.ADMIN_EMAIL;
+    if (adminEmail) {
+      const user = await db<DbUser>('users').where({ id: req.user!.id }).first();
+      if (user) {
+        sendGcashPaymentNotificationEmail(
+          adminEmail, user.name, user.email, user.id, plan, cfg.amount, ref,
+        ).catch(() => {});
+      }
+    }
+
+    res.json({ message: 'Payment submitted! Admin will verify your GCash payment and activate your plan within 24 hours.' });
+  } catch (err) { next(err); }
 }

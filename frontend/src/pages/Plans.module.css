@@ -85,6 +85,20 @@
 .upgradeBtn:hover:not(:disabled) { opacity: 0.85; }
 .upgradeBtn:disabled { opacity: 0.6; cursor: not-allowed; }
 
+.gcashIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #fff;
+  color: #0073e6;
+  font-weight: 900;
+  font-size: 11px;
+  flex-shrink: 0;
+}
+
 .btnSpinner {
   display: inline-block;
   width: 16px;
@@ -118,4 +132,187 @@
 
 @media (max-width: 520px) {
   .grid { grid-template-columns: 1fr; }
+}
+
+/* ── GCash Payment Modal ── */
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 1rem;
+}
+
+.modalBox {
+  background: var(--dark-card);
+  border: 1.5px solid var(--dark-border);
+  border-radius: 20px;
+  padding: 1.5rem;
+  width: 100%;
+  max-width: 400px;
+  position: relative;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+.modalClose {
+  position: absolute;
+  top: 12px;
+  right: 14px;
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 1rem;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 6px;
+  line-height: 1;
+}
+.modalClose:hover { color: var(--text); background: rgba(255,255,255,0.06); }
+
+.modalHeader {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 1.25rem;
+  padding-right: 2rem;
+}
+
+.gcashInstruction {
+  background: rgba(0, 115, 230, 0.06);
+  border: 1.5px solid rgba(0, 115, 230, 0.2);
+  border-radius: 14px;
+  padding: 1rem;
+  text-align: center;
+  margin-bottom: 1rem;
+}
+
+.instructionTitle {
+  margin: 0 0 0.75rem;
+  font-size: 0.88rem;
+  color: var(--text-muted);
+}
+
+.qrWrapper {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 0.75rem;
+}
+
+.qrImage {
+  width: 160px;
+  height: 160px;
+  border-radius: 12px;
+  object-fit: contain;
+  background: #fff;
+  padding: 6px;
+}
+
+.qrPlaceholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 160px;
+  height: 160px;
+  border-radius: 12px;
+  border: 2px dashed rgba(0, 115, 230, 0.3);
+  margin: 0 auto 0.75rem;
+}
+
+.gcashIconLarge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: #0073e6;
+  color: #fff;
+  font-weight: 900;
+  font-size: 28px;
+}
+
+.gcashAccount {
+  margin-top: 0.25rem;
+}
+
+.gcashNum {
+  font-size: 1.2rem;
+  font-weight: 800;
+  color: #0073e6;
+  letter-spacing: 1px;
+}
+
+.gcashOwner {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+.refSection {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 0.5rem;
+}
+
+.refLabel {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.refInput {
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1.5px solid var(--dark-border);
+  background: var(--dark-bg);
+  color: var(--text);
+  font-size: 0.92rem;
+  outline: none;
+  transition: border-color 0.15s;
+}
+.refInput:focus { border-color: #0073e6; }
+
+.refError {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--red, #ef4444);
+}
+
+.successState {
+  text-align: center;
+  padding: 1rem 0;
+}
+
+.successIcon {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: rgba(34, 197, 94, 0.15);
+  border: 2px solid #22c55e;
+  color: #22c55e;
+  font-size: 1.5rem;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 1rem;
+}
+
+.successState h3 {
+  margin: 0 0 0.5rem;
+  font-size: 1.15rem;
+  color: var(--text);
+}
+
+.successState p {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  line-height: 1.6;
+  margin: 0;
 }
