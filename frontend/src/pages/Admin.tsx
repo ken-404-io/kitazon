@@ -832,8 +832,8 @@ export default function Admin() {
                           borderRadius: 12,
                           fontWeight: 700,
                           fontSize: 13,
-                          background: w.daily_completed_count === 0 ? '#f3f4f6' : w.daily_completed_count >= 3 ? '#fee2e2' : '#dcfce7',
-                          color: w.daily_completed_count === 0 ? '#6b7280' : w.daily_completed_count >= 3 ? '#dc2626' : '#16a34a',
+                          background: w.daily_completed_count === 0 ? '#374151' : w.daily_completed_count >= 3 ? '#7f1d1d' : '#14532d',
+                          color: w.daily_completed_count === 0 ? '#9ca3af' : w.daily_completed_count >= 3 ? '#fca5a5' : '#86efac',
                         }}>
                           {w.daily_completed_count}
                         </span>
