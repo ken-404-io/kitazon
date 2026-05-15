@@ -4,7 +4,20 @@ import { useAuth } from '../context/AuthContext';
 import api from '../services/api';
 import { WithdrawalStatus, WithdrawalChannel } from '../types';
 
-type Tab = 'stats' | 'users' | 'withdrawals' | 'tasks' | 'logs' | 'revenue' | 'broadcast' | 'kyc' | 'online';
+type Tab = 'stats' | 'users' | 'withdrawals' | 'pending-withdrawals' | 'tasks' | 'logs' | 'revenue' | 'broadcast' | 'kyc' | 'online';
+
+const TAB_LABELS: Record<Tab, string> = {
+  stats: 'Stats',
+  revenue: 'Revenue',
+  users: 'Users',
+  'pending-withdrawals': 'Pending Withdrawals',
+  withdrawals: 'All Withdrawals',
+  tasks: 'Tasks',
+  kyc: 'KYC',
+  online: 'Online',
+  logs: 'Audit Logs',
+  broadcast: 'Broadcast',
+};
 
 interface OnlineUser {
   id: number;
@@ -204,6 +217,15 @@ export default function Admin() {
     if (user && !user.is_admin) navigate('/dashboard', { replace: true });
   }, [user, navigate]);
 
+  // Reset pagination and selection when entering either withdrawals view,
+  // so state from the other view doesn't carry over to a smaller result set.
+  useEffect(() => {
+    if (tab === 'withdrawals' || tab === 'pending-withdrawals') {
+      setWPage(1);
+      setSelectedW(new Set());
+    }
+  }, [tab]);
+
   const loadStats = useCallback(async () => {
     const res = await api.get<PlatformStats>('/admin/stats');
     setStats(res.data);
@@ -273,10 +295,17 @@ export default function Admin() {
     } finally { setOnlineLoading(false); }
   }, []);
 
+  // Load platform stats once on mount so the "Pending Withdrawals (N)"
+  // tab badge stays accurate even before the Stats tab has been opened.
+  useEffect(() => {
+    if (user?.is_admin && !stats) loadStats();
+  }, [user, stats, loadStats]);
+
   useEffect(() => {
     if (tab === 'stats' && !stats) loadStats();
     if (tab === 'users') loadUsers(userPage, userSearch);
     if (tab === 'withdrawals') loadWithdrawals(wPage, wFilter);
+    if (tab === 'pending-withdrawals') loadWithdrawals(wPage, 'pending');
     if (tab === 'tasks') loadTasks();
     if (tab === 'logs') loadLogs(logPage);
     if (tab === 'revenue' && !revenueStats) loadRevenue();
@@ -432,11 +461,13 @@ export default function Admin() {
       )}
       <h2>Admin Panel</h2>
       <div style={{ display: 'flex', gap: 8, marginBottom: '1.5rem', flexWrap: 'wrap' }}>
-        {(['stats', 'revenue', 'users', 'withdrawals', 'tasks', 'kyc', 'online', 'logs', 'broadcast'] as Tab[]).map(t => (
+        {(['stats', 'revenue', 'users', 'pending-withdrawals', 'withdrawals', 'tasks', 'kyc', 'online', 'logs', 'broadcast'] as Tab[]).map(t => (
           <button key={t} style={tabStyle(t)} onClick={() => setTab(t)}>
             {t === 'online'
-              ? `🟢 Online${onlineCount !== null ? ` (${onlineCount})` : ''}`
-              : t.charAt(0).toUpperCase() + t.slice(1)}
+              ? `🟢 ${TAB_LABELS[t]}${onlineCount !== null ? ` (${onlineCount})` : ''}`
+              : t === 'pending-withdrawals'
+                ? `⏳ ${TAB_LABELS[t]}${stats?.pending_withdrawals ? ` (${stats.pending_withdrawals})` : ''}`
+                : TAB_LABELS[t]}
           </button>
         ))}
       </div>
@@ -659,23 +690,38 @@ export default function Admin() {
         </div>
       )}
 
-      {/* ── Withdrawals ── */}
-      {tab === 'withdrawals' && (
+      {/* ── Withdrawals (All) & Pending Withdrawals ── */}
+      {(tab === 'withdrawals' || tab === 'pending-withdrawals') && (
         <div>
-          <div style={{ display: 'flex', gap: 8, marginBottom: '1rem', flexWrap: 'wrap', alignItems: 'center' }}>
-            <label style={{ fontSize: 13 }}>Filter by status:</label>
-            <select
-              value={wFilter}
-              onChange={e => { setWFilter(e.target.value); setWPage(1); setSelectedW(new Set()); }}
-              style={{ padding: '6px 10px', borderRadius: 6, border: '1px solid #e5e7eb' }}
-            >
-              <option value="">All</option>
-              <option value="pending">Pending</option>
-              <option value="processing">Processing</option>
-              <option value="completed">Completed</option>
-              <option value="failed">Failed</option>
-            </select>
-          </div>
+          {tab === 'withdrawals' ? (
+            <div style={{ display: 'flex', gap: 8, marginBottom: '1rem', flexWrap: 'wrap', alignItems: 'center' }}>
+              <label style={{ fontSize: 13 }}>Filter by status:</label>
+              <select
+                value={wFilter}
+                onChange={e => { setWFilter(e.target.value); setWPage(1); setSelectedW(new Set()); }}
+                style={{ padding: '6px 10px', borderRadius: 6, border: '1px solid #e5e7eb' }}
+              >
+                <option value="">All</option>
+                <option value="pending">Pending</option>
+                <option value="processing">Processing</option>
+                <option value="completed">Completed</option>
+                <option value="failed">Failed</option>
+              </select>
+            </div>
+          ) : (
+            <div style={{
+              marginBottom: '1rem', padding: '10px 14px', borderRadius: 8,
+              background: 'rgba(245,158,11,0.12)', border: '1px solid #f59e0b',
+              fontSize: 13, fontWeight: 600, color: '#f59e0b',
+            }}>
+              ⏳ Showing pending withdrawals only.
+              {stats?.pending_withdrawals !== undefined && (
+                <span style={{ fontWeight: 400, marginLeft: 6 }}>
+                  Total pending: {stats.pending_withdrawals}
+                </span>
+              )}
+            </div>
+          )}
 
           {/* Bulk approve action bar */}
           <div style={{
