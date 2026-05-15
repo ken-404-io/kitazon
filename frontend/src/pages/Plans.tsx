@@ -56,23 +56,48 @@ const PLANS: {
   },
 ];
 
+const GCASH_QR_URL   = process.env.REACT_APP_GCASH_QR_URL   ?? '';
+const GCASH_NUMBER   = process.env.REACT_APP_GCASH_NUMBER   ?? '';
+const GCASH_NAME     = process.env.REACT_APP_GCASH_NAME     ?? 'Kitazon';
+
 export default function Plans() {
   const { user } = useAuth();
   const currentPlan = user?.plan ?? 'free';
-  const [loading, setLoading] = useState<UserPlan | null>(null);
-  const [error, setError] = useState('');
 
-  const subscribe = async (plan: UserPlan) => {
-    if (plan === 'free') return;
-    setError('');
-    setLoading(plan);
+  const [modal, setModal] = useState<typeof PLANS[number] | null>(null);
+  const [reference, setReference] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState('');
+  const [submitted, setSubmitted] = useState(false);
+
+  const openModal = (p: typeof PLANS[number]) => {
+    setModal(p);
+    setReference('');
+    setSubmitError('');
+    setSubmitted(false);
+  };
+
+  const closeModal = () => {
+    if (submitting) return;
+    setModal(null);
+  };
+
+  const handleSubmit = async () => {
+    if (!modal) return;
+    setSubmitError('');
+    if (reference.trim().length < 5) {
+      setSubmitError('Please enter your GCash reference number.');
+      return;
+    }
+    setSubmitting(true);
     try {
-      const res = await api.post<{ approvalUrl: string }>('/subscriptions/create', { plan });
-      window.location.href = res.data.approvalUrl;
+      await api.post('/subscriptions/gcash-submit', { plan: modal.plan, reference: reference.trim() });
+      setSubmitted(true);
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { message?: string } } }).response?.data?.message;
-      setError(msg ?? 'Could not start checkout. Please try again.');
-      setLoading(null);
+      setSubmitError(msg ?? 'Something went wrong. Please try again.');
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -83,13 +108,10 @@ export default function Plans() {
         <p className={styles.sub}>Unlock higher daily withdrawal limits and more perks.</p>
       </div>
 
-      {error && <p style={{ textAlign: 'center', color: 'var(--red)', marginBottom: '1rem', fontSize: '0.88rem' }}>{error}</p>}
-
       <div className={styles.grid}>
         {PLANS.map((p) => {
           const isCurrent   = p.plan === currentPlan;
           const isDowngrade = PLANS.findIndex(x => x.plan === p.plan) < PLANS.findIndex(x => x.plan === currentPlan);
-          const isLoading   = loading === p.plan;
 
           return (
             <div
@@ -127,20 +149,10 @@ export default function Plans() {
                 <button
                   className={styles.upgradeBtn}
                   style={{ background: p.color === 'var(--text-muted)' ? undefined : p.color }}
-                  onClick={() => subscribe(p.plan)}
-                  disabled={!!loading}
+                  onClick={() => openModal(p)}
                 >
-                  {isLoading ? (
-                    <span className={styles.btnSpinner} />
-                  ) : (
-                    <>
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" style={{ flexShrink: 0 }}>
-                        <path d="M20.067 8.478c.492.88.556 2.014.3 3.327-.74 3.806-3.276 5.12-6.514 5.12h-.5a.805.805 0 0 0-.794.68l-.04.22-.63 3.993-.032.17a.804.804 0 0 1-.794.679H8.969a.483.483 0 0 1-.477-.558L9.134 17h1.024c4.566 0 8.08-2.272 9.14-6.498.39-1.564.33-2.879-.231-3.024z"/>
-                        <path d="M17.98 7.17C17.62 5.36 16.25 4.5 14.13 4.5H8.512a.805.805 0 0 0-.795.68L6 17.5h2.565l.634-4.022h2.045c4.293 0 6.777-2.075 7.633-5.7-.004-.023-.006-.044-.009-.068-.282-1.01-.888-1.54-.888-1.54z"/>
-                      </svg>
-                      Subscribe Now · {p.price}
-                    </>
-                  )}
+                  <span className={styles.gcashIcon}>G</span>
+                  Pay via GCash · {p.price}
                 </button>
               )}
             </div>
@@ -149,8 +161,81 @@ export default function Plans() {
       </div>
 
       <p className={styles.note}>
-        Payments are processed securely via PayPal. We never store your payment information.
+        Payments are made via GCash. After sending, submit your reference number below and the admin will activate your plan within 24 hours.
       </p>
+
+      {/* ── GCash Payment Modal ── */}
+      {modal && (
+        <div className={styles.overlay} onClick={closeModal}>
+          <div className={styles.modalBox} onClick={e => e.stopPropagation()}>
+            <button className={styles.modalClose} onClick={closeModal} aria-label="Close">✕</button>
+
+            {submitted ? (
+              <div className={styles.successState}>
+                <div className={styles.successIcon}>✓</div>
+                <h3>Payment Submitted!</h3>
+                <p>Your reference number has been received. The admin will verify your GCash payment and activate your <strong style={{ color: modal.color }}>{modal.name}</strong> plan within 24 hours.</p>
+                <button className={styles.upgradeBtn} style={{ background: modal.color, marginTop: '1rem' }} onClick={closeModal}>
+                  Got it
+                </button>
+              </div>
+            ) : (
+              <>
+                <div className={styles.modalHeader}>
+                  <span style={{ fontSize: '1.5rem' }}>{modal.badge}</span>
+                  <div>
+                    <h3 style={{ margin: 0, color: modal.color }}>{modal.name} Plan</h3>
+                    <p style={{ margin: 0, fontSize: '0.82rem', color: 'var(--text-muted)' }}>{modal.price}</p>
+                  </div>
+                </div>
+
+                <div className={styles.gcashInstruction}>
+                  <p className={styles.instructionTitle}>Send exactly <strong style={{ color: '#0073e6' }}>₱{modal.priceNum.toLocaleString()}</strong> to this GCash account:</p>
+
+                  {GCASH_QR_URL ? (
+                    <div className={styles.qrWrapper}>
+                      <img src={GCASH_QR_URL} alt="GCash QR Code" className={styles.qrImage} />
+                    </div>
+                  ) : (
+                    <div className={styles.qrPlaceholder}>
+                      <span className={styles.gcashIconLarge}>G</span>
+                      <p style={{ margin: '8px 0 0', fontSize: '0.78rem', color: 'var(--text-muted)' }}>QR code not configured</p>
+                    </div>
+                  )}
+
+                  <div className={styles.gcashAccount}>
+                    <div className={styles.gcashNum}>{GCASH_NUMBER || '—'}</div>
+                    <div className={styles.gcashOwner}>{GCASH_NAME}</div>
+                  </div>
+                </div>
+
+                <div className={styles.refSection}>
+                  <label className={styles.refLabel}>GCash Reference Number</label>
+                  <input
+                    className={styles.refInput}
+                    type="text"
+                    placeholder="e.g. 1234567890123"
+                    value={reference}
+                    onChange={e => setReference(e.target.value)}
+                    maxLength={50}
+                    disabled={submitting}
+                  />
+                  {submitError && <p className={styles.refError}>{submitError}</p>}
+                </div>
+
+                <button
+                  className={styles.upgradeBtn}
+                  style={{ background: modal.color, width: '100%', marginTop: '0.5rem' }}
+                  onClick={handleSubmit}
+                  disabled={submitting}
+                >
+                  {submitting ? <span className={styles.btnSpinner} /> : 'I\'ve Paid – Submit Reference'}
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
