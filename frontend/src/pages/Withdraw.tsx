@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import KycGate from '../components/KycGate';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
@@ -48,6 +48,7 @@ interface Eligibility {
 export default function Withdraw() {
   const { user }      = useAuth();
   const { showToast } = useToast();
+  const navigate      = useNavigate();
   const [searchParams] = useSearchParams();
   const [view,      setView]      = useState<View>((searchParams.get('view') as View) ?? 'overview');
   const [stats,     setStats]     = useState<UserStats | null>(null);
@@ -57,7 +58,9 @@ export default function Withdraw() {
   const [converting, setConverting] = useState(false);
   const [preset,    setPreset]    = useState<number | null>(null);
   const [account,     setAccount]     = useState('');
+  const [accountName, setAccountName] = useState('');
   const [savedAcct,   setSavedAcct]   = useState<string | null>(null);
+  const [savedAcctName, setSavedAcctName] = useState<string | null>(null);
   const [loading,     setLoading]     = useState(false);
   const [error,       setError]       = useState('');
   const [showOtp,     setShowOtp]     = useState(false);
@@ -65,14 +68,20 @@ export default function Withdraw() {
   const [otpErr,      setOtpErr]      = useState('');
   const [otpLoad,     setOtpLoad]     = useState(false);
   const [acctTouched, setAcctTouched] = useState(false);
+  const [acctNameTouched, setAcctNameTouched] = useState(false);
   const [removingAcct, setRemovingAcct] = useState(false);
 
   const loadData = () => {
     api.get<UserStats>('/auth/me/stats').then(r => setStats(r.data)).catch(() => {});
     api.get<Withdrawal[]>('/withdrawals').then(r => setHistory(r.data)).catch(() => {});
     api.get<Eligibility>('/withdrawals/eligibility').then(r => setElig(r.data)).catch(() => {});
-    api.get<{ account_number: string } | null>('/withdrawals/saved-account').then(r => {
-      if (r.data) { setSavedAcct(r.data.account_number); setAccount(r.data.account_number); }
+    api.get<{ account_number: string; account_name?: string | null } | null>('/withdrawals/saved-account').then(r => {
+      if (r.data) {
+        setSavedAcct(r.data.account_number);
+        setAccount(r.data.account_number);
+        setSavedAcctName(r.data.account_name ?? null);
+        if (r.data.account_name) setAccountName(r.data.account_name);
+      }
     }).catch(() => {});
   };
   useEffect(() => { loadData(); }, []);
@@ -100,6 +109,21 @@ export default function Withdraw() {
 
   const acctErr = acctTouched ? validateAccount(account) : null;
 
+  // Account name: required. Reject PayPal and any email-shaped value.
+  const validateAccountName = (val: string): string | null => {
+    const trimmed = val.trim();
+    if (!trimmed) return 'GCash account name is required.';
+    if (trimmed.length < 2) return 'Account name is too short.';
+    if (/@/.test(trimmed) || /\S+@\S+\.\S+/.test(trimmed)) {
+      return 'Account name cannot be an email. Enter the full name on your GCash account.';
+    }
+    if (/paypal/i.test(trimmed)) {
+      return 'PayPal is not supported. Withdrawals are GCash-only.';
+    }
+    return null;
+  };
+  const acctNameErr = acctNameTouched ? validateAccountName(accountName) : null;
+
   const convertCredits = async () => {
     const amt = parseInt(convertAmt, 10);
     if (!amt || amt < 1) return;
@@ -118,7 +142,9 @@ export default function Withdraw() {
     e.preventDefault();
     setError('');
     setAcctTouched(true);
+    setAcctNameTouched(true);
     if (validateAccount(account)) return;
+    if (validateAccountName(accountName)) return;
     if (amount > balance) return setError('Insufficient balance.');
     setLoading(true);
     try {
@@ -134,9 +160,15 @@ export default function Withdraw() {
     setOtpErr('');
     setOtpLoad(true);
     try {
-      await api.post('/withdrawals', { amount: String(amount), channel: 'gcash', account_number: sanitizeInput(account), otp });
+      await api.post('/withdrawals', {
+        amount: String(amount),
+        channel: 'gcash',
+        account_number: sanitizeInput(account),
+        account_name: sanitizeInput(accountName.trim()),
+        otp,
+      });
       setShowOtp(false);
-      setPreset(null); setAccount(''); setOtp('');
+      setPreset(null); setAccount(''); setAccountName(''); setOtp('');
       setView('overview');
       loadData();
       showToast('Withdrawal submitted successfully!', 'success');
@@ -268,6 +300,25 @@ export default function Withdraw() {
           style={elig !== null && !elig.eligible ? { opacity: 0.4, cursor: 'not-allowed' } : undefined}
         >
           {elig !== null && !elig.eligible ? '🔒 Locked' : 'Fast Cash →'}
+        </button>
+
+        <button
+          type="button"
+          onClick={() => navigate('/change-withdrawal-method')}
+          style={{
+            width: '100%',
+            marginTop: 10,
+            background: 'transparent',
+            border: '1.5px solid var(--border)',
+            color: 'var(--text)',
+            borderRadius: 10,
+            padding: '0.7rem 1rem',
+            fontSize: '0.85rem',
+            fontWeight: 600,
+            cursor: 'pointer',
+          }}
+        >
+          Change Withdrawal Method →
         </button>
 
         <div className={styles.totalStrip}>
@@ -445,8 +496,11 @@ export default function Withdraw() {
                       try {
                         await api.delete('/withdrawals/saved-account');
                         setSavedAcct(null);
+                        setSavedAcctName(null);
                         setAccount('');
+                        setAccountName('');
                         setAcctTouched(false);
+                        setAcctNameTouched(false);
                         showToast('Payment method removed.', 'success');
                       } catch (err: unknown) {
                         showToast((err as { response?: { data?: { message?: string } } }).response?.data?.message ?? 'Failed to remove payment method.', 'error');
@@ -487,6 +541,36 @@ export default function Withdraw() {
               {!savedAcct && (
                 <p style={{ fontSize: '0.71rem', color: 'var(--text-muted)', marginTop: 6 }}>
                   ⚠️ Once used, this GCash number will be permanently linked to your profile.
+                </p>
+              )}
+            </div>
+
+            {/* GCash account name */}
+            <div className={styles.sectionCard}>
+              <h4>GCash Account Name</h4>
+              {savedAcct && savedAcctName ? (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, background: 'var(--surface)', border: '1.5px solid var(--border)', borderRadius: 10, padding: '0.65rem 0.9rem' }}>
+                  <LockIcon />
+                  <span style={{ flex: 1, fontSize: '0.9rem', color: 'var(--text)' }}>{savedAcctName}</span>
+                  <span style={{ fontSize: '0.7rem', fontWeight: 700, color: '#22c55e', background: 'rgba(34,197,94,0.1)', padding: '2px 8px', borderRadius: 20 }}>Saved</span>
+                </div>
+              ) : (
+                <input
+                  type="text"
+                  value={accountName}
+                  onChange={e => { setAccountName(e.target.value); setAcctNameTouched(false); }}
+                  onBlur={() => setAcctNameTouched(true)}
+                  className={acctNameTouched ? (acctNameErr ? 'field-invalid' : 'field-valid') : ''}
+                  placeholder="Full name on your GCash account"
+                  maxLength={100}
+                  autoComplete="name"
+                  required
+                />
+              )}
+              {acctNameErr && !(savedAcct && savedAcctName) && <p className="field-hint hint-invalid">{acctNameErr}</p>}
+              {!(savedAcct && savedAcctName) && !acctNameErr && (
+                <p style={{ fontSize: '0.71rem', color: 'var(--text-muted)', marginTop: 6 }}>
+                  Must match the name registered to your GCash. PayPal and emails are not accepted.
                 </p>
               )}
             </div>

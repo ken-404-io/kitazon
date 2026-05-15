@@ -10,6 +10,7 @@ import Register from './pages/Register';
 import Dashboard from './pages/Dashboard';
 import Tasks from './pages/Tasks';
 import Withdraw from './pages/Withdraw';
+import ChangeWithdrawalMethod from './pages/ChangeWithdrawalMethod';
 import Referral from './pages/Referral';
 import PayoutProof from './pages/PayoutProof';
 import VerifyEmail from './pages/VerifyEmail';
@@ -73,6 +74,7 @@ export default function App() {
           <Route path="/dashboard" element={<PrivateRoute><Dashboard /></PrivateRoute>} />
           <Route path="/tasks" element={<PrivateRoute><Tasks /></PrivateRoute>} />
           <Route path="/withdraw" element={<PrivateRoute><Withdraw /></PrivateRoute>} />
+          <Route path="/change-withdrawal-method" element={<PrivateRoute><ChangeWithdrawalMethod /></PrivateRoute>} />
           <Route path="/referral" element={<PrivateRoute><Referral /></PrivateRoute>} />
           <Route path="/account" element={<PrivateRoute><AccountSettings /></PrivateRoute>} />
           <Route path="/admin" element={<PrivateRoute><Admin /></PrivateRoute>} />
