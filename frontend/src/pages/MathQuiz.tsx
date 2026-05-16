@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { useNavigate, useBlocker } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import KycGate from '../components/KycGate';
 import api from '../services/api';
@@ -52,7 +52,6 @@ function makeQuestion(): Question {
     wrongSet.add(answer + (Math.random() < 0.5 ? delta : -delta));
   }
   const choices = Array.from(wrongSet).sort(() => Math.random() - 0.5);
-
   return { text: `${a} ${op} ${b}`, answer, choices };
 }
 
@@ -76,23 +75,33 @@ function LeaveConfirmModal({ onStay, onLeave }: { onStay: () => void; onLeave: (
 }
 
 /* ── Adsterra ad break component ─────────────────────────────────────────── */
-function AdBreak({ onDone }: { onDone: () => void }) {
+function AdBreak({ onDone, onAbandoned }: { onDone: () => void; onAbandoned: () => void }) {
   const [secs, setSecs]       = useState(AD_SECONDS);
   const [adReady, setAdReady] = useState(false);
-  const containerRef = useRef<HTMLDivElement>(null);
+  const containerRef  = useRef<HTMLDivElement>(null);
   const doneCalledRef = useRef(false);
+  const onDoneRef     = useRef(onDone);
+  const onAbandonedRef = useRef(onAbandoned);
+  onDoneRef.current     = onDone;
+  onAbandonedRef.current = onAbandoned;
 
   const skip = useCallback(() => {
     if (doneCalledRef.current) return;
     doneCalledRef.current = true;
-    onDone();
-  }, [onDone]);
+    onDoneRef.current();
+  }, []);
+
+  // If component unmounts before ad finishes → user navigated away → forfeit reward
+  useEffect(() => {
+    return () => {
+      if (!doneCalledRef.current) onAbandonedRef.current();
+    };
+  }, []);
 
   useEffect(() => {
     if (!containerRef.current) return;
     containerRef.current.innerHTML = '';
 
-    // If no iframe appears within 4s, ad failed — proceed (reward still counts)
     const fallback = setTimeout(skip, 4000);
 
     const observer = new MutationObserver(() => {
@@ -112,17 +121,12 @@ function AdBreak({ onDone }: { onDone: () => void }) {
     const invoke = document.createElement('script');
     invoke.type = 'text/javascript';
     invoke.src = 'https://www.highperformanceformat.com/00611793b43988f6f1c486423ed8b687/invoke.js';
-    invoke.onerror = () => {
-      observer.disconnect();
-      clearTimeout(fallback);
-      skip();
-    };
+    invoke.onerror = () => { observer.disconnect(); clearTimeout(fallback); skip(); };
     containerRef.current.appendChild(invoke);
 
     return () => { clearTimeout(fallback); observer.disconnect(); };
   }, [skip]);
 
-  // Countdown only starts once ad is confirmed rendered
   useEffect(() => {
     if (!adReady) return;
     if (secs <= 0) { skip(); return; }
@@ -153,15 +157,28 @@ function QuizInner() {
   const [earned,        setEarned]        = useState(0);
   const [capped,        setCapped]        = useState(false);
   const [phase,         setPhase]         = useState<'question' | 'ad' | 'result'>('question');
-  // Reward is deferred: only credited after the ad completes successfully
   const [pendingReward, setPendingReward] = useState(false);
+  const [showLeaveModal, setShowLeaveModal] = useState(false);
 
   const isAdPhase = phase === 'ad';
+  const pendingRewardRef = useRef(pendingReward);
+  pendingRewardRef.current = pendingReward;
 
-  // Block in-app navigation (React Router links, back button) during ad
-  const blocker = useBlocker(isAdPhase);
+  // ── Back-button guard (popstate) ──────────────────────────────────────────
+  useEffect(() => {
+    if (!isAdPhase) return;
+    // Push a duplicate state so the back button triggers popstate instead of leaving
+    window.history.pushState(null, '', window.location.href);
+    const handler = () => {
+      // Re-push so another press doesn't leave without prompting again
+      window.history.pushState(null, '', window.location.href);
+      setShowLeaveModal(true);
+    };
+    window.addEventListener('popstate', handler);
+    return () => window.removeEventListener('popstate', handler);
+  }, [isAdPhase]);
 
-  // Block browser close / tab close / refresh during ad
+  // ── Browser close / refresh guard ────────────────────────────────────────
   useEffect(() => {
     if (!isAdPhase) return;
     const handler = (e: BeforeUnloadEvent) => { e.preventDefault(); e.returnValue = ''; };
@@ -169,16 +186,16 @@ function QuizInner() {
     return () => window.removeEventListener('beforeunload', handler);
   }, [isAdPhase]);
 
-  // Credit the pending reward — called only when ad fully completes
+  // ── Credit reward (only called after ad finishes) ─────────────────────────
   const creditReward = useCallback(async () => {
-    if (!pendingReward || capped) { setPendingReward(false); return; }
+    if (!pendingRewardRef.current || capped) { setPendingReward(false); return; }
     setPendingReward(false);
     try {
       const r = await api.post<{ amount: number; capped: boolean }>('/tasks/quiz/correct', {});
       setEarned(e => e + r.data.amount);
       if (r.data.capped) setCapped(true);
     } catch { /* capped or rate-limited */ }
-  }, [pendingReward, capped]);
+  }, [capped]);
 
   const handleAnswer = useCallback(async (choice: number) => {
     if (selected !== null) return;
@@ -187,9 +204,8 @@ function QuizInner() {
 
     if (isCorrect) {
       setCorrect(c => c + 1);
-
       if (qNum >= QUESTIONS_PER_ROUND) {
-        // Last question — no ad break follows, credit immediately
+        // Last question — no ad, credit immediately
         if (!capped) {
           try {
             const r = await api.post<{ amount: number; capped: boolean }>('/tasks/quiz/correct', {});
@@ -198,7 +214,7 @@ function QuizInner() {
           } catch {}
         }
       } else {
-        // Ad break follows — defer credit until ad completes
+        // Defer reward until after ad completes
         setPendingReward(true);
       }
     }
@@ -209,7 +225,6 @@ function QuizInner() {
     }, 900);
   }, [selected, question.answer, capped, qNum]);
 
-  // Called when ad finishes normally or fails on its own (not user-abandoned)
   const nextQuestion = useCallback(() => {
     creditReward();
     setQuestion(makeQuestion());
@@ -217,6 +232,19 @@ function QuizInner() {
     setSelected(null);
     setPhase('question');
   }, [creditReward]);
+
+  // Ad unmounted without completing → user navigated away → forfeit
+  const handleAbandoned = useCallback(() => {
+    setPendingReward(false);
+  }, []);
+
+  const handleStay = () => setShowLeaveModal(false);
+
+  const handleLeave = () => {
+    setPendingReward(false);
+    setShowLeaveModal(false);
+    navigate(-1); // go back now that we've cleared the reward
+  };
 
   const playAgain = () => {
     setPendingReward(false);
@@ -229,84 +257,70 @@ function QuizInner() {
     setPhase('question');
   };
 
-  // Blocker modal handlers
-  const handleStay  = () => blocker.reset?.();
-  const handleLeave = () => {
-    setPendingReward(false); // reward is forfeited
-    blocker.proceed?.();
-  };
-
-  if (phase === 'ad') {
-    return (
-      <>
-        {blocker.state === 'blocked' && (
-          <LeaveConfirmModal onStay={handleStay} onLeave={handleLeave} />
-        )}
-        <AdBreak onDone={nextQuestion} />
-      </>
-    );
-  }
-
-  if (phase === 'result') {
-    return (
-      <div className={styles.result}>
-        <div className={styles.resultIcon}>
-          {correct >= 7
-            ? <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#22c55e" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-            : <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#f97316" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-          }
-        </div>
-        <h2 className={styles.resultTitle}>Round Complete!</h2>
-        <p className={styles.resultScore}>{correct} / {QUESTIONS_PER_ROUND} correct</p>
-        <p className={styles.resultEarned}>+₱{earned.toFixed(2)} earned</p>
-        {capped && <p className={styles.cappedNote}>Daily limit reached — come back tomorrow for more!</p>}
-        <div className={styles.resultBtns}>
-          <button className={styles.playAgainBtn} onClick={playAgain}>Play Again</button>
-          <button className={styles.dashBtn} onClick={() => navigate('/dashboard')}>Dashboard</button>
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div className={styles.quiz}>
-      {/* Progress */}
-      <div className={styles.progress}>
-        <div className={styles.progressBar}>
-          <div className={styles.progressFill} style={{ width: `${((qNum - 1) / QUESTIONS_PER_ROUND) * 100}%` }} />
+    <>
+      {showLeaveModal && <LeaveConfirmModal onStay={handleStay} onLeave={handleLeave} />}
+
+      {phase === 'ad' && (
+        <AdBreak onDone={nextQuestion} onAbandoned={handleAbandoned} />
+      )}
+
+      {phase === 'result' && (
+        <div className={styles.result}>
+          <div className={styles.resultIcon}>
+            {correct >= 7
+              ? <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#22c55e" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+              : <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#f97316" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+            }
+          </div>
+          <h2 className={styles.resultTitle}>Round Complete!</h2>
+          <p className={styles.resultScore}>{correct} / {QUESTIONS_PER_ROUND} correct</p>
+          <p className={styles.resultEarned}>+₱{earned.toFixed(2)} earned</p>
+          {capped && <p className={styles.cappedNote}>Daily limit reached — come back tomorrow for more!</p>}
+          <div className={styles.resultBtns}>
+            <button className={styles.playAgainBtn} onClick={playAgain}>Play Again</button>
+            <button className={styles.dashBtn} onClick={() => navigate('/dashboard')}>Dashboard</button>
+          </div>
         </div>
-        <span className={styles.progressLabel}>{qNum} / {QUESTIONS_PER_ROUND}</span>
-      </div>
+      )}
 
-      {/* Earnings so far */}
-      <div className={styles.earningsBadge}>
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-        ₱{earned.toFixed(2)} earned
-      </div>
+      {phase === 'question' && (
+        <div className={styles.quiz}>
+          <div className={styles.progress}>
+            <div className={styles.progressBar}>
+              <div className={styles.progressFill} style={{ width: `${((qNum - 1) / QUESTIONS_PER_ROUND) * 100}%` }} />
+            </div>
+            <span className={styles.progressLabel}>{qNum} / {QUESTIONS_PER_ROUND}</span>
+          </div>
 
-      {/* Question */}
-      <div className={styles.questionCard}>
-        <p className={styles.questionLabel}>What is</p>
-        <p className={styles.questionText}>{question.text} = ?</p>
-      </div>
+          <div className={styles.earningsBadge}>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+            ₱{earned.toFixed(2)} earned
+          </div>
 
-      {/* Choices */}
-      <div className={styles.choices}>
-        {question.choices.map(c => {
-          let cls = styles.choice;
-          if (selected !== null) {
-            if (c === question.answer) cls = `${styles.choice} ${styles.choiceCorrect}`;
-            else if (c === selected)  cls = `${styles.choice} ${styles.choiceWrong}`;
-            else                      cls = `${styles.choice} ${styles.choiceDim}`;
-          }
-          return (
-            <button key={c} className={cls} onClick={() => handleAnswer(c)} disabled={selected !== null}>
-              {c}
-            </button>
-          );
-        })}
-      </div>
-    </div>
+          <div className={styles.questionCard}>
+            <p className={styles.questionLabel}>What is</p>
+            <p className={styles.questionText}>{question.text} = ?</p>
+          </div>
+
+          <div className={styles.choices}>
+            {question.choices.map(c => {
+              let cls = styles.choice;
+              if (selected !== null) {
+                if (c === question.answer) cls = `${styles.choice} ${styles.choiceCorrect}`;
+                else if (c === selected)  cls = `${styles.choice} ${styles.choiceWrong}`;
+                else                      cls = `${styles.choice} ${styles.choiceDim}`;
+              }
+              return (
+                <button key={c} className={cls} onClick={() => handleAnswer(c)} disabled={selected !== null}>
+                  {c}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </>
   );
 }
 
