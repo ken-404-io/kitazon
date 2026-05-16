@@ -785,3 +785,31 @@ export async function rejectGcashPayment(req: Request, res: Response, next: Next
     res.json({ message: 'Payment rejected.' });
   } catch (err) { next(err); }
 }
+
+// ─── Adjust referral count ────────────────────────────────────────────────────
+export async function setReferralCount(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const userId = parseInt(req.params.id, 10);
+    const { count } = req.body as { count?: number };
+
+    if (typeof count !== 'number' || !Number.isInteger(count) || count < 0) {
+      res.status(400).json({ message: 'count must be a non-negative integer.' });
+      return;
+    }
+
+    const user = await db<DbUser>('users').where({ id: userId }).first();
+    if (!user) { res.status(404).json({ message: 'User not found.' }); return; }
+
+    // real referral count
+    const row = await db('referrals').where({ referrer_id: userId }).count('id as n').first();
+    const realCount = Number((row as { n?: unknown } | undefined)?.n ?? 0);
+    const adjustment = count - realCount;
+
+    await db('users').where({ id: userId }).update({ referral_count_adjustment: adjustment });
+    await logAudit(req.user!.id, 'admin_set_referral_count', req, {
+      metadata: { target_user_id: userId, real_count: realCount, desired_count: count, adjustment },
+    });
+
+    res.json({ message: `Referral count set to ${count}.`, referral_count: count });
+  } catch (err) { next(err); }
+}
