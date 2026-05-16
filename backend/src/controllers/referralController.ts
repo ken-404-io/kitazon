@@ -12,7 +12,7 @@ export async function leaderboard(_req: Request, res: Response, next: NextFuncti
         db.raw('SUM(r.commission_earned) as total_earned')
       )
       .groupBy('r.referrer_id', 'u.name')
-      .orderBy('total_earned', 'desc')
+      .orderBy('referral_count', 'desc')
       .limit(20);
 
     res.json(rows.map((r: { name: string; referral_count: string; total_earned: string }, i: number) => ({
