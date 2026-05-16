@@ -265,6 +265,15 @@ export async function paypalWebhook(req: Request, res: Response, next: NextFunct
 }
 
 /* ── POST /api/subscriptions/gcash-submit ───────────────────────────────────── */
+export async function getGcashPendingPlans(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const rows = await db('gcash_payments')
+      .where({ user_id: req.user!.id, status: 'pending' })
+      .select('plan');
+    res.json({ pending_plans: rows.map((r: { plan: string }) => r.plan) });
+  } catch (err) { next(err); }
+}
+
 export async function submitGcashPayment(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     const { plan, reference, screenshot_data } = req.body as {
