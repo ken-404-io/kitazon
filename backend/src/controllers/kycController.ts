@@ -3,6 +3,7 @@ import { v2 as cloudinary } from 'cloudinary';
 import db from '../../config/database';
 import { DbUser, KycStatus } from '../types';
 import { logAudit } from '../services/audit';
+import { sendKycApprovedEmail, sendKycRejectedEmail } from '../services/email';
 
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
@@ -196,6 +197,10 @@ export async function adminApprove(req: Request, res: Response, next: NextFuncti
     });
 
     await logAudit(req.user!.id, 'kyc_approve', req, { metadata: { target_user: sub.user_id } });
+
+    const user = await db<DbUser>('users').where({ id: sub.user_id }).select('email', 'name').first();
+    if (user) sendKycApprovedEmail(user.email, user.name).catch(() => {});
+
     res.json({ message: 'KYC approved.' });
   } catch (err) { next(err); }
 }
@@ -227,6 +232,10 @@ export async function adminReject(req: Request, res: Response, next: NextFunctio
     });
 
     await logAudit(req.user!.id, 'kyc_reject', req, { metadata: { target_user: sub.user_id, reason } });
+
+    const user = await db<DbUser>('users').where({ id: sub.user_id }).select('email', 'name').first();
+    if (user) sendKycRejectedEmail(user.email, user.name, reason.trim()).catch(() => {});
+
     res.json({ message: 'KYC rejected.' });
   } catch (err) { next(err); }
 }
