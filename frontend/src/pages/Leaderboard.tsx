@@ -24,7 +24,7 @@ export default function Leaderboard() {
         const realNames = new Set(real.map((l) => l.name.toLowerCase()));
         const filtered = leaderboardSeedData.filter((s) => !realNames.has(s.name.toLowerCase()));
         const merged = [...real, ...filtered]
-          .sort((a, b) => b.total_earned - a.total_earned)
+          .sort((a, b) => b.referral_count - a.referral_count || b.total_earned - a.total_earned)
           .map((l, i) => ({ ...l, rank: i + 1 }));
         setLeaders(merged);
       })
