@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react';
 import api from '../services/api';
 import { Skeleton } from '../components/ui/Skeleton';
 import { TrophyIcon, MedalIcon } from '../components/ui/Icons';
-import { leaderboardSeedData } from './leaderboardSeedData';
 
 interface Leader {
   rank: number;
@@ -21,16 +20,9 @@ export default function Leaderboard() {
     api.get<Leader[]>('/referrals/leaderboard')
       .then((r) => {
         const real = Array.isArray(r.data) ? r.data : [];
-        const realNames = new Set(real.map((l) => l.name.toLowerCase()));
-        const filtered = leaderboardSeedData.filter((s) => !realNames.has(s.name.toLowerCase()));
-        const merged = [...real, ...filtered]
-          .sort((a, b) => b.referral_count - a.referral_count || b.total_earned - a.total_earned)
-          .map((l, i) => ({ ...l, rank: i + 1 }));
-        setLeaders(merged);
+        setLeaders(real.map((l, i) => ({ ...l, rank: i + 1 })));
       })
-      .catch(() => {
-        setLeaders(leaderboardSeedData);
-      })
+      .catch(() => setLeaders([]))
       .finally(() => setLoading(false));
   }, []);
 
@@ -53,10 +45,16 @@ export default function Leaderboard() {
             <Skeleton height={24} width={70} />
           </div>
         ))
+      ) : leaders.length === 0 ? (
+        <div style={{ textAlign: 'center', padding: '3rem 1rem', color: 'var(--text-muted)' }}>
+          <p style={{ fontSize: 36, margin: '0 0 0.5rem' }}>🏆</p>
+          <p style={{ fontSize: 15, fontWeight: 600 }}>No referrals yet</p>
+          <p style={{ fontSize: 13 }}>Be the first to refer friends and claim the top spot!</p>
+        </div>
       ) : (
         leaders.map((l) => (
           <div key={l.rank} className="card" style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 8 }}>
-            <div style={{ minWidth: 36, textAlign: 'center', color: l.rank <= 3 ? MEDAL_COLORS[l.rank - 1] : 'var(--text-muted)', fontWeight: 700, fontSize: l.rank <= 3 ? 14 : 14 }}>
+            <div style={{ minWidth: 36, textAlign: 'center', color: l.rank <= 3 ? MEDAL_COLORS[l.rank - 1] : 'var(--text-muted)', fontWeight: 700, fontSize: 14 }}>
               {l.rank <= 3
                 ? <span style={{ color: MEDAL_COLORS[l.rank - 1] }}><MedalIcon /></span>
                 : <span>#{l.rank}</span>}
