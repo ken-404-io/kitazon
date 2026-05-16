@@ -56,7 +56,12 @@ const PLANS: {
   },
 ];
 
-const GCASH_QR_URL   = process.env.REACT_APP_GCASH_QR_URL   ?? '';
+const GCASH_QR: Record<string, string> = {
+  silver:  'https://res.cloudinary.com/dtm4n2uk3/image/upload/v1778916894/4432f02f-79d9-4bf7-bd8f-39f0b63487ad_qbjxzx.jpg',
+  gold:    'https://res.cloudinary.com/dtm4n2uk3/image/upload/v1778916894/1593c9bc-c490-4854-826d-72ad2a5a79a1_cwdk3l.jpg',
+  diamond: 'https://res.cloudinary.com/dtm4n2uk3/image/upload/v1778916894/69504c45-6f87-43b1-aebe-83d55a30e5be_p6tncl.jpg',
+};
+
 const GCASH_NUMBER   = process.env.REACT_APP_GCASH_NUMBER   ?? '';
 const GCASH_NAME     = process.env.REACT_APP_GCASH_NAME     ?? 'Kitazon';
 
@@ -192,9 +197,9 @@ export default function Plans() {
                 <div className={styles.gcashInstruction}>
                   <p className={styles.instructionTitle}>Send exactly <strong style={{ color: '#0073e6' }}>₱{modal.priceNum.toLocaleString()}</strong> to this GCash account:</p>
 
-                  {GCASH_QR_URL ? (
+                  {GCASH_QR[modal.plan] ? (
                     <div className={styles.qrWrapper}>
-                      <img src={GCASH_QR_URL} alt="GCash QR Code" className={styles.qrImage} />
+                      <img src={GCASH_QR[modal.plan]} alt={`${modal.name} GCash QR Code`} className={styles.qrImage} />
                     </div>
                   ) : (
                     <div className={styles.qrPlaceholder}>
