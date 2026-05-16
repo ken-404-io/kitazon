@@ -241,6 +241,22 @@ export default function Plans() {
                 </div>
 
                 <div className={styles.refSection}>
+                  {/* Step-by-step guide */}
+                  <div className={styles.stepsBox}>
+                    <p className={styles.stepsTitle}>How to Pay</p>
+                    {[
+                      { n: 1, text: 'Screenshot or long-press the QR code above to save it.' },
+                      { n: 2, text: 'Open GCash → tap "Pay QR" → tap the upload icon → select the saved QR.' },
+                      { n: 3, text: 'Confirm and complete the payment in GCash.' },
+                      { n: 4, text: 'Come back here, upload your receipt and enter the reference number below.' },
+                    ].map(s => (
+                      <div key={s.n} className={styles.stepRow}>
+                        <span className={styles.stepNum}>{s.n}</span>
+                        <span className={styles.stepText}>{s.text}</span>
+                      </div>
+                    ))}
+                  </div>
+
                   <label className={styles.refLabel}>GCash Reference Number</label>
                   <input
                     className={styles.refInput}

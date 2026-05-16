@@ -368,3 +368,50 @@
   margin-top: 0.25rem;
 }
 .removeScreenshot:hover { text-decoration: underline; }
+
+.stepsBox {
+  background: rgba(0, 115, 230, 0.07);
+  border: 1px solid rgba(0, 115, 230, 0.2);
+  border-radius: 12px;
+  padding: 0.85rem 1rem;
+  margin-bottom: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+.stepsTitle {
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: #60a5fa;
+  margin: 0 0 0.35rem;
+}
+
+.stepRow {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+}
+
+.stepNum {
+  flex-shrink: 0;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #0073e6;
+  color: #fff;
+  font-size: 0.7rem;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 1px;
+}
+
+.stepText {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  line-height: 1.5;
+}
