@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import authMiddleware from '../middleware/auth';
 import adminAuth from '../middleware/adminAuth';
-import { platformStats, listUsers, toggleUserActive, listWithdrawals, updateWithdrawalStatus, listAuditLogs, listTasks, createTask, updateTask, updateUserPlan, adjustBalance, broadcastEmail, revenueStats, bulkImportTasks, grantLeaderboardRewards, listOnlineUsers, bulkApproveWithdrawals } from '../controllers/adminController';
+import { platformStats, listUsers, toggleUserActive, listWithdrawals, updateWithdrawalStatus, listAuditLogs, listTasks, createTask, updateTask, updateUserPlan, adjustBalance, broadcastEmail, revenueStats, bulkImportTasks, grantLeaderboardRewards, listOnlineUsers, bulkApproveWithdrawals, listGcashPayments, approveGcashPayment, rejectGcashPayment } from '../controllers/adminController';
 
 const router = Router();
 
@@ -24,5 +24,8 @@ router.patch('/tasks/:id', updateTask);
 router.post('/broadcast', broadcastEmail);
 router.get('/revenue', revenueStats);
 router.post('/leaderboard-rewards', grantLeaderboardRewards);
+router.get('/gcash-payments', listGcashPayments);
+router.patch('/gcash-payments/:id/approve', approveGcashPayment);
+router.patch('/gcash-payments/:id/reject', rejectGcashPayment);
 
 export default router;

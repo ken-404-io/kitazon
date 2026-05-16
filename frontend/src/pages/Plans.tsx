@@ -71,6 +71,7 @@ export default function Plans() {
 
   const [modal, setModal] = useState<typeof PLANS[number] | null>(null);
   const [reference, setReference] = useState('');
+  const [screenshot, setScreenshot] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState('');
   const [submitted, setSubmitted] = useState(false);
@@ -78,8 +79,18 @@ export default function Plans() {
   const openModal = (p: typeof PLANS[number]) => {
     setModal(p);
     setReference('');
+    setScreenshot(null);
     setSubmitError('');
     setSubmitted(false);
+  };
+
+  const handleScreenshot = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) { setSubmitError('Screenshot must be under 5 MB.'); return; }
+    const reader = new FileReader();
+    reader.onload = () => setScreenshot(reader.result as string);
+    reader.readAsDataURL(file);
   };
 
   const closeModal = () => {
@@ -96,7 +107,11 @@ export default function Plans() {
     }
     setSubmitting(true);
     try {
-      await api.post('/subscriptions/gcash-submit', { plan: modal.plan, reference: reference.trim() });
+      await api.post('/subscriptions/gcash-submit', {
+        plan: modal.plan,
+        reference: reference.trim(),
+        ...(screenshot ? { screenshot_data: screenshot } : {}),
+      });
       setSubmitted(true);
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { message?: string } } }).response?.data?.message;
@@ -225,6 +240,38 @@ export default function Plans() {
                     maxLength={50}
                     disabled={submitting}
                   />
+
+                  <label className={styles.refLabel} style={{ marginTop: '0.75rem' }}>
+                    Screenshot / Receipt <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>(optional but recommended)</span>
+                  </label>
+                  <label className={styles.screenshotUpload}>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      style={{ display: 'none' }}
+                      onChange={handleScreenshot}
+                      disabled={submitting}
+                    />
+                    {screenshot ? (
+                      <img src={screenshot} alt="Receipt preview" className={styles.screenshotPreview} />
+                    ) : (
+                      <div className={styles.screenshotPlaceholder}>
+                        <span style={{ fontSize: '1.5rem' }}>📷</span>
+                        <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Tap to attach receipt</span>
+                      </div>
+                    )}
+                  </label>
+                  {screenshot && (
+                    <button
+                      className={styles.removeScreenshot}
+                      onClick={() => setScreenshot(null)}
+                      disabled={submitting}
+                      type="button"
+                    >
+                      Remove photo
+                    </button>
+                  )}
+
                   {submitError && <p className={styles.refError}>{submitError}</p>}
                 </div>
 

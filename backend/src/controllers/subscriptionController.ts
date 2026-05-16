@@ -1,9 +1,16 @@
 import { Request, Response, NextFunction } from 'express';
+import { v2 as cloudinary } from 'cloudinary';
 import db from '../../config/database';
 import { DbUser, UserPlan, DbWithdrawal, WithdrawalStatus } from '../types';
 import { logAudit } from '../services/audit';
 import { sendPlanUpgradeEmail, sendWithdrawalStatusEmail, sendGcashPaymentNotificationEmail } from '../services/email';
 import { paypalBase, getPayPalToken } from '../services/paypal';
+
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key:    process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
+});
 
 const PLAN_PRICES: Record<Exclude<UserPlan, 'free'>, { amount: string; label: string }> = {
   silver:  { amount: '499.00', label: 'Kitazon Silver Plan' },
@@ -260,7 +267,9 @@ export async function paypalWebhook(req: Request, res: Response, next: NextFunct
 /* ── POST /api/subscriptions/gcash-submit ───────────────────────────────────── */
 export async function submitGcashPayment(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const { plan, reference } = req.body as { plan?: string; reference?: string };
+    const { plan, reference, screenshot_data } = req.body as {
+      plan?: string; reference?: string; screenshot_data?: string;
+    };
 
     if (!plan || !(plan in PLAN_PRICES)) {
       res.status(400).json({ message: 'Invalid plan selected.' });
@@ -273,6 +282,30 @@ export async function submitGcashPayment(req: Request, res: Response, next: Next
     }
 
     const cfg = PLAN_PRICES[plan as Exclude<UserPlan, 'free'>];
+
+    // Upload screenshot to Cloudinary if provided
+    let screenshotUrl: string | null = null;
+    if (screenshot_data && typeof screenshot_data === 'string' && screenshot_data.startsWith('data:image/')) {
+      try {
+        const result = await cloudinary.uploader.upload(screenshot_data, {
+          folder: 'gcash_receipts',
+          public_id: `${req.user!.id}_${Date.now()}`,
+          overwrite: false,
+          resource_type: 'image',
+        });
+        screenshotUrl = result.secure_url;
+      } catch { /* screenshot upload failed — continue without it */ }
+    }
+
+    // Persist to gcash_payments table
+    await db('gcash_payments').insert({
+      user_id: req.user!.id,
+      plan,
+      amount: cfg.amount,
+      reference: ref,
+      screenshot_url: screenshotUrl,
+      status: 'pending',
+    });
 
     await logAudit(req.user!.id, 'gcash_payment_submitted', req, {
       metadata: { plan, reference: ref, amount: cfg.amount },

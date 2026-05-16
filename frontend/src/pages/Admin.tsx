@@ -4,7 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import api from '../services/api';
 import { WithdrawalStatus, WithdrawalChannel } from '../types';
 
-type Tab = 'stats' | 'users' | 'withdrawals' | 'pending-withdrawals' | 'tasks' | 'logs' | 'revenue' | 'broadcast' | 'kyc' | 'online';
+type Tab = 'stats' | 'users' | 'withdrawals' | 'pending-withdrawals' | 'tasks' | 'logs' | 'revenue' | 'broadcast' | 'kyc' | 'online' | 'gcash-payments';
 
 const TAB_LABELS: Record<Tab, string> = {
   stats: 'Stats',
@@ -14,6 +14,7 @@ const TAB_LABELS: Record<Tab, string> = {
   withdrawals: 'All Withdrawals',
   tasks: 'Tasks',
   kyc: 'KYC',
+  'gcash-payments': 'GCash Payments',
   online: 'Online',
   logs: 'Audit Logs',
   broadcast: 'Broadcast',
@@ -47,6 +48,20 @@ interface KycSubmission {
   id_front_data: string | null;
   id_back_data: string | null;
   selfie_data: string | null;
+}
+
+interface GcashPayment {
+  id: number;
+  user_id: number;
+  user_name: string;
+  user_email: string;
+  plan: string;
+  amount: string;
+  reference: string;
+  screenshot_url: string | null;
+  status: string;
+  admin_note: string | null;
+  created_at: string;
 }
 
 interface PlatformStats {
@@ -202,6 +217,12 @@ export default function Admin() {
   const [kycRejectId, setKycRejectId] = useState<number | null>(null);
   const [kycRejectReason, setKycRejectReason] = useState('');
 
+  // GCash Payments
+  const [gcashPayments, setGcashPayments] = useState<GcashPayment[]>([]);
+  const [gcashFilter, setGcashFilter] = useState('pending');
+  const [gcashLoading, setGcashLoading] = useState(false);
+  const [gcashPreview, setGcashPreview] = useState<string | null>(null);
+
   // Online users
   const [onlineUsers, setOnlineUsers] = useState<OnlineUser[]>([]);
   const [onlineCount, setOnlineCount] = useState<number | null>(null);
@@ -293,6 +314,14 @@ export default function Admin() {
     } finally { setKycLoading(false); }
   }, []);
 
+  const loadGcashPayments = useCallback(async (status: string) => {
+    setGcashLoading(true);
+    try {
+      const res = await api.get<GcashPayment[]>(`/admin/gcash-payments?status=${status}`);
+      setGcashPayments(res.data);
+    } finally { setGcashLoading(false); }
+  }, []);
+
   const loadOnline = useCallback(async () => {
     setOnlineLoading(true);
     try {
@@ -317,8 +346,9 @@ export default function Admin() {
     if (tab === 'logs') loadLogs(logPage);
     if (tab === 'revenue' && !revenueStats) loadRevenue();
     if (tab === 'kyc') loadKyc(kycFilter);
+    if (tab === 'gcash-payments') loadGcashPayments(gcashFilter);
     if (tab === 'online') loadOnline();
-  }, [tab, userPage, wPage, wFilter, logPage, kycFilter, stats, revenueStats, loadStats, loadUsers, loadWithdrawals, loadTasks, loadLogs, loadRevenue, loadKyc, loadOnline]);
+  }, [tab, userPage, wPage, wFilter, logPage, kycFilter, gcashFilter, stats, revenueStats, loadStats, loadUsers, loadWithdrawals, loadTasks, loadLogs, loadRevenue, loadKyc, loadGcashPayments, loadOnline]);
 
   // Auto-refresh online tab every 30 seconds
   useEffect(() => {
@@ -468,7 +498,7 @@ export default function Admin() {
       )}
       <h2>Admin Panel</h2>
       <div style={{ display: 'flex', gap: 8, marginBottom: '1.5rem', flexWrap: 'wrap' }}>
-        {(['stats', 'revenue', 'users', 'pending-withdrawals', 'withdrawals', 'tasks', 'kyc', 'online', 'logs', 'broadcast'] as Tab[]).map(t => (
+        {(['stats', 'revenue', 'users', 'pending-withdrawals', 'withdrawals', 'tasks', 'kyc', 'gcash-payments', 'online', 'logs', 'broadcast'] as Tab[]).map(t => (
           <button key={t} style={tabStyle(t)} onClick={() => setTab(t)}>
             {t === 'online'
               ? `🟢 ${TAB_LABELS[t]}${onlineCount !== null ? ` (${onlineCount})` : ''}`
@@ -1319,6 +1349,113 @@ export default function Admin() {
                     </tr>
                   );
                 })}
+              </tbody>
+            </table>
+          )}
+        </div>
+      )}
+
+      {/* ── GCash Payments ── */}
+      {tab === 'gcash-payments' && (
+        <div>
+          {/* Screenshot lightbox */}
+          {gcashPreview && (
+            <div
+              onClick={() => setGcashPreview(null)}
+              style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'zoom-out' }}
+            >
+              <img src={gcashPreview} alt="Receipt" style={{ maxWidth: '90vw', maxHeight: '90vh', borderRadius: 12, objectFit: 'contain' }} />
+            </div>
+          )}
+
+          <div style={{ display: 'flex', gap: 8, marginBottom: '1rem', alignItems: 'center' }}>
+            {(['pending', 'approved', 'rejected'] as const).map(s => (
+              <button key={s} onClick={() => setGcashFilter(s)} style={{
+                padding: '6px 14px', borderRadius: 6, cursor: 'pointer', fontWeight: gcashFilter === s ? 700 : 400,
+                background: gcashFilter === s ? 'var(--gold)' : 'transparent',
+                color: gcashFilter === s ? '#000' : 'inherit',
+                border: '1px solid var(--gold)', textTransform: 'capitalize',
+              }}>{s}</button>
+            ))}
+            <button onClick={() => loadGcashPayments(gcashFilter)} style={{ marginLeft: 'auto', padding: '6px 14px', borderRadius: 6, border: '1px solid var(--border)', background: 'transparent', cursor: 'pointer' }}>
+              {gcashLoading ? 'Loading…' : '↻ Refresh'}
+            </button>
+          </div>
+
+          {gcashLoading && gcashPayments.length === 0 ? <p>Loading…</p> : gcashPayments.length === 0 ? (
+            <p style={{ color: 'var(--text-muted)', padding: '2rem', textAlign: 'center' }}>No {gcashFilter} payments.</p>
+          ) : (
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+              <thead>
+                <tr style={{ borderBottom: '2px solid var(--border)' }}>
+                  {['Submitted', 'User', 'Plan', 'Amount', 'Reference #', 'Receipt', 'Status', 'Actions'].map(h => (
+                    <th key={h} style={{ textAlign: 'left', padding: '8px 10px', whiteSpace: 'nowrap' }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {gcashPayments.map(g => (
+                  <tr key={g.id} style={{ borderBottom: '1px solid var(--border)' }}>
+                    <td style={{ padding: '8px 10px', whiteSpace: 'nowrap' }}>
+                      <div>{new Date(g.created_at).toLocaleDateString('en-PH', { timeZone: 'Asia/Manila' })}</div>
+                      <div style={{ fontSize: 11, color: '#9ca3af' }}>{new Date(g.created_at).toLocaleTimeString('en-PH', { timeZone: 'Asia/Manila', hour: '2-digit', minute: '2-digit' })}</div>
+                    </td>
+                    <td style={{ padding: '8px 10px' }}>
+                      <div style={{ fontWeight: 600 }}>{g.user_name}</div>
+                      <div style={{ fontSize: 11, color: '#9ca3af' }}>{g.user_email}</div>
+                    </td>
+                    <td style={{ padding: '8px 10px' }}>
+                      <span style={{ textTransform: 'capitalize', fontWeight: 700, color: g.plan === 'diamond' ? '#60a5fa' : g.plan === 'gold' ? '#f59e0b' : '#9ca3af' }}>
+                        {g.plan}
+                      </span>
+                    </td>
+                    <td style={{ padding: '8px 10px', fontWeight: 700, color: '#22c55e' }}>₱{g.amount}</td>
+                    <td style={{ padding: '8px 10px', fontFamily: 'monospace', fontSize: 12 }}>{g.reference}</td>
+                    <td style={{ padding: '8px 10px' }}>
+                      {g.screenshot_url ? (
+                        <img
+                          src={g.screenshot_url}
+                          alt="receipt"
+                          onClick={() => setGcashPreview(g.screenshot_url)}
+                          style={{ width: 52, height: 52, objectFit: 'cover', borderRadius: 6, cursor: 'zoom-in', border: '1px solid var(--border)' }}
+                        />
+                      ) : <span style={{ color: '#6b7280', fontSize: 11 }}>None</span>}
+                    </td>
+                    <td style={{ padding: '8px 10px' }}>
+                      <span style={{
+                        fontSize: 11, fontWeight: 700, padding: '3px 8px', borderRadius: 20, textTransform: 'capitalize',
+                        background: g.status === 'approved' ? 'rgba(34,197,94,0.15)' : g.status === 'rejected' ? 'rgba(239,68,68,0.15)' : 'rgba(234,179,8,0.15)',
+                        color: g.status === 'approved' ? '#22c55e' : g.status === 'rejected' ? '#ef4444' : '#eab308',
+                      }}>{g.status}</span>
+                      {g.admin_note && <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 2 }}>{g.admin_note}</div>}
+                    </td>
+                    <td style={{ padding: '8px 10px' }}>
+                      {g.status === 'pending' && (
+                        <div style={{ display: 'flex', gap: 6 }}>
+                          <button
+                            onClick={async () => {
+                              if (!window.confirm(`Approve ${g.plan} plan for ${g.user_name}? This will activate their plan.`)) return;
+                              await api.patch(`/admin/gcash-payments/${g.id}/approve`);
+                              showToast('Plan activated!');
+                              loadGcashPayments(gcashFilter);
+                            }}
+                            style={{ padding: '4px 10px', background: '#16a34a', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 12, fontWeight: 700 }}
+                          >Approve</button>
+                          <button
+                            onClick={async () => {
+                              const note = window.prompt('Rejection reason (optional):') ?? '';
+                              if (note === null) return;
+                              await api.patch(`/admin/gcash-payments/${g.id}/reject`, { note });
+                              showToast('Payment rejected.');
+                              loadGcashPayments(gcashFilter);
+                            }}
+                            style={{ padding: '4px 10px', background: 'transparent', color: '#ef4444', border: '1px solid #ef4444', borderRadius: 6, cursor: 'pointer', fontSize: 12 }}
+                          >Reject</button>
+                        </div>
+                      )}
+                    </td>
+                  </tr>
+                ))}
               </tbody>
             </table>
           )}
