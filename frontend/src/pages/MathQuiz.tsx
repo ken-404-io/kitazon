@@ -58,38 +58,72 @@ function makeQuestion(): Question {
 
 /* ── Adsterra ad break component ─────────────────────────────────────────── */
 function AdBreak({ onDone }: { onDone: () => void }) {
-  const [secs, setSecs] = useState(AD_SECONDS);
+  const [secs, setSecs]       = useState(AD_SECONDS);
+  const [adReady, setAdReady] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+  const doneCalledRef = useRef(false);
+
+  const skip = useCallback(() => {
+    if (doneCalledRef.current) return;
+    doneCalledRef.current = true;
+    onDone();
+  }, [onDone]);
 
   useEffect(() => {
     if (!containerRef.current) return;
     containerRef.current.innerHTML = '';
 
-    // atOptions config script
+    // If no iframe appears within 4s the ad failed — skip immediately
+    const fallback = setTimeout(skip, 4000);
+
+    // Watch for iframe injected by the ad script → ad rendered successfully
+    const observer = new MutationObserver(() => {
+      if (containerRef.current?.querySelector('iframe')) {
+        observer.disconnect();
+        clearTimeout(fallback);
+        setAdReady(true);
+      }
+    });
+    observer.observe(containerRef.current, { childList: true, subtree: true });
+
     const cfg = document.createElement('script');
     cfg.type = 'text/javascript';
     cfg.text = `atOptions = { 'key': '00611793b43988f6f1c486423ed8b687', 'format': 'iframe', 'height': 250, 'width': 300, 'params': {} };`;
     containerRef.current.appendChild(cfg);
 
-    // invoke script
     const invoke = document.createElement('script');
     invoke.type = 'text/javascript';
     invoke.src = 'https://www.highperformanceformat.com/00611793b43988f6f1c486423ed8b687/invoke.js';
+    // Script failed to load (network error / blocked) → skip immediately
+    invoke.onerror = () => {
+      observer.disconnect();
+      clearTimeout(fallback);
+      skip();
+    };
     containerRef.current.appendChild(invoke);
-  }, []);
 
+    return () => {
+      clearTimeout(fallback);
+      observer.disconnect();
+    };
+  }, [skip]);
+
+  // Countdown only starts once the ad is confirmed rendered
   useEffect(() => {
-    if (secs <= 0) { onDone(); return; }
+    if (!adReady) return;
+    if (secs <= 0) { skip(); return; }
     const t = setTimeout(() => setSecs(s => s - 1), 1000);
     return () => clearTimeout(t);
-  }, [secs, onDone]);
+  }, [secs, adReady, skip]);
 
   return (
     <div className={styles.adBreak}>
-      <p className={styles.adLabel}>Ad — next question in {secs}s</p>
+      <p className={styles.adLabel}>
+        {adReady ? `AD — next question in ${secs}s` : 'Loading…'}
+      </p>
       <div ref={containerRef} className={styles.adContainer} />
-      <button className={styles.skipBtn} onClick={onDone} disabled={secs > 0}>
-        {secs > 0 ? `Skip in ${secs}s` : 'Continue →'}
+      <button className={styles.skipBtn} onClick={skip} disabled={adReady && secs > 0}>
+        {!adReady ? 'Loading…' : secs > 0 ? `Skip in ${secs}s` : 'Continue →'}
       </button>
     </div>
   );
