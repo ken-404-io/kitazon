@@ -217,6 +217,11 @@ export default function Admin() {
   const [kycRejectId, setKycRejectId] = useState<number | null>(null);
   const [kycRejectReason, setKycRejectReason] = useState('');
 
+  // Referral count edit
+  const [editingReferrals, setEditingReferrals] = useState<number | null>(null);
+  const [referralInput, setReferralInput] = useState('');
+  const [referralLoading, setReferralLoading] = useState(false);
+
   // GCash Payments
   const [gcashPayments, setGcashPayments] = useState<GcashPayment[]>([]);
   const [gcashFilter, setGcashFilter] = useState('pending');
@@ -673,7 +678,58 @@ export default function Admin() {
                           >
                             💰 Adjust
                           </button>
+                          <button
+                            className="btn-outline"
+                            style={{ fontSize: 12, padding: '4px 10px', borderColor: '#60a5fa', color: '#60a5fa' }}
+                            onClick={() => {
+                              if (editingReferrals === u.id) { setEditingReferrals(null); }
+                              else { setEditingReferrals(u.id); setReferralInput(''); }
+                            }}
+                          >
+                            👥 Referrals
+                          </button>
                         </div>
+                        {editingReferrals === u.id && (
+                          <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 6, minWidth: 200 }}>
+                            <input
+                              type="number"
+                              min={0}
+                              step={1}
+                              placeholder="Set total referral count"
+                              value={referralInput}
+                              onChange={e => setReferralInput(e.target.value)}
+                              style={{ padding: '5px 8px', borderRadius: 6, border: '1px solid #60a5fa', fontSize: 12, width: '100%' }}
+                            />
+                            <div style={{ display: 'flex', gap: 6 }}>
+                              <button
+                                className="btn-primary"
+                                style={{ fontSize: 12, padding: '4px 10px', flex: 1 }}
+                                disabled={referralLoading || referralInput === ''}
+                                onClick={async () => {
+                                  const count = parseInt(referralInput, 10);
+                                  if (isNaN(count) || count < 0) { showToast('Enter a valid number.'); return; }
+                                  setReferralLoading(true);
+                                  try {
+                                    await api.post(`/admin/users/${u.id}/referrals`, { count });
+                                    showToast(`Referral count set to ${count}`);
+                                    setEditingReferrals(null);
+                                  } catch (err: unknown) {
+                                    showToast((err as { response?: { data?: { message?: string } } }).response?.data?.message ?? 'Failed.');
+                                  } finally { setReferralLoading(false); }
+                                }}
+                              >
+                                {referralLoading ? 'Saving…' : 'Set'}
+                              </button>
+                              <button
+                                className="btn-outline"
+                                style={{ fontSize: 12, padding: '4px 10px' }}
+                                onClick={() => setEditingReferrals(null)}
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                          </div>
+                        )}
                         {adjustingUser === u.id && (
                           <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 6, minWidth: 200 }}>
                             <input
