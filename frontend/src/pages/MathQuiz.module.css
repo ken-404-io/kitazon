@@ -155,6 +155,8 @@
   align-items: center;
   gap: 1rem;
   padding: 1.5rem 0;
+  position: relative;
+  z-index: 9001;
 }
 .adLabel {
   font-size: 0.8rem;
@@ -253,6 +255,15 @@
   transition: background 0.15s;
 }
 .dashBtn:hover { background: var(--dark-card); }
+
+/* Nav intercept overlay — sits above everything except the leave modal */
+.navIntercept {
+  position: fixed;
+  inset: 0;
+  z-index: 9000;
+  background: transparent;
+  cursor: default;
+}
 
 /* Leave confirmation modal */
 .leaveOverlay {

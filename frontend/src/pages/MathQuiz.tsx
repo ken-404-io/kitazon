@@ -261,6 +261,11 @@ function QuizInner() {
     <>
       {showLeaveModal && <LeaveConfirmModal onStay={handleStay} onLeave={handleLeave} />}
 
+      {/* Transparent overlay during ad phase — intercepts any click outside the ad area */}
+      {isAdPhase && !showLeaveModal && (
+        <div className={styles.navIntercept} onClick={() => setShowLeaveModal(true)} />
+      )}
+
       {phase === 'ad' && (
         <AdBreak onDone={nextQuestion} onAbandoned={handleAbandoned} />
       )}
