@@ -22,15 +22,15 @@ export default function Credits() {
 
   useEffect(() => { load(); }, []);
 
-  const creditsPreview = Math.floor((Number(convertAmt) || 0) / PHP_PER_CREDIT);
-  const phpToSpend     = creditsPreview * PHP_PER_CREDIT;
-  const canConvert     = creditsPreview >= 1 && balance !== null && phpToSpend <= balance;
+  const creditInput    = Math.max(0, Math.floor(Number(convertAmt) || 0));
+  const phpToSpend     = creditInput * PHP_PER_CREDIT;
+  const canConvert     = creditInput >= 1 && balance !== null && phpToSpend <= balance;
 
   const handleConvert = async () => {
     if (!canConvert) return;
     setLoading(true);
     try {
-      const res = await api.post<{ credits: number; balance: number; message: string }>('/credits/convert', { amount: phpToSpend });
+      const res = await api.post<{ credits: number; balance: number; message: string }>('/credits/convert', { amount: phpToSpend, credits: creditInput });
       showToast(res.data.message, 'success');
       setCredits(res.data.credits);
       setBalance(res.data.balance);
@@ -92,17 +92,17 @@ export default function Credits() {
       <div className="card">
         <p style={{ fontWeight: 700, fontSize: '0.88rem', marginBottom: 4 }}>Convert Balance → Credits</p>
         <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '1rem' }}>
-          Minimum ₱{PHP_PER_CREDIT} · only multiples of ₱{PHP_PER_CREDIT} are accepted
+          Enter how many credits you want · 1 credit costs ₱{PHP_PER_CREDIT}
         </p>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: '0.6rem' }}>
           <div style={{ flex: 1, display: 'flex', alignItems: 'center', border: '1.5px solid var(--border)', borderRadius: 12, overflow: 'hidden', background: 'var(--surface)' }}>
-            <span style={{ padding: '0 0 0 14px', color: 'var(--text-muted)', fontWeight: 700, fontSize: '0.9rem' }}>₱</span>
+            <span style={{ padding: '0 0 0 14px', color: '#60a5fa', fontWeight: 700, fontSize: '0.9rem' }}>CR</span>
             <input
               type="number"
-              min={PHP_PER_CREDIT}
-              step={PHP_PER_CREDIT}
-              placeholder={`e.g. ${PHP_PER_CREDIT}`}
+              min={1}
+              step={1}
+              placeholder="e.g. 5"
               value={convertAmt}
               onChange={e => setConvertAmt(e.target.value)}
               style={{ flex: 1, border: 'none', background: 'transparent', padding: '0.7rem 0.75rem', fontSize: '0.9rem', color: 'var(--text)', outline: 'none' }}
@@ -120,17 +120,18 @@ export default function Credits() {
 
         {/* Live preview */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.65rem 0.85rem', background: 'var(--surface)', borderRadius: 10 }}>
-          <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>₱{phpToSpend || '0'} →</span>
-          <span style={{ fontSize: '0.88rem', fontWeight: 700, color: creditsPreview > 0 ? '#60a5fa' : 'var(--text-muted)' }}>
-            {creditsPreview} credit{creditsPreview !== 1 ? 's' : ''}
+          <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+            {creditInput > 0 ? `${creditInput} credit${creditInput !== 1 ? 's' : ''}` : '0 credits'} =
+          </span>
+          <span style={{ fontSize: '0.88rem', fontWeight: 700, color: creditInput > 0 ? '#f97316' : 'var(--text-muted)' }}>
+            ₱{phpToSpend.toLocaleString('en-PH', { minimumFractionDigits: 2 })}
           </span>
         </div>
 
-        {Number(convertAmt) > 0 && Number(convertAmt) < PHP_PER_CREDIT && (
-          <p style={{ fontSize: '0.72rem', color: 'var(--red)', marginTop: 6 }}>Minimum ₱{PHP_PER_CREDIT}</p>
-        )}
-        {balance !== null && phpToSpend > balance && phpToSpend > 0 && (
-          <p style={{ fontSize: '0.72rem', color: 'var(--red)', marginTop: 6 }}>Insufficient balance</p>
+        {creditInput > 0 && balance !== null && phpToSpend > balance && (
+          <p style={{ fontSize: '0.72rem', color: 'var(--red)', marginTop: 6 }}>
+            Insufficient balance — you need ₱{phpToSpend.toLocaleString('en-PH', { minimumFractionDigits: 2 })} but only have ₱{Number(balance).toLocaleString('en-PH', { minimumFractionDigits: 2 })}
+          </p>
         )}
       </div>
 
