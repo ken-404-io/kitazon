@@ -57,9 +57,9 @@ const PLANS: {
 ];
 
 const GCASH_QR: Record<string, string> = {
-  silver:  'https://res.cloudinary.com/dtm4n2uk3/image/upload/v1778916894/4432f02f-79d9-4bf7-bd8f-39f0b63487ad_qbjxzx.jpg',
-  gold:    'https://res.cloudinary.com/dtm4n2uk3/image/upload/v1778916894/1593c9bc-c490-4854-826d-72ad2a5a79a1_cwdk3l.jpg',
-  diamond: 'https://res.cloudinary.com/dtm4n2uk3/image/upload/v1778916894/69504c45-6f87-43b1-aebe-83d55a30e5be_p6tncl.jpg',
+  silver:  'https://res.cloudinary.com/dtm4n2uk3/image/upload/v1778935459/4432f02f-79d9-4bf7-bd8f-39f0b63487ad_qbjxzx.jpg',
+  gold:    'https://res.cloudinary.com/dtm4n2uk3/image/upload/v1778935610/1593c9bc-c490-4854-826d-72ad2a5a79a1_cwdk3l.jpg',
+  diamond: 'https://res.cloudinary.com/dtm4n2uk3/image/upload/v1778935570/69504c45-6f87-43b1-aebe-83d55a30e5be_p6tncl.jpg',
 };
 
 const GCASH_NUMBER   = process.env.REACT_APP_GCASH_NUMBER   ?? '';
