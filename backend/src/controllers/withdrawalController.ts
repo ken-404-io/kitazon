@@ -10,7 +10,7 @@ const VALID_CHANNELS: WithdrawalChannel[] = ['gcash'];
 // Philippine mobile number: 11 digits starting with 09 (e.g. 09171234567)
 // Also accept +63 prefix form (e.g. +639171234567)
 const ACCOUNT_PATTERN = /^(09\d{9}|\+639\d{9})$/;
-const QUIZ_GATE_REQUIRED = 30;
+const QUIZ_GATE_REQUIRED = 35;
 
 // GCash account-name validation:
 //  - Required (so we can match against the user's GCash registration).

@@ -231,7 +231,7 @@ export default function Withdraw() {
               {elig.quizzes_required !== undefined && (() => {
                 const frozen = elig.quiz_gate_frozen ?? false;
                 const done   = elig.quizzes_completed ?? 0;
-                const need   = elig.quizzes_required ?? 30;
+                const need   = elig.quizzes_required ?? 35;
                 const met    = !frozen && done >= need;
                 return (
                   <div className={`${styles.reqRow} ${met ? styles.reqDone : styles.reqPending}`}>
