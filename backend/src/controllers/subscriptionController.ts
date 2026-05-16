@@ -3,7 +3,7 @@ import { v2 as cloudinary } from 'cloudinary';
 import db from '../../config/database';
 import { DbUser, UserPlan, DbWithdrawal, WithdrawalStatus } from '../types';
 import { logAudit } from '../services/audit';
-import { sendPlanUpgradeEmail, sendWithdrawalStatusEmail, sendGcashPaymentNotificationEmail } from '../services/email';
+import { sendPlanUpgradeEmail, sendWithdrawalStatusEmail, sendGcashPaymentNotificationEmail, sendGcashPaymentReceivedEmail } from '../services/email';
 import { paypalBase, getPayPalToken } from '../services/paypal';
 
 cloudinary.config({
@@ -311,15 +311,16 @@ export async function submitGcashPayment(req: Request, res: Response, next: Next
       metadata: { plan, reference: ref, amount: cfg.amount },
     });
 
-    // Notify admin (fire-and-forget)
-    const adminEmail = process.env.ADMIN_EMAIL;
-    if (adminEmail) {
-      const user = await db<DbUser>('users').where({ id: req.user!.id }).first();
-      if (user) {
+    // Notify admin + confirm to user (fire-and-forget)
+    const user = await db<DbUser>('users').where({ id: req.user!.id }).first();
+    if (user) {
+      const adminEmail = process.env.ADMIN_EMAIL;
+      if (adminEmail) {
         sendGcashPaymentNotificationEmail(
           adminEmail, user.name, user.email, user.id, plan, cfg.amount, ref,
         ).catch(() => {});
       }
+      sendGcashPaymentReceivedEmail(user.email, user.name, plan, cfg.amount, ref).catch(() => {});
     }
 
     res.json({ message: 'Payment submitted! Admin will verify your GCash payment and activate your plan within 24 hours.' });

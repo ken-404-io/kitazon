@@ -229,6 +229,22 @@ export async function sendReferralEarnedEmail(to: string, name: string, referred
   `));
 }
 
+export async function sendGcashPaymentReceivedEmail(to: string, name: string, plan: string, amount: string, reference: string): Promise<void> {
+  const planLabel = plan.charAt(0).toUpperCase() + plan.slice(1);
+  await send(to, 'We received your GCash payment proof 📥', layout('Payment Proof Received', `
+    ${h2(`Payment received, ${name.split(' ')[0]}!`)}
+    ${p(`We've received your payment proof for the <strong style="color:#f97316;">${planLabel} Plan</strong>. Our team will verify your GCash transaction and activate your plan within <strong style="color:#e8e8e8;">24 hours</strong>.`)}
+    ${table(
+      row('Plan', `<span style="color:#f97316;font-weight:800;">${planLabel}</span>`) +
+      row('Amount', `₱${amount}`) +
+      row('Reference #', `<span style="font-family:monospace;">${reference}</span>`) +
+      row('Status', `<span style="color:#eab308;font-weight:800;">Under Review</span>`)
+    )}
+    ${p('You will receive another email once your plan has been activated. No further action is needed from you.')}
+    ${p('If you did <strong style="color:#e8e8e8;">not</strong> make this payment, please contact support immediately.')}
+  `));
+}
+
 export async function sendKycApprovedEmail(to: string, name: string): Promise<void> {
   const dashboardLink = `${BASE}/dashboard`;
   await send(to, '🎉 Your Kitazon identity has been verified!', layout('KYC Approved', `
