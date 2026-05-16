@@ -2,7 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import db from '../../config/database';
 import { DbUser, DbWithdrawal, WithdrawalStatus, UserPlan } from '../types';
 import { logAudit } from '../services/audit';
-import { sendWithdrawalStatusEmail, sendBroadcastEmail } from '../services/email';
+import { sendWithdrawalStatusEmail, sendBroadcastEmail, sendPlanUpgradeEmail } from '../services/email';
 
 // Maximum withdrawals approvable in a single bulk approve call. Throttling at
 // 5s per email means a batch of 100 takes ~8 minutes, so keep the cap modest.
@@ -705,5 +705,83 @@ export async function listOnlineUsers(req: Request, res: Response, next: NextFun
       .orderBy('last_active_at', 'desc');
 
     res.json({ count: rows.length, users: rows });
+  } catch (err) { next(err); }
+}
+
+// ─── GCash Payments ───────────────────────────────────────────────────────────
+export async function listGcashPayments(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const { status = 'pending' } = req.query as { status?: string };
+    const rows = await db('gcash_payments as g')
+      .join('users as u', 'u.id', 'g.user_id')
+      .where('g.status', status)
+      .orderBy('g.created_at', 'desc')
+      .select(
+        'g.id', 'g.user_id', 'g.plan', 'g.amount', 'g.reference',
+        'g.screenshot_url', 'g.status', 'g.admin_note', 'g.created_at',
+        'u.name as user_name', 'u.email as user_email',
+      );
+    res.json(rows);
+  } catch (err) { next(err); }
+}
+
+export async function approveGcashPayment(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const id = parseInt(req.params.id, 10);
+    const payment = await db('gcash_payments').where({ id }).first();
+    if (!payment) { res.status(404).json({ message: 'Payment not found.' }); return; }
+    if (payment.status !== 'pending') {
+      res.status(409).json({ message: 'Payment already reviewed.' }); return;
+    }
+
+    const PLAN_DURATION_DAYS = 30;
+    const expiresAt = new Date(Date.now() + PLAN_DURATION_DAYS * 24 * 3600 * 1000);
+
+    await db.transaction(async (trx) => {
+      await trx('gcash_payments').where({ id }).update({
+        status: 'approved',
+        reviewed_by: req.user!.id,
+        updated_at: new Date(),
+      });
+      await trx('users').where({ id: payment.user_id }).update({
+        plan: payment.plan,
+        plan_expires_at: expiresAt,
+      });
+    });
+
+    await logAudit(req.user!.id, 'gcash_payment_approved', req, {
+      metadata: { payment_id: id, user_id: payment.user_id, plan: payment.plan },
+    });
+
+    const user = await db<DbUser>('users').where({ id: payment.user_id }).select('email', 'name').first();
+    if (user) sendPlanUpgradeEmail(user.email, user.name, payment.plan, expiresAt).catch(() => {});
+
+    res.json({ message: 'Payment approved and plan activated.' });
+  } catch (err) { next(err); }
+}
+
+export async function rejectGcashPayment(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const id = parseInt(req.params.id, 10);
+    const { note } = req.body as { note?: string };
+
+    const payment = await db('gcash_payments').where({ id }).first();
+    if (!payment) { res.status(404).json({ message: 'Payment not found.' }); return; }
+    if (payment.status !== 'pending') {
+      res.status(409).json({ message: 'Payment already reviewed.' }); return;
+    }
+
+    await db('gcash_payments').where({ id }).update({
+      status: 'rejected',
+      admin_note: note?.trim() ?? null,
+      reviewed_by: req.user!.id,
+      updated_at: new Date(),
+    });
+
+    await logAudit(req.user!.id, 'gcash_payment_rejected', req, {
+      metadata: { payment_id: id, user_id: payment.user_id, note },
+    });
+
+    res.json({ message: 'Payment rejected.' });
   } catch (err) { next(err); }
 }
