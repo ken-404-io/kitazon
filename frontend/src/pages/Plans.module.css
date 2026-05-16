@@ -121,6 +121,18 @@
   background: transparent;
 }
 
+.reviewingBtn {
+  text-align: center;
+  padding: 0.75rem;
+  border-radius: 12px;
+  font-weight: 700;
+  font-size: 0.88rem;
+  color: #9ca3af;
+  border: 1.5px solid rgba(234,179,8,0.35);
+  background: rgba(234,179,8,0.08);
+  cursor: default;
+}
+
 .note {
   text-align: center;
   font-size: 0.8rem;

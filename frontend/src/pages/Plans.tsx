@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { UserPlan } from '../types';
 import api from '../services/api';
@@ -69,6 +69,14 @@ export default function Plans() {
   const { user } = useAuth();
   const currentPlan = user?.plan ?? 'free';
 
+  const [pendingPlans, setPendingPlans] = useState<string[]>([]);
+
+  useEffect(() => {
+    api.get<{ pending_plans: string[] }>('/subscriptions/gcash-pending')
+      .then(r => setPendingPlans(r.data.pending_plans))
+      .catch(() => {});
+  }, []);
+
   const [modal, setModal] = useState<typeof PLANS[number] | null>(null);
   const [reference, setReference] = useState('');
   const [screenshot, setScreenshot] = useState<string | null>(null);
@@ -113,6 +121,7 @@ export default function Plans() {
         ...(screenshot ? { screenshot_data: screenshot } : {}),
       });
       setSubmitted(true);
+      setPendingPlans(prev => [...prev, modal.plan]);
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { message?: string } } }).response?.data?.message;
       setSubmitError(msg ?? 'Something went wrong. Please try again.');
@@ -165,6 +174,8 @@ export default function Plans() {
                 <div className={styles.currentBtn}>Active</div>
               ) : p.plan === 'free' || isDowngrade ? (
                 <div className={styles.currentBtn} style={{ opacity: 0.4 }}>—</div>
+              ) : pendingPlans.includes(p.plan) ? (
+                <div className={styles.reviewingBtn}>⏳ Reviewing…</div>
               ) : (
                 <button
                   className={styles.upgradeBtn}
