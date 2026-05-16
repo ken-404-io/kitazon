@@ -229,6 +229,29 @@ export async function sendReferralEarnedEmail(to: string, name: string, referred
   `));
 }
 
+export async function sendKycApprovedEmail(to: string, name: string): Promise<void> {
+  const dashboardLink = `${BASE}/dashboard`;
+  await send(to, '🎉 Your Kitazon identity has been verified!', layout('KYC Approved', `
+    ${h2(`You're verified, ${name.split(' ')[0]}! ✅`)}
+    ${p('Great news — your identity verification (KYC) has been reviewed and <strong style="color:#22c55e;">approved</strong>.')}
+    ${p('You can now enjoy all Kitazon features including withdrawals, upgraded plans, and more.')}
+    <div style="text-align:center;margin:24px 0;">${btn(dashboardLink, 'Go to Dashboard')}</div>
+    ${p('Thank you for completing verification. Keep earning!')}
+  `));
+}
+
+export async function sendKycRejectedEmail(to: string, name: string, reason: string): Promise<void> {
+  const kycLink = `${BASE}/kyc`;
+  await send(to, 'Your Kitazon KYC submission was not approved', layout('KYC Not Approved', `
+    ${h2(`KYC submission rejected ❌`)}
+    ${p(`Hi ${name.split(' ')[0]}, unfortunately your identity verification could not be approved at this time.`)}
+    ${table(row('Reason', `<span style="color:#fca5a5;">${escapeHtml(reason)}</span>`))}
+    ${p('Please review the reason above and resubmit your KYC with the correct documents. Make sure your images are clear and all information matches your ID.')}
+    <div style="text-align:center;margin:24px 0;">${btn(kycLink, 'Resubmit KYC')}</div>
+    ${p('If you believe this is a mistake, please contact support.')}
+  `));
+}
+
 export async function sendGcashPaymentNotificationEmail(
   adminEmail: string,
   userName: string,
