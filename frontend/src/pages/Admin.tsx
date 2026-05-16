@@ -1435,7 +1435,7 @@ export default function Admin() {
                           <button
                             onClick={async () => {
                               if (!window.confirm(`Approve ${g.plan} plan for ${g.user_name}? This will activate their plan.`)) return;
-                              await api.patch(`/admin/gcash-payments/${g.id}/approve`);
+                              await api.patch(`/admin/gcash-payments/${g.id}/approve`, {});
                               showToast('Plan activated!');
                               loadGcashPayments(gcashFilter);
                             }}
