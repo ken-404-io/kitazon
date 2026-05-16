@@ -253,3 +253,87 @@
   transition: background 0.15s;
 }
 .dashBtn:hover { background: var(--dark-card); }
+
+/* Leave confirmation modal */
+.leaveOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.75);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  padding: 1rem;
+}
+
+.leaveModal {
+  background: var(--dark-card);
+  border: 1.5px solid rgba(239, 68, 68, 0.35);
+  border-radius: 20px;
+  padding: 2rem 1.5rem;
+  max-width: 340px;
+  width: 100%;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.leaveWarningIcon {
+  font-size: 2.5rem;
+  line-height: 1;
+}
+
+.leaveTitle {
+  margin: 0;
+  font-size: 1.15rem;
+  font-weight: 800;
+  color: var(--text);
+}
+
+.leaveBody {
+  margin: 0;
+  font-size: 0.88rem;
+  color: var(--text-muted);
+  line-height: 1.6;
+}
+
+.leaveBody strong {
+  color: #fca5a5;
+}
+
+.leaveBtns {
+  display: flex;
+  gap: 0.75rem;
+  width: 100%;
+  margin-top: 0.5rem;
+}
+
+.stayBtn {
+  flex: 1;
+  padding: 0.8rem;
+  background: #f97316;
+  color: #fff;
+  border: none;
+  border-radius: 12px;
+  font-size: 0.92rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+.stayBtn:hover { opacity: 0.88; }
+
+.leaveBtn {
+  flex: 1;
+  padding: 0.8rem;
+  background: transparent;
+  color: #fca5a5;
+  border: 1px solid rgba(239, 68, 68, 0.4);
+  border-radius: 12px;
+  font-size: 0.92rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.leaveBtn:hover { background: rgba(239, 68, 68, 0.1); }

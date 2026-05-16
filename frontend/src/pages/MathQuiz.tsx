@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useBlocker } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import KycGate from '../components/KycGate';
 import api from '../services/api';
@@ -56,6 +56,25 @@ function makeQuestion(): Question {
   return { text: `${a} ${op} ${b}`, answer, choices };
 }
 
+/* ── Leave confirmation modal ─────────────────────────────────────────────── */
+function LeaveConfirmModal({ onStay, onLeave }: { onStay: () => void; onLeave: () => void }) {
+  return (
+    <div className={styles.leaveOverlay}>
+      <div className={styles.leaveModal}>
+        <div className={styles.leaveWarningIcon}>⚠️</div>
+        <h3 className={styles.leaveTitle}>Leave Quiz?</h3>
+        <p className={styles.leaveBody}>
+          Your reward for this question will <strong>not be counted</strong> if you leave during the ad.
+        </p>
+        <div className={styles.leaveBtns}>
+          <button className={styles.stayBtn} onClick={onStay}>Stay &amp; Watch</button>
+          <button className={styles.leaveBtn} onClick={onLeave}>Leave Anyway</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /* ── Adsterra ad break component ─────────────────────────────────────────── */
 function AdBreak({ onDone }: { onDone: () => void }) {
   const [secs, setSecs]       = useState(AD_SECONDS);
@@ -73,10 +92,9 @@ function AdBreak({ onDone }: { onDone: () => void }) {
     if (!containerRef.current) return;
     containerRef.current.innerHTML = '';
 
-    // If no iframe appears within 4s the ad failed — skip immediately
+    // If no iframe appears within 4s, ad failed — proceed (reward still counts)
     const fallback = setTimeout(skip, 4000);
 
-    // Watch for iframe injected by the ad script → ad rendered successfully
     const observer = new MutationObserver(() => {
       if (containerRef.current?.querySelector('iframe')) {
         observer.disconnect();
@@ -94,7 +112,6 @@ function AdBreak({ onDone }: { onDone: () => void }) {
     const invoke = document.createElement('script');
     invoke.type = 'text/javascript';
     invoke.src = 'https://www.highperformanceformat.com/00611793b43988f6f1c486423ed8b687/invoke.js';
-    // Script failed to load (network error / blocked) → skip immediately
     invoke.onerror = () => {
       observer.disconnect();
       clearTimeout(fallback);
@@ -102,13 +119,10 @@ function AdBreak({ onDone }: { onDone: () => void }) {
     };
     containerRef.current.appendChild(invoke);
 
-    return () => {
-      clearTimeout(fallback);
-      observer.disconnect();
-    };
+    return () => { clearTimeout(fallback); observer.disconnect(); };
   }, [skip]);
 
-  // Countdown only starts once the ad is confirmed rendered
+  // Countdown only starts once ad is confirmed rendered
   useEffect(() => {
     if (!adReady) return;
     if (secs <= 0) { skip(); return; }
@@ -132,46 +146,80 @@ function AdBreak({ onDone }: { onDone: () => void }) {
 /* ── Main quiz component ─────────────────────────────────────────────────── */
 function QuizInner() {
   const navigate = useNavigate();
-  const [question,   setQuestion]   = useState<Question>(makeQuestion);
-  const [qNum,       setQNum]       = useState(1);
-  const [selected,   setSelected]   = useState<number | null>(null);
-  const [correct,    setCorrect]    = useState(0);
-  const [earned,     setEarned]     = useState(0);
-  const [capped,     setCapped]     = useState(false);
-  const [phase,      setPhase]      = useState<'question' | 'ad' | 'result'>('question');
+  const [question,      setQuestion]      = useState<Question>(makeQuestion);
+  const [qNum,          setQNum]          = useState(1);
+  const [selected,      setSelected]      = useState<number | null>(null);
+  const [correct,       setCorrect]       = useState(0);
+  const [earned,        setEarned]        = useState(0);
+  const [capped,        setCapped]        = useState(false);
+  const [phase,         setPhase]         = useState<'question' | 'ad' | 'result'>('question');
+  // Reward is deferred: only credited after the ad completes successfully
+  const [pendingReward, setPendingReward] = useState(false);
+
+  const isAdPhase = phase === 'ad';
+
+  // Block in-app navigation (React Router links, back button) during ad
+  const blocker = useBlocker(isAdPhase);
+
+  // Block browser close / tab close / refresh during ad
+  useEffect(() => {
+    if (!isAdPhase) return;
+    const handler = (e: BeforeUnloadEvent) => { e.preventDefault(); e.returnValue = ''; };
+    window.addEventListener('beforeunload', handler);
+    return () => window.removeEventListener('beforeunload', handler);
+  }, [isAdPhase]);
+
+  // Credit the pending reward — called only when ad fully completes
+  const creditReward = useCallback(async () => {
+    if (!pendingReward || capped) { setPendingReward(false); return; }
+    setPendingReward(false);
+    try {
+      const r = await api.post<{ amount: number; capped: boolean }>('/tasks/quiz/correct', {});
+      setEarned(e => e + r.data.amount);
+      if (r.data.capped) setCapped(true);
+    } catch { /* capped or rate-limited */ }
+  }, [pendingReward, capped]);
 
   const handleAnswer = useCallback(async (choice: number) => {
     if (selected !== null) return;
     setSelected(choice);
     const isCorrect = choice === question.answer;
+
     if (isCorrect) {
       setCorrect(c => c + 1);
-      if (!capped) {
-        try {
-          const r = await api.post<{ amount: number; capped: boolean }>('/tasks/quiz/correct', {});
-          setEarned(e => e + r.data.amount);
-          if (r.data.capped) setCapped(true);
-        } catch { /* already capped or rate limited */ }
+
+      if (qNum >= QUESTIONS_PER_ROUND) {
+        // Last question — no ad break follows, credit immediately
+        if (!capped) {
+          try {
+            const r = await api.post<{ amount: number; capped: boolean }>('/tasks/quiz/correct', {});
+            setEarned(e => e + r.data.amount);
+            if (r.data.capped) setCapped(true);
+          } catch {}
+        }
+      } else {
+        // Ad break follows — defer credit until ad completes
+        setPendingReward(true);
       }
     }
-    // Brief pause so user sees result, then show ad
+
     setTimeout(() => {
-      if (qNum >= QUESTIONS_PER_ROUND) {
-        setPhase('result');
-      } else {
-        setPhase('ad');
-      }
+      if (qNum >= QUESTIONS_PER_ROUND) setPhase('result');
+      else setPhase('ad');
     }, 900);
   }, [selected, question.answer, capped, qNum]);
 
+  // Called when ad finishes normally or fails on its own (not user-abandoned)
   const nextQuestion = useCallback(() => {
+    creditReward();
     setQuestion(makeQuestion());
     setQNum(n => n + 1);
     setSelected(null);
     setPhase('question');
-  }, []);
+  }, [creditReward]);
 
   const playAgain = () => {
+    setPendingReward(false);
     setQuestion(makeQuestion());
     setQNum(1);
     setSelected(null);
@@ -181,7 +229,23 @@ function QuizInner() {
     setPhase('question');
   };
 
-  if (phase === 'ad') return <AdBreak onDone={nextQuestion} />;
+  // Blocker modal handlers
+  const handleStay  = () => blocker.reset?.();
+  const handleLeave = () => {
+    setPendingReward(false); // reward is forfeited
+    blocker.proceed?.();
+  };
+
+  if (phase === 'ad') {
+    return (
+      <>
+        {blocker.state === 'blocked' && (
+          <LeaveConfirmModal onStay={handleStay} onLeave={handleLeave} />
+        )}
+        <AdBreak onDone={nextQuestion} />
+      </>
+    );
+  }
 
   if (phase === 'result') {
     return (
@@ -248,7 +312,7 @@ function QuizInner() {
 
 export default function MathQuiz() {
   const { user } = useAuth();
-  const plan = (user as any)?.plan ?? 'free';
+  const plan = (user as { plan?: string })?.plan ?? 'free';
   const limitLabel = PLAN_LIMITS[plan] ?? PLAN_LIMITS.free;
 
   return (
