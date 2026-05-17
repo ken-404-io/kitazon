@@ -31,7 +31,7 @@ const STATIC_PLANS: {
     name:     'Silver',
     badge:    <SilverIcon />,
     color:    '#9ca3af',
-    features: ['Choose your withdrawal amount', 'Priority support'],
+    features: ['1 invite to withdraw', '20 correct answers to withdraw', 'Choose your withdrawal amount', 'Priority support'],
   },
   {
     plan:     'gold',
