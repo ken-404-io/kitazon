@@ -98,6 +98,7 @@ interface AdminUser {
   last_login_at: string | null;
   plan?: string;
   plan_expires_at?: string | null;
+  withdrawal_credits?: number | null;
 }
 
 interface AdminWithdrawal {
@@ -751,7 +752,7 @@ export default function Admin() {
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
                 <thead>
                   <tr style={{ borderBottom: '2px solid #e5e7eb', background: '#f9fafb' }}>
-                    {['ID', 'Name', 'Email', 'Balance', 'Plan', 'Verified', 'Active', 'Joined', 'Actions'].map(h => (
+                    {['ID', 'Name', 'Email', 'Balance', 'Credits', 'Plan', 'Verified', 'Active', 'Joined', 'Actions'].map(h => (
                       <th key={h} style={{ padding: '8px 10px', textAlign: 'left', whiteSpace: 'nowrap' }}>{h}</th>
                     ))}
                   </tr>
@@ -763,6 +764,9 @@ export default function Admin() {
                       <td style={{ padding: '8px 10px' }}>{u.name}</td>
                       <td style={{ padding: '8px 10px' }}>{u.email}</td>
                       <td style={{ padding: '8px 10px' }}>₱{fmt(u.balance)}</td>
+                      <td style={{ padding: '8px 10px', fontWeight: 600, color: Number(u.withdrawal_credits ?? 0) > 0 ? '#f59e0b' : 'var(--text-muted)' }}>
+                        {Number(u.withdrawal_credits ?? 0)} CR
+                      </td>
                       <td style={{ padding: '8px 10px' }}>
                         <span style={{
                           display: 'inline-block',
