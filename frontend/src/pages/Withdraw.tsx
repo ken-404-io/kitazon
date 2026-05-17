@@ -43,6 +43,9 @@ interface Eligibility {
   quizzes_completed?: number;
   quizzes_required?: number;
   quiz_gate_frozen?: boolean;
+  referrals_completed?: number;
+  referrals_required?: number;
+  referral_gate_frozen?: boolean;
   reasons: string[];
 }
 
@@ -247,6 +250,30 @@ export default function Withdraw() {
                     {met
                       ? <span className={styles.reqBadge}>Done</span>
                       : <Link to="/quiz" className={styles.reqCountdown} style={{ textDecoration: 'none' }}>Play Quiz →</Link>}
+                  </div>
+                );
+              })()}
+
+              {/* Referral gate */}
+              {(() => {
+                const frozen = elig.referral_gate_frozen ?? false;
+                const done   = elig.referrals_completed ?? 0;
+                const need   = elig.referrals_required ?? 2;
+                const met    = !frozen && done >= need;
+                return (
+                  <div className={`${styles.reqRow} ${met ? styles.reqDone : styles.reqPending}`}>
+                    <span className={styles.reqIcon}>{met ? <CheckIcon /> : <span className={styles.reqNum}>4</span>}</span>
+                    <div className={styles.reqText}>
+                      <span>Invite {need} friends</span>
+                      <span className={styles.reqSub}>
+                        {frozen
+                          ? 'Invite gate resets after your pending withdrawal is completed'
+                          : `${done}/${need} invited since your last withdrawal`}
+                      </span>
+                    </div>
+                    {met
+                      ? <span className={styles.reqBadge}>Done</span>
+                      : <Link to="/referrals" className={styles.reqCountdown} style={{ textDecoration: 'none' }}>Invite →</Link>}
                   </div>
                 );
               })()}
