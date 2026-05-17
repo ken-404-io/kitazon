@@ -13,8 +13,10 @@ const ACCOUNT_PATTERN = /^(09\d{9}|\+639\d{9})$/;
 const QUIZ_GATE_REQUIRED    = 35;
 const REFERRAL_GATE_REQUIRED = 2;
 
-// Count referrals made since the last settled withdrawal.
-// Frozen (returns 0) while any withdrawal is pending/processing.
+// Count referrals made since the last COMPLETED withdrawal.
+// - Frozen (returns 0) while any withdrawal is pending/processing.
+// - Only a completed withdrawal moves the cutoff date; failed ones don't reset the count.
+// - If no completed withdrawal exists, counts all-time referrals.
 async function countReferralsForNextGate(userId: number): Promise<{ count: number; frozen: boolean }> {
   const pending = await db('withdrawals')
     .where({ user_id: userId })
@@ -23,15 +25,14 @@ async function countReferralsForNextGate(userId: number): Promise<{ count: numbe
 
   if (pending) return { count: 0, frozen: true };
 
-  const lastSettled = await db('withdrawals')
-    .where({ user_id: userId })
-    .whereIn('status', ['completed', 'failed'])
+  const lastCompleted = await db('withdrawals')
+    .where({ user_id: userId, status: 'completed' })
     .orderBy('updated_at', 'desc')
     .select('updated_at')
     .first();
 
   let q = db('referrals').where({ referrer_id: userId });
-  if (lastSettled) q = q.where('created_at', '>', lastSettled.updated_at);
+  if (lastCompleted) q = q.where('created_at', '>', lastCompleted.updated_at);
   const row = await q.count('id as n').first();
   return { count: Number((row as { n?: unknown } | undefined)?.n ?? 0), frozen: false };
 }
