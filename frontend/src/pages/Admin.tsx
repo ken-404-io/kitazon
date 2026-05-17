@@ -246,9 +246,9 @@ export default function Admin() {
   const SETTINGS_DEFAULTS: Record<string, string> = {
     gcash_number: '',
     gcash_name: 'Kitazon',
-    gcash_qr_silver: '',
-    gcash_qr_gold: '',
-    gcash_qr_diamond: '',
+    gcash_qr_silver: 'https://res.cloudinary.com/dtm4n2uk3/image/upload/v1778935459/4432f02f-79d9-4bf7-bd8f-39f0b63487ad_qbjxzx.jpg',
+    gcash_qr_gold: 'https://res.cloudinary.com/dtm4n2uk3/image/upload/v1778935610/1593c9bc-c490-4854-826d-72ad2a5a79a1_cwdk3l.jpg',
+    gcash_qr_diamond: 'https://res.cloudinary.com/dtm4n2uk3/image/upload/v1778935570/69504c45-6f87-43b1-aebe-83d55a30e5be_p6tncl.jpg',
     credit_php_per_credit: '25',
     withdrawal_min: '5',
     quiz_gate_free: '40',
