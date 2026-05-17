@@ -567,7 +567,7 @@ export default function Admin() {
       )}
 
       {/* ── Sidebar ── */}
-      <div style={{ width: 230, flexShrink: 0, background: 'var(--dark-card)', borderRight: '1px solid var(--dark-border)', minHeight: '100vh', padding: '1.5rem 0.75rem', position: 'sticky', top: 0 }}>
+      <div style={{ width: 230, flexShrink: 0, background: 'var(--dark-card)', borderRight: '1px solid var(--dark-border)', minHeight: '100vh', padding: '1.5rem 0.75rem', position: 'sticky', top: 0, height: '100vh', overflowY: 'auto' }}>
         <div style={{ fontSize: '0.65rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--text-muted)', padding: '0 0.5rem', marginBottom: '1rem' }}>Admin Panel</div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
           {TABS.map(t => {
