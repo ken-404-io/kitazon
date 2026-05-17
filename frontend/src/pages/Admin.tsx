@@ -4,7 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import api from '../services/api';
 import { WithdrawalStatus, WithdrawalChannel } from '../types';
 
-type Tab = 'stats' | 'users' | 'withdrawals' | 'pending-withdrawals' | 'tasks' | 'logs' | 'revenue' | 'broadcast' | 'kyc' | 'online' | 'gcash-payments';
+type Tab = 'stats' | 'users' | 'withdrawals' | 'pending-withdrawals' | 'tasks' | 'logs' | 'revenue' | 'broadcast' | 'kyc' | 'online' | 'gcash-payments' | 'settings';
 
 const TAB_LABELS: Record<Tab, string> = {
   stats: 'Stats',
@@ -18,6 +18,7 @@ const TAB_LABELS: Record<Tab, string> = {
   online: 'Online',
   logs: 'Audit Logs',
   broadcast: 'Broadcast',
+  settings: 'Settings',
 };
 
 interface OnlineUser {
@@ -241,6 +242,12 @@ export default function Admin() {
   const [rewardsLoading, setRewardsLoading] = useState(false);
   const [rewardsResult, setRewardsResult] = useState<string | null>(null);
 
+  // Site Settings
+  const [siteSettings, setSiteSettings] = useState<Record<string, string>>({});
+  const [settingsLoading, setSettingsLoading] = useState(false);
+  const [settingsSaving, setSettingsSaving] = useState(false);
+  const [settingsResult, setSettingsResult] = useState<string | null>(null);
+
   // Toast
   const [toast, setToast] = useState<string | null>(null);
   const showToast = (msg: string) => {
@@ -339,6 +346,28 @@ export default function Admin() {
     } finally { setOnlineLoading(false); }
   }, []);
 
+  const loadSiteSettings = useCallback(async () => {
+    setSettingsLoading(true);
+    try {
+      const res = await api.get<Record<string, string>>('/admin/settings');
+      setSiteSettings(res.data);
+    } finally { setSettingsLoading(false); }
+  }, []);
+
+  const saveSiteSettings = async () => {
+    setSettingsSaving(true); setSettingsResult(null);
+    try {
+      await api.put('/admin/settings', siteSettings);
+      setSettingsResult('Settings saved successfully.');
+    } catch (err: unknown) {
+      setSettingsResult((err as { response?: { data?: { message?: string } } }).response?.data?.message ?? 'Failed to save settings.');
+    } finally { setSettingsSaving(false); }
+  };
+
+  const setSetting = (key: string, value: string) => {
+    setSiteSettings(prev => ({ ...prev, [key]: value }));
+  };
+
   // Load platform stats once on mount so the "Pending Withdrawals (N)"
   // tab badge stays accurate even before the Stats tab has been opened.
   useEffect(() => {
@@ -356,7 +385,8 @@ export default function Admin() {
     if (tab === 'kyc') loadKyc(kycFilter);
     if (tab === 'gcash-payments') loadGcashPayments(gcashFilter);
     if (tab === 'online') loadOnline();
-  }, [tab, userPage, wPage, wFilter, logPage, kycFilter, gcashFilter, stats, revenueStats, loadStats, loadUsers, loadWithdrawals, loadTasks, loadLogs, loadRevenue, loadKyc, loadGcashPayments, loadOnline]);
+    if (tab === 'settings') loadSiteSettings();
+  }, [tab, userPage, wPage, wFilter, logPage, kycFilter, gcashFilter, stats, revenueStats, loadStats, loadUsers, loadWithdrawals, loadTasks, loadLogs, loadRevenue, loadKyc, loadGcashPayments, loadOnline, loadSiteSettings]);
 
   // Auto-refresh online tab every 30 seconds
   useEffect(() => {
@@ -525,6 +555,7 @@ export default function Admin() {
     { id: 'online',              label: 'Online',              icon: <svg {...si}><circle cx="12" cy="12" r="3"/><path d="M2 12C2 6.48 6.48 2 12 2s10 4.48 10 10-4.48 10-10 10"/></svg> },
     { id: 'logs',                label: 'Audit Logs',          icon: <svg {...si}><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg> },
     { id: 'broadcast',           label: 'Broadcast',           icon: <svg {...si}><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12 19.79 19.79 0 0 1 1.63 3.38 2 2 0 0 1 3.6 1.18h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 8.96a16 16 0 0 0 6.13 6.13l.96-.96a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg> },
+    { id: 'settings',            label: 'Settings',            icon: <svg {...si}><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg> },
   ];
 
   return (
@@ -1594,6 +1625,186 @@ export default function Admin() {
                 ))}
               </tbody>
             </table>
+          )}
+        </div>
+      )}
+      {/* ── Settings ── */}
+      {tab === 'settings' && (
+        <div style={{ maxWidth: 680 }}>
+          {settingsLoading ? <p>Loading…</p> : (
+            <>
+              {/* GCash Config */}
+              <div className="card" style={{ marginBottom: '1.5rem' }}>
+                <h3 style={{ marginBottom: '1rem', fontSize: '1rem' }}>GCash Config</h3>
+                {[
+                  { key: 'gcash_number',    label: 'GCash Number' },
+                  { key: 'gcash_name',      label: 'GCash Account Name' },
+                  { key: 'gcash_qr_silver', label: 'Silver QR URL' },
+                  { key: 'gcash_qr_gold',   label: 'Gold QR URL' },
+                  { key: 'gcash_qr_diamond',label: 'Diamond QR URL' },
+                ].map(({ key, label }) => (
+                  <div key={key} className="form-group" style={{ marginBottom: '0.75rem' }}>
+                    <label style={{ fontSize: 12, fontWeight: 600, color: '#9ca3af' }}>{label}</label>
+                    <input
+                      type="text"
+                      value={siteSettings[key] ?? ''}
+                      onChange={e => setSetting(key, e.target.value)}
+                      style={{ padding: '7px 10px', borderRadius: 6, border: '1px solid var(--dark-border)', background: 'var(--dark-bg)', color: 'var(--text)', width: '100%', fontSize: 13 }}
+                    />
+                  </div>
+                ))}
+              </div>
+
+              {/* Plan Limits */}
+              <div className="card" style={{ marginBottom: '1.5rem' }}>
+                <h3 style={{ marginBottom: '1rem', fontSize: '1rem' }}>Plan Limits (max per request, ₱)</h3>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
+                  {(['free', 'silver', 'gold', 'diamond'] as const).map(plan => (
+                    <div key={plan}>
+                      <label style={{ fontSize: 11, fontWeight: 600, color: '#9ca3af', textTransform: 'capitalize' }}>{plan}</label>
+                      <input
+                        type="number"
+                        min={1}
+                        value={siteSettings[`plan_limit_${plan}`] ?? ''}
+                        onChange={e => setSetting(`plan_limit_${plan}`, e.target.value)}
+                        style={{ padding: '7px 10px', borderRadius: 6, border: '1px solid var(--dark-border)', background: 'var(--dark-bg)', color: 'var(--text)', width: '100%', fontSize: 13 }}
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Plan Prices */}
+              <div className="card" style={{ marginBottom: '1.5rem' }}>
+                <h3 style={{ marginBottom: '1rem', fontSize: '1rem' }}>Plan Prices (₱/mo)</h3>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
+                  {(['silver', 'gold', 'diamond'] as const).map(plan => (
+                    <div key={plan}>
+                      <label style={{ fontSize: 11, fontWeight: 600, color: '#9ca3af', textTransform: 'capitalize' }}>{plan}</label>
+                      <input
+                        type="number"
+                        min={0}
+                        value={siteSettings[`plan_price_${plan}`] ?? ''}
+                        onChange={e => setSetting(`plan_price_${plan}`, e.target.value)}
+                        style={{ padding: '7px 10px', borderRadius: 6, border: '1px solid var(--dark-border)', background: 'var(--dark-bg)', color: 'var(--text)', width: '100%', fontSize: 13 }}
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Withdrawal Gates */}
+              <div className="card" style={{ marginBottom: '1.5rem' }}>
+                <h3 style={{ marginBottom: '1rem', fontSize: '1rem' }}>Withdrawal Gates</h3>
+                <p style={{ fontSize: 12, color: '#9ca3af', marginBottom: '0.75rem' }}>Quiz gate — correct answers required before withdrawing (0 = disabled)</p>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: '1rem' }}>
+                  {(['free', 'silver', 'gold', 'diamond'] as const).map(plan => (
+                    <div key={plan}>
+                      <label style={{ fontSize: 11, fontWeight: 600, color: '#9ca3af', textTransform: 'capitalize' }}>{plan}</label>
+                      <input
+                        type="number"
+                        min={0}
+                        value={siteSettings[`quiz_gate_${plan}`] ?? ''}
+                        onChange={e => setSetting(`quiz_gate_${plan}`, e.target.value)}
+                        style={{ padding: '7px 10px', borderRadius: 6, border: '1px solid var(--dark-border)', background: 'var(--dark-bg)', color: 'var(--text)', width: '100%', fontSize: 13 }}
+                      />
+                    </div>
+                  ))}
+                </div>
+                <p style={{ fontSize: 12, color: '#9ca3af', marginBottom: '0.75rem' }}>Referral gate — invites required before withdrawing (0 = disabled)</p>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
+                  {(['free', 'silver', 'gold', 'diamond'] as const).map(plan => (
+                    <div key={plan}>
+                      <label style={{ fontSize: 11, fontWeight: 600, color: '#9ca3af', textTransform: 'capitalize' }}>{plan}</label>
+                      <input
+                        type="number"
+                        min={0}
+                        value={siteSettings[`referral_gate_${plan}`] ?? ''}
+                        onChange={e => setSetting(`referral_gate_${plan}`, e.target.value)}
+                        style={{ padding: '7px 10px', borderRadius: 6, border: '1px solid var(--dark-border)', background: 'var(--dark-bg)', color: 'var(--text)', width: '100%', fontSize: 13 }}
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Credits */}
+              <div className="card" style={{ marginBottom: '1.5rem' }}>
+                <h3 style={{ marginBottom: '1rem', fontSize: '1rem' }}>Credits</h3>
+                <div className="form-group" style={{ marginBottom: 0 }}>
+                  <label style={{ fontSize: 12, fontWeight: 600, color: '#9ca3af' }}>PHP per credit (conversion rate)</label>
+                  <input
+                    type="number"
+                    min={1}
+                    value={siteSettings['credit_php_per_credit'] ?? ''}
+                    onChange={e => setSetting('credit_php_per_credit', e.target.value)}
+                    style={{ padding: '7px 10px', borderRadius: 6, border: '1px solid var(--dark-border)', background: 'var(--dark-bg)', color: 'var(--text)', width: '100%', fontSize: 13 }}
+                  />
+                </div>
+              </div>
+
+              {/* Site */}
+              <div className="card" style={{ marginBottom: '1.5rem' }}>
+                <h3 style={{ marginBottom: '1rem', fontSize: '1rem' }}>Site</h3>
+                <div className="form-group" style={{ marginBottom: '0.75rem' }}>
+                  <label style={{ fontSize: 12, fontWeight: 600, color: '#9ca3af' }}>Announcement Text (empty = no banner)</label>
+                  <input
+                    type="text"
+                    value={siteSettings['announcement_text'] ?? ''}
+                    onChange={e => setSetting('announcement_text', e.target.value)}
+                    placeholder="e.g. System maintenance on Friday 10pm–12am"
+                    style={{ padding: '7px 10px', borderRadius: 6, border: '1px solid var(--dark-border)', background: 'var(--dark-bg)', color: 'var(--text)', width: '100%', fontSize: 13 }}
+                  />
+                </div>
+                <div className="form-group" style={{ marginBottom: '0.75rem' }}>
+                  <label style={{ fontSize: 12, fontWeight: 600, color: '#9ca3af' }}>Announcement Color</label>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <input
+                      type="color"
+                      value={siteSettings['announcement_color'] ?? '#f59e0b'}
+                      onChange={e => setSetting('announcement_color', e.target.value)}
+                      style={{ width: 40, height: 34, borderRadius: 6, border: '1px solid var(--dark-border)', cursor: 'pointer', padding: 2 }}
+                    />
+                    <span style={{ fontSize: 13, color: '#9ca3af' }}>{siteSettings['announcement_color'] ?? '#f59e0b'}</span>
+                  </div>
+                </div>
+                <div className="form-group" style={{ marginBottom: '0.75rem' }}>
+                  <label style={{ fontSize: 12, fontWeight: 600, color: '#9ca3af' }}>Minimum Withdrawal Amount (₱)</label>
+                  <input
+                    type="number"
+                    min={1}
+                    value={siteSettings['withdrawal_min'] ?? ''}
+                    onChange={e => setSetting('withdrawal_min', e.target.value)}
+                    style={{ padding: '7px 10px', borderRadius: 6, border: '1px solid var(--dark-border)', background: 'var(--dark-bg)', color: 'var(--text)', width: '100%', fontSize: 13 }}
+                  />
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>
+                    <input
+                      type="checkbox"
+                      checked={siteSettings['maintenance_mode'] === 'true'}
+                      onChange={e => setSetting('maintenance_mode', e.target.checked ? 'true' : 'false')}
+                      style={{ width: 16, height: 16, cursor: 'pointer' }}
+                    />
+                    Maintenance Mode (non-admin users see maintenance page)
+                  </label>
+                </div>
+              </div>
+
+              {settingsResult && (
+                <p style={{ fontSize: 13, fontWeight: 600, color: settingsResult.startsWith('Settings saved') ? '#22c55e' : '#dc2626', marginBottom: '0.75rem' }}>
+                  {settingsResult}
+                </p>
+              )}
+              <button
+                className="btn-primary"
+                disabled={settingsSaving}
+                onClick={saveSiteSettings}
+                style={{ fontSize: 14, padding: '10px 24px' }}
+              >
+                {settingsSaving ? 'Saving…' : 'Save Settings'}
+              </button>
+            </>
           )}
         </div>
       )}
