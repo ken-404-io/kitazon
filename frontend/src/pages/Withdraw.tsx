@@ -128,12 +128,14 @@ export default function Withdraw() {
   };
   const acctNameErr = acctNameTouched ? validateAccountName(accountName) : null;
 
+  const creditInput  = Math.max(0, Math.floor(Number(convertAmt) || 0));
+  const phpToSpend   = creditInput * 25;
+
   const convertCredits = async () => {
-    const amt = parseInt(convertAmt, 10);
-    if (!amt || amt < 1) return;
+    if (creditInput < 1) return;
     setConverting(true);
     try {
-      const res = await api.post<{ credits: number; balance: number; message: string }>('/credits/convert', { amount: amt });
+      const res = await api.post<{ credits: number; balance: number; message: string }>('/credits/convert', { amount: phpToSpend, credits: creditInput });
       showToast(res.data.message, 'success');
       setConvertAmt('');
       loadData();
@@ -273,7 +275,7 @@ export default function Withdraw() {
                     </div>
                     {met
                       ? <span className={styles.reqBadge}>Done</span>
-                      : <Link to="/referrals" className={styles.reqCountdown} style={{ textDecoration: 'none' }}>Invite →</Link>}
+                      : <Link to="/referral" className={styles.reqCountdown} style={{ textDecoration: 'none' }}>Invite →</Link>}
                   </div>
                 );
               })()}
@@ -365,19 +367,19 @@ export default function Withdraw() {
               <span className={styles.creditsIcon}>🎟️</span>
               <div>
                 <p className={styles.creditsTitle}>Get Withdrawal Credits</p>
-                <p className={styles.creditsSub}>₱25 = 1 credit · 1 credit = withdraw ₱1 · +1 credit per daily check-in</p>
+                <p className={styles.creditsSub}>Enter how many credits you want · 1 credit costs ₱25 · +1 credit per daily check-in</p>
               </div>
             </div>
           </div>
 
           <div className={styles.convertRow}>
             <div className={styles.convertInput}>
-              <span className={styles.convertPrefix}>₱</span>
+              <span className={styles.convertPrefix}>CR</span>
               <input
                 type="number"
                 min="1"
                 step="1"
-                placeholder="Amount to convert"
+                placeholder="e.g. 5"
                 value={convertAmt}
                 onChange={e => setConvertAmt(e.target.value)}
                 className={styles.convertField}
@@ -386,16 +388,15 @@ export default function Withdraw() {
             <button
               className="btn-primary"
               style={{ fontSize: 13, padding: '0.55rem 1rem', whiteSpace: 'nowrap' }}
-              disabled={converting || !convertAmt || Number(convertAmt) < 25 || Number(convertAmt) > balance}
+              disabled={converting || creditInput < 1 || phpToSpend > balance}
               onClick={convertCredits}
             >
               {converting ? 'Converting…' : 'Convert → Credits'}
             </button>
           </div>
           <p className={styles.convertHint}>
-            ₱25 per credit · ₱{convertAmt || '0'} → <strong>{Math.floor((Number(convertAmt) || 0) / 25)} credits</strong>
-            {Number(convertAmt) > 0 && Number(convertAmt) < 25 ? <span style={{ color: 'var(--red)' }}> · Minimum ₱25</span> : null}
-            {Number(convertAmt) >= 25 && Number(convertAmt) > balance ? <span style={{ color: 'var(--red)' }}> · Insufficient balance</span> : null}
+            {creditInput > 0 ? `${creditInput} credit${creditInput !== 1 ? 's' : ''}` : '0 credits'} = <strong>₱{phpToSpend.toLocaleString('en-PH', { minimumFractionDigits: 2 })}</strong>
+            {creditInput > 0 && phpToSpend > balance ? <span style={{ color: 'var(--red)' }}> · Insufficient balance</span> : null}
           </p>
         </div>
 

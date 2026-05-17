@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 
-const IDLE_MS = 30 * 60 * 1000; // 30 minutes
+const IDLE_MS = 120 * 60 * 1000; // 2 hours
 const EVENTS  = ['mousemove', 'keydown', 'pointerdown', 'scroll', 'touchstart'] as const;
 
 export function useIdleLogout(onLogout: () => void, active: boolean) {
