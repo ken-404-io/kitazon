@@ -24,7 +24,7 @@ const STATIC_PLANS: {
     name:     'Free',
     badge:    <FreeIcon />,
     color:    'var(--text-muted)',
-    features: ['GCash withdrawals', 'Task earnings', 'Referral bonuses'],
+    features: ['2 invites to withdraw', '40 correct answers to withdraw', 'GCash withdrawals', 'Task earnings', 'Referral bonuses'],
   },
   {
     plan:     'silver',
