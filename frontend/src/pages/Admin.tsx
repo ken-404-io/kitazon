@@ -4,7 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import api from '../services/api';
 import { WithdrawalStatus, WithdrawalChannel } from '../types';
 
-type Tab = 'stats' | 'users' | 'withdrawals' | 'pending-withdrawals' | 'tasks' | 'logs' | 'revenue' | 'broadcast' | 'kyc' | 'online' | 'gcash-payments' | 'settings';
+type Tab = 'stats' | 'users' | 'withdrawals' | 'pending-withdrawals' | 'tasks' | 'logs' | 'revenue' | 'broadcast' | 'kyc' | 'online' | 'gcash-payments' | 'fraud' | 'settings';
 
 const TAB_LABELS: Record<Tab, string> = {
   stats: 'Stats',
@@ -14,6 +14,7 @@ const TAB_LABELS: Record<Tab, string> = {
   withdrawals: 'All Withdrawals',
   tasks: 'Tasks',
   kyc: 'KYC',
+  fraud: 'Fraud Detection',
   'gcash-payments': 'GCash Payments',
   online: 'Online',
   logs: 'Audit Logs',
@@ -242,6 +243,15 @@ export default function Admin() {
   const [rewardsLoading, setRewardsLoading] = useState(false);
   const [rewardsResult, setRewardsResult] = useState<string | null>(null);
 
+  // Fraud Detection
+  interface FlaggedWithdrawal { id: number; user_id: number; user_name: string; user_email: string; amount: string | number; status: string; created_at: string; metadata: string | null; is_active: boolean; }
+  interface DupDevice { fingerprint: string; user1_id: number; user1_name: string; user1_email: string; user1_active: boolean; user1_created_at: string; user2_id: number; user2_name: string; user2_email: string; user2_active: boolean; user2_created_at: string; }
+  interface DupIpGroup { ip: string; count: number; users: { id: number; name: string; email: string; is_active: boolean; created_at: string; plan: string }[]; }
+  interface FraudReferral { referral_id: number; created_at: string; referrer_id: number; referrer_name: string; referrer_email: string; referred_id: number; referred_name: string; referred_email: string; same_device: boolean; same_ip: boolean; }
+  interface FraudReport { flagged_withdrawals: FlaggedWithdrawal[]; duplicate_devices: DupDevice[]; duplicate_ips: DupIpGroup[]; fraud_referrals: FraudReferral[]; }
+  const [fraudData, setFraudData] = useState<FraudReport | null>(null);
+  const [fraudLoading, setFraudLoading] = useState(false);
+
   // Site Settings
   const SETTINGS_DEFAULTS: Record<string, string> = {
     gcash_number: '',
@@ -373,6 +383,14 @@ export default function Admin() {
     } finally { setOnlineLoading(false); }
   }, []);
 
+  const loadFraud = useCallback(async () => {
+    setFraudLoading(true);
+    try {
+      const res = await api.get<FraudReport>('/admin/fraud');
+      setFraudData(res.data);
+    } finally { setFraudLoading(false); }
+  }, []);
+
   const loadSiteSettings = useCallback(async () => {
     setSettingsLoading(true);
     try {
@@ -412,8 +430,9 @@ export default function Admin() {
     if (tab === 'kyc') loadKyc(kycFilter);
     if (tab === 'gcash-payments') loadGcashPayments(gcashFilter);
     if (tab === 'online') loadOnline();
+    if (tab === 'fraud' && !fraudData) loadFraud();
     if (tab === 'settings') loadSiteSettings();
-  }, [tab, userPage, wPage, wFilter, logPage, kycFilter, gcashFilter, stats, revenueStats, loadStats, loadUsers, loadWithdrawals, loadTasks, loadLogs, loadRevenue, loadKyc, loadGcashPayments, loadOnline, loadSiteSettings]);
+  }, [tab, userPage, wPage, wFilter, logPage, kycFilter, gcashFilter, stats, revenueStats, fraudData, loadStats, loadUsers, loadWithdrawals, loadTasks, loadLogs, loadRevenue, loadKyc, loadGcashPayments, loadOnline, loadFraud, loadSiteSettings]);
 
   // Auto-refresh online tab every 30 seconds
   useEffect(() => {
@@ -570,7 +589,7 @@ export default function Admin() {
   };
 
   const si = { width: 16, height: 16, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 2, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const };
-  const TABS: { id: Tab; label: string; icon: JSX.Element }[] = [
+  const TABS: { id: Tab; label: string; icon: JSX.Element; badge?: number }[] = [
     { id: 'stats',               label: 'Stats',               icon: <svg {...si}><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg> },
     { id: 'revenue',             label: 'Revenue',             icon: <svg {...si}><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg> },
     { id: 'users',               label: 'Users',               icon: <svg {...si}><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg> },
@@ -582,6 +601,7 @@ export default function Admin() {
     { id: 'online',              label: 'Online',              icon: <svg {...si}><circle cx="12" cy="12" r="3"/><path d="M2 12C2 6.48 6.48 2 12 2s10 4.48 10 10-4.48 10-10 10"/></svg> },
     { id: 'logs',                label: 'Audit Logs',          icon: <svg {...si}><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg> },
     { id: 'broadcast',           label: 'Broadcast',           icon: <svg {...si}><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12 19.79 19.79 0 0 1 1.63 3.38 2 2 0 0 1 3.6 1.18h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 8.96a16 16 0 0 0 6.13 6.13l.96-.96a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg> },
+    { id: 'fraud',               label: 'Fraud Detection',     icon: <svg {...si}><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>, badge: (fraudData?.duplicate_devices.length ?? 0) + (fraudData?.fraud_referrals.length ?? 0) + (fraudData?.flagged_withdrawals.filter((w: FlaggedWithdrawal) => w.status === 'pending').length ?? 0) },
     { id: 'settings',            label: 'Settings',            icon: <svg {...si}><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg> },
   ];
 
@@ -604,6 +624,7 @@ export default function Admin() {
               t.id === 'kyc'                 ? (stats?.pending_kyc || null) :
               t.id === 'gcash-payments'      ? (stats?.pending_gcash || null) :
               t.id === 'online'              ? onlineCount :
+              t.badge != null && t.badge > 0 ? t.badge :
               null;
             return (
               <button
@@ -1652,6 +1673,208 @@ export default function Admin() {
                 ))}
               </tbody>
             </table>
+          )}
+        </div>
+      )}
+      {/* ── Fraud Detection ── */}
+      {tab === 'fraud' && (
+        <div style={{ maxWidth: 980 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.25rem' }}>
+            <div>
+              <h2 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 700 }}>Fraud Detection</h2>
+              <p style={{ margin: '2px 0 0', fontSize: '0.8rem', color: 'var(--text-muted)' }}>Suspicious accounts, duplicate devices, and flagged activity</p>
+            </div>
+            <button onClick={loadFraud} disabled={fraudLoading} style={{ padding: '7px 16px', borderRadius: 10, border: '1.5px solid var(--dark-border)', background: 'transparent', color: 'var(--text)', cursor: 'pointer', fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: 6 }}>
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={fraudLoading ? { animation: 'spin 1s linear infinite' } : {}}><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>
+              Refresh
+            </button>
+          </div>
+
+          {fraudLoading ? (
+            <div style={{ color: 'var(--text-muted)', padding: '2rem 0', display: 'flex', alignItems: 'center', gap: 10 }}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ animation: 'spin 1s linear infinite' }}><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>
+              Scanning for fraud signals…
+            </div>
+          ) : fraudData && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+
+              {/* Flagged Withdrawals */}
+              <div style={{ background: 'var(--dark-card)', border: '1px solid var(--dark-border)', borderRadius: 16, overflow: 'hidden' }}>
+                <div style={{ padding: '1rem 1.25rem', borderBottom: '1px solid var(--dark-border)', display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <div style={{ width: 32, height: 32, borderRadius: 8, background: 'rgba(239,68,68,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#ef4444' }}>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <p style={{ fontWeight: 700, fontSize: '0.9rem', margin: 0 }}>Flagged Withdrawals</p>
+                    <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', margin: 0 }}>Withdrawals marked suspicious by the fraud engine</p>
+                  </div>
+                  <span style={{ background: '#ef4444', color: '#fff', borderRadius: 20, padding: '2px 10px', fontSize: '0.75rem', fontWeight: 700 }}>{fraudData.flagged_withdrawals.length}</span>
+                </div>
+                {fraudData.flagged_withdrawals.length === 0 ? (
+                  <p style={{ padding: '1.25rem', color: 'var(--text-muted)', fontSize: '0.85rem', margin: 0 }}>No flagged withdrawals.</p>
+                ) : (
+                  <div style={{ overflowX: 'auto' }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem' }}>
+                      <thead><tr style={{ borderBottom: '1px solid var(--dark-border)' }}>
+                        {['ID','User','Amount','Status','Flags','Date'].map(h => <th key={h} style={{ padding: '8px 12px', textAlign: 'left', color: 'var(--text-muted)', fontWeight: 600, whiteSpace: 'nowrap' }}>{h}</th>)}
+                      </tr></thead>
+                      <tbody>
+                        {fraudData.flagged_withdrawals.map(w => {
+                          let flags: string[] = [];
+                          try { const m = typeof w.metadata === 'string' ? JSON.parse(w.metadata) : w.metadata; flags = m?.flags ?? []; } catch {}
+                          return (
+                            <tr key={w.id} style={{ borderBottom: '1px solid var(--dark-border)' }}>
+                              <td style={{ padding: '8px 12px', color: 'var(--text-muted)' }}>#{w.id}</td>
+                              <td style={{ padding: '8px 12px' }}>
+                                <div style={{ fontWeight: 600 }}>{w.user_name}</div>
+                                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{w.user_email}</div>
+                              </td>
+                              <td style={{ padding: '8px 12px', fontWeight: 700 }}>₱{Number(w.amount).toFixed(2)}</td>
+                              <td style={{ padding: '8px 12px' }}>
+                                <span style={{ padding: '2px 8px', borderRadius: 20, fontSize: '0.72rem', fontWeight: 700, background: w.status === 'pending' ? 'rgba(217,119,6,0.15)' : w.status === 'completed' ? 'rgba(22,163,74,0.15)' : 'rgba(107,114,128,0.15)', color: w.status === 'pending' ? '#d97706' : w.status === 'completed' ? '#16a34a' : 'var(--text-muted)' }}>{w.status}</span>
+                              </td>
+                              <td style={{ padding: '8px 12px' }}>
+                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                                  {flags.map((f: string) => <span key={f} style={{ padding: '2px 7px', borderRadius: 20, fontSize: '0.68rem', fontWeight: 700, background: 'rgba(239,68,68,0.12)', color: '#ef4444' }}>{f.replace(/_/g, ' ')}</span>)}
+                                </div>
+                              </td>
+                              <td style={{ padding: '8px 12px', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>{new Date(w.created_at).toLocaleDateString()}</td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+
+              {/* Duplicate Devices */}
+              <div style={{ background: 'var(--dark-card)', border: '1px solid var(--dark-border)', borderRadius: 16, overflow: 'hidden' }}>
+                <div style={{ padding: '1rem 1.25rem', borderBottom: '1px solid var(--dark-border)', display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <div style={{ width: 32, height: 32, borderRadius: 8, background: 'rgba(245,158,11,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#f59e0b' }}>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="5" y="2" width="14" height="20" rx="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <p style={{ fontWeight: 700, fontSize: '0.9rem', margin: 0 }}>Duplicate Device Registrations</p>
+                    <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', margin: 0 }}>Multiple accounts sharing the same browser fingerprint</p>
+                  </div>
+                  <span style={{ background: '#f59e0b', color: '#fff', borderRadius: 20, padding: '2px 10px', fontSize: '0.75rem', fontWeight: 700 }}>{fraudData.duplicate_devices.length}</span>
+                </div>
+                {fraudData.duplicate_devices.length === 0 ? (
+                  <p style={{ padding: '1.25rem', color: 'var(--text-muted)', fontSize: '0.85rem', margin: 0 }}>No duplicate device fingerprints found.</p>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+                    {fraudData.duplicate_devices.map((d, i) => (
+                      <div key={i} style={{ padding: '1rem 1.25rem', borderBottom: '1px solid var(--dark-border)', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                        {[{ id: d.user1_id, name: d.user1_name, email: d.user1_email, active: d.user1_active, created_at: d.user1_created_at }, { id: d.user2_id, name: d.user2_name, email: d.user2_email, active: d.user2_active, created_at: d.user2_created_at }].map((u, j) => (
+                          <div key={j} style={{ background: 'var(--dark-bg)', borderRadius: 10, padding: '10px 12px', border: '1px solid var(--dark-border)' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+                              <span style={{ fontWeight: 700, fontSize: '0.85rem' }}>{u.name}</span>
+                              <span style={{ padding: '2px 7px', borderRadius: 20, fontSize: '0.7rem', fontWeight: 700, background: u.active ? 'rgba(22,163,74,0.15)' : 'rgba(239,68,68,0.15)', color: u.active ? '#16a34a' : '#ef4444' }}>{u.active ? 'Active' : 'Banned'}</span>
+                            </div>
+                            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{u.email}</div>
+                            <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: 2 }}>Joined {new Date(u.created_at).toLocaleDateString()}</div>
+                            <button onClick={() => toggleActive(u.id)} style={{ marginTop: 8, padding: '4px 10px', borderRadius: 8, border: '1px solid var(--dark-border)', background: 'transparent', color: u.active ? '#ef4444' : '#16a34a', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 600 }}>
+                              {u.active ? 'Ban Account' : 'Unban Account'}
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Duplicate IPs */}
+              <div style={{ background: 'var(--dark-card)', border: '1px solid var(--dark-border)', borderRadius: 16, overflow: 'hidden' }}>
+                <div style={{ padding: '1rem 1.25rem', borderBottom: '1px solid var(--dark-border)', display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <div style={{ width: 32, height: 32, borderRadius: 8, background: 'rgba(96,165,250,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#60a5fa' }}>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <p style={{ fontWeight: 700, fontSize: '0.9rem', margin: 0 }}>Shared Registration IPs</p>
+                    <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', margin: 0 }}>IPs used to register 3 or more accounts</p>
+                  </div>
+                  <span style={{ background: '#60a5fa', color: '#fff', borderRadius: 20, padding: '2px 10px', fontSize: '0.75rem', fontWeight: 700 }}>{fraudData.duplicate_ips.length}</span>
+                </div>
+                {fraudData.duplicate_ips.length === 0 ? (
+                  <p style={{ padding: '1.25rem', color: 'var(--text-muted)', fontSize: '0.85rem', margin: 0 }}>No suspicious IPs found.</p>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+                    {fraudData.duplicate_ips.map((group, i) => (
+                      <div key={i} style={{ padding: '1rem 1.25rem', borderBottom: '1px solid var(--dark-border)' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+                          <code style={{ background: 'var(--dark-bg)', padding: '3px 8px', borderRadius: 6, fontSize: '0.8rem', border: '1px solid var(--dark-border)' }}>{group.ip}</code>
+                          <span style={{ fontSize: '0.75rem', color: '#60a5fa', fontWeight: 700 }}>{group.count} accounts</span>
+                        </div>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                          {group.users.map(u => (
+                            <div key={u.id} style={{ background: 'var(--dark-bg)', borderRadius: 10, padding: '8px 12px', border: '1px solid var(--dark-border)', minWidth: 180 }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
+                                <span style={{ fontWeight: 700, fontSize: '0.82rem' }}>{u.name}</span>
+                                <span style={{ padding: '1px 6px', borderRadius: 20, fontSize: '0.65rem', fontWeight: 700, background: u.is_active ? 'rgba(22,163,74,0.15)' : 'rgba(239,68,68,0.15)', color: u.is_active ? '#16a34a' : '#ef4444' }}>{u.is_active ? 'Active' : 'Banned'}</span>
+                              </div>
+                              <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>{u.email}</div>
+                              <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', marginTop: 1 }}>{u.plan} · {new Date(u.created_at).toLocaleDateString()}</div>
+                              <button onClick={() => toggleActive(u.id)} style={{ marginTop: 6, padding: '3px 8px', borderRadius: 6, border: '1px solid var(--dark-border)', background: 'transparent', color: u.is_active ? '#ef4444' : '#16a34a', cursor: 'pointer', fontSize: '0.7rem', fontWeight: 600 }}>
+                                {u.is_active ? 'Ban' : 'Unban'}
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Fraud Referrals */}
+              <div style={{ background: 'var(--dark-card)', border: '1px solid var(--dark-border)', borderRadius: 16, overflow: 'hidden' }}>
+                <div style={{ padding: '1rem 1.25rem', borderBottom: '1px solid var(--dark-border)', display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <div style={{ width: 32, height: 32, borderRadius: 8, background: 'rgba(168,85,247,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#a855f7' }}>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <p style={{ fontWeight: 700, fontSize: '0.9rem', margin: 0 }}>Suspicious Referrals</p>
+                    <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', margin: 0 }}>Referrer and referred share same device or IP address</p>
+                  </div>
+                  <span style={{ background: '#a855f7', color: '#fff', borderRadius: 20, padding: '2px 10px', fontSize: '0.75rem', fontWeight: 700 }}>{fraudData.fraud_referrals.length}</span>
+                </div>
+                {fraudData.fraud_referrals.length === 0 ? (
+                  <p style={{ padding: '1.25rem', color: 'var(--text-muted)', fontSize: '0.85rem', margin: 0 }}>No suspicious referrals found.</p>
+                ) : (
+                  <div style={{ overflowX: 'auto' }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem' }}>
+                      <thead><tr style={{ borderBottom: '1px solid var(--dark-border)' }}>
+                        {['Referrer','Referred','Signal','Date'].map(h => <th key={h} style={{ padding: '8px 12px', textAlign: 'left', color: 'var(--text-muted)', fontWeight: 600, whiteSpace: 'nowrap' }}>{h}</th>)}
+                      </tr></thead>
+                      <tbody>
+                        {fraudData.fraud_referrals.map(r => (
+                          <tr key={r.referral_id} style={{ borderBottom: '1px solid var(--dark-border)' }}>
+                            <td style={{ padding: '8px 12px' }}>
+                              <div style={{ fontWeight: 600 }}>{r.referrer_name}</div>
+                              <div style={{ fontSize: '0.73rem', color: 'var(--text-muted)' }}>{r.referrer_email}</div>
+                            </td>
+                            <td style={{ padding: '8px 12px' }}>
+                              <div style={{ fontWeight: 600 }}>{r.referred_name}</div>
+                              <div style={{ fontSize: '0.73rem', color: 'var(--text-muted)' }}>{r.referred_email}</div>
+                            </td>
+                            <td style={{ padding: '8px 12px' }}>
+                              <div style={{ display: 'flex', gap: 4 }}>
+                                {r.same_device && <span style={{ padding: '2px 8px', borderRadius: 20, fontSize: '0.72rem', fontWeight: 700, background: 'rgba(239,68,68,0.12)', color: '#ef4444' }}>Same Device</span>}
+                                {r.same_ip && <span style={{ padding: '2px 8px', borderRadius: 20, fontSize: '0.72rem', fontWeight: 700, background: 'rgba(245,158,11,0.12)', color: '#f59e0b' }}>Same IP</span>}
+                              </div>
+                            </td>
+                            <td style={{ padding: '8px 12px', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>{new Date(r.created_at).toLocaleDateString()}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+
+            </div>
           )}
         </div>
       )}
