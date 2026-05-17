@@ -25,7 +25,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => { refreshSettings(); }, [refreshSettings]);
 
-  const getSetting = (key: string, defaultValue = '') => settings[key] ?? defaultValue;
+  const getSetting = (key: string, defaultValue = '') => settings[key] || defaultValue;
 
   return (
     <SettingsContext.Provider value={{ settings, loadingSettings, refreshSettings, getSetting }}>
