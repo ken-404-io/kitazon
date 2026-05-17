@@ -41,6 +41,7 @@ import Credits from './pages/Credits';
 import CheckIn from './pages/CheckIn';
 import KYC from './pages/KYC';
 import MathQuiz from './pages/MathQuiz';
+import AdManager from './components/AdManager';
 
 function MaintenanceGuard({ children }: { children: ReactNode }) {
   const { user } = useAuth();
@@ -78,6 +79,7 @@ export default function App() {
       <ToastProvider>
       <BrowserRouter>
         <MaintenanceGuard>
+        <AdManager />
         <AdBlockDetector />
         <AuthTransitionOverlay />
         <PWAInstallPrompt />
