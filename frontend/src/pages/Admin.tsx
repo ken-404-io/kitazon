@@ -1666,34 +1666,6 @@ export default function Admin() {
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
 
-              {/* ── GCash Config ── */}
-              <div style={{ background: 'var(--dark-card)', border: '1px solid var(--dark-border)', borderRadius: 16, overflow: 'hidden' }}>
-                <div style={{ padding: '1rem 1.25rem', borderBottom: '1px solid var(--dark-border)', display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <div style={{ width: 32, height: 32, borderRadius: 8, background: 'rgba(0,115,230,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#3b82f6' }}>
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
-                  </div>
-                  <div>
-                    <p style={{ fontWeight: 700, fontSize: '0.9rem', margin: 0 }}>GCash Configuration</p>
-                    <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', margin: 0 }}>Payment account & QR codes shown to users</p>
-                  </div>
-                </div>
-                <div style={{ padding: '1.25rem', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                  {[
-                    { key: 'gcash_number', label: 'GCash Number', placeholder: '09XXXXXXXXX', type: 'text', full: false },
-                    { key: 'gcash_name',   label: 'Account Name', placeholder: 'Kitazon', type: 'text', full: false },
-                    { key: 'gcash_qr_silver',  label: 'Silver Plan QR URL',  placeholder: 'https://...', type: 'text', full: true },
-                    { key: 'gcash_qr_gold',    label: 'Gold Plan QR URL',    placeholder: 'https://...', type: 'text', full: true },
-                    { key: 'gcash_qr_diamond', label: 'Diamond Plan QR URL', placeholder: 'https://...', type: 'text', full: true },
-                  ].map(({ key, label, placeholder, full }) => (
-                    <div key={key} style={{ gridColumn: full ? '1 / -1' : 'auto' }}>
-                      <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{label}</label>
-                      <input type="text" value={siteSettings[key] ?? ''} onChange={e => setSetting(key, e.target.value)} placeholder={placeholder}
-                        style={{ width: '100%', padding: '9px 12px', borderRadius: 10, border: '1.5px solid var(--dark-border)', background: 'var(--dark-bg)', color: 'var(--text)', fontSize: '0.85rem', outline: 'none', boxSizing: 'border-box' }} />
-                    </div>
-                  ))}
-                </div>
-              </div>
-
               {/* ── Plans ── */}
               <div style={{ background: 'var(--dark-card)', border: '1px solid var(--dark-border)', borderRadius: 16, overflow: 'hidden' }}>
                 <div style={{ padding: '1rem 1.25rem', borderBottom: '1px solid var(--dark-border)', display: 'flex', alignItems: 'center', gap: 10 }}>
