@@ -509,35 +509,68 @@ export default function Admin() {
     URL.revokeObjectURL(url);
   };
 
-  const tabStyle = (t: Tab) => ({
-    padding: '8px 18px',
-    background: tab === t ? 'var(--gold)' : 'transparent',
-    color: tab === t ? '#000' : 'inherit',
-    border: '1px solid var(--gold)',
-    borderRadius: 6,
-    cursor: 'pointer',
-    fontWeight: tab === t ? 700 : 400,
-  });
+  const TABS: { id: Tab; label: string; icon: string }[] = [
+    { id: 'stats',                label: 'Stats',               icon: '📊' },
+    { id: 'revenue',              label: 'Revenue',             icon: '💰' },
+    { id: 'users',                label: 'Users',               icon: '👥' },
+    { id: 'pending-withdrawals',  label: 'Pending Withdrawals', icon: '⏳' },
+    { id: 'withdrawals',          label: 'All Withdrawals',     icon: '💸' },
+    { id: 'tasks',                label: 'Tasks',               icon: '✅' },
+    { id: 'kyc',                  label: 'KYC',                 icon: '🪪' },
+    { id: 'gcash-payments',       label: 'GCash Payments',      icon: '💳' },
+    { id: 'online',               label: 'Online',              icon: '🟢' },
+    { id: 'logs',                 label: 'Audit Logs',          icon: '📋' },
+    { id: 'broadcast',            label: 'Broadcast',           icon: '📢' },
+  ];
 
   return (
-    <div style={{ maxWidth: 1100, margin: '2rem auto', padding: '0 1rem' }}>
+    <div style={{ maxWidth: 1200, margin: '2rem auto', padding: '0 1rem', display: 'flex', gap: '1.5rem', alignItems: 'flex-start' }}>
       {toast && (
         <div style={{ position: 'fixed', top: 20, right: 20, background: '#16a34a', color: '#fff', padding: '10px 18px', borderRadius: 8, zIndex: 9999, fontWeight: 600 }}>
           {toast}
         </div>
       )}
-      <h2>Admin Panel</h2>
-      <div style={{ display: 'flex', gap: 8, marginBottom: '1.5rem', flexWrap: 'wrap' }}>
-        {(['stats', 'revenue', 'users', 'pending-withdrawals', 'withdrawals', 'tasks', 'kyc', 'gcash-payments', 'online', 'logs', 'broadcast'] as Tab[]).map(t => (
-          <button key={t} style={tabStyle(t)} onClick={() => setTab(t)}>
-            {t === 'online'
-              ? `🟢 ${TAB_LABELS[t]}${onlineCount !== null ? ` (${onlineCount})` : ''}`
-              : t === 'pending-withdrawals'
-                ? `⏳ ${TAB_LABELS[t]}${stats?.pending_withdrawals ? ` (${stats.pending_withdrawals})` : ''}`
-                : TAB_LABELS[t]}
-          </button>
-        ))}
+
+      {/* ── Sidebar ── */}
+      <div style={{ width: 220, flexShrink: 0, background: 'var(--dark-card)', border: '1px solid var(--dark-border)', borderRadius: 16, padding: '1rem 0.75rem', position: 'sticky', top: '1rem' }}>
+        <div style={{ fontSize: '0.7rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--text-muted)', padding: '0 0.5rem', marginBottom: '0.75rem' }}>Admin Panel</div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+          {TABS.map(t => {
+            const isActive = tab === t.id;
+            const badge = t.id === 'pending-withdrawals' && stats?.pending_withdrawals
+              ? stats.pending_withdrawals
+              : t.id === 'online' && onlineCount !== null
+                ? onlineCount
+                : null;
+            return (
+              <button
+                key={t.id}
+                onClick={() => setTab(t.id)}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 10,
+                  padding: '0.6rem 0.75rem', borderRadius: 10, border: 'none', cursor: 'pointer',
+                  background: isActive ? 'var(--gold)' : 'transparent',
+                  color: isActive ? '#000' : 'var(--text)',
+                  fontWeight: isActive ? 700 : 400, fontSize: '0.85rem',
+                  textAlign: 'left', width: '100%', transition: 'background 0.15s',
+                }}
+              >
+                <span style={{ fontSize: '1rem', lineHeight: 1 }}>{t.icon}</span>
+                <span style={{ flex: 1 }}>{t.label}</span>
+                {badge !== null && (
+                  <span style={{ background: isActive ? 'rgba(0,0,0,0.2)' : 'var(--gold)', color: isActive ? '#000' : '#000', fontSize: '0.7rem', fontWeight: 800, borderRadius: 999, padding: '1px 7px', minWidth: 20, textAlign: 'center' }}>
+                    {badge}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
       </div>
+
+      {/* ── Main content ── */}
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <h2 style={{ marginBottom: '1.5rem' }}>{TAB_LABELS[tab]}</h2>
 
       {/* ── Stats ── */}
       {tab === 'stats' && (
@@ -1558,6 +1591,7 @@ export default function Admin() {
           )}
         </div>
       )}
+      </div>
     </div>
   );
 }
