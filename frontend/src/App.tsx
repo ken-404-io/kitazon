@@ -2,8 +2,10 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { ToastProvider } from './context/ToastContext';
 import { ThemeProvider } from './context/ThemeContext';
+import { SettingsProvider, useSettings } from './context/SettingsContext';
 import Navbar from './components/layout/Navbar';
 import Footer from './components/layout/Footer';
+import AnnouncementBanner from './components/AnnouncementBanner';
 import Home from './pages/Home';
 import Login from './pages/Login';
 import Register from './pages/Register';
@@ -40,6 +42,21 @@ import CheckIn from './pages/CheckIn';
 import KYC from './pages/KYC';
 import MathQuiz from './pages/MathQuiz';
 
+function MaintenanceGuard({ children }: { children: ReactNode }) {
+  const { user } = useAuth();
+  const { settings, loadingSettings } = useSettings();
+  if (!loadingSettings && settings.maintenance_mode === 'true' && !user?.is_admin) {
+    return (
+      <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center', padding: '2rem' }}>
+        <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>🔧</div>
+        <h1 style={{ fontSize: '1.8rem', fontWeight: 800, marginBottom: '0.5rem' }}>We'll be right back</h1>
+        <p style={{ color: 'var(--text-muted)', maxWidth: 400 }}>Kitazon is undergoing scheduled maintenance. Please check back shortly.</p>
+      </div>
+    );
+  }
+  return <>{children}</>;
+}
+
 function PrivateRoute({ children }: { children: ReactNode }) {
   const { user, loading } = useAuth();
   if (loading) return <div style={{ textAlign: 'center', padding: '4rem', color: 'var(--gold)' }}>Loading...</div>;
@@ -57,12 +74,15 @@ export default function App() {
     <ErrorBoundary>
     <ThemeProvider>
     <AuthProvider>
+      <SettingsProvider>
       <ToastProvider>
       <BrowserRouter>
+        <MaintenanceGuard>
         <AdBlockDetector />
         <AuthTransitionOverlay />
         <PWAInstallPrompt />
         <Navbar />
+        <AnnouncementBanner />
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/payout-proof" element={<PayoutProof />} />
@@ -97,8 +117,10 @@ export default function App() {
         </Routes>
         <Footer />
         <FacebookFab />
+        </MaintenanceGuard>
       </BrowserRouter>
       </ToastProvider>
+      </SettingsProvider>
     </AuthProvider>
     </ThemeProvider>
     </ErrorBoundary>

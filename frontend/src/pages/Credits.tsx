@@ -1,15 +1,16 @@
 import { useEffect, useState } from 'react';
 import { useToast } from '../context/ToastContext';
+import { useSettings } from '../context/SettingsContext';
 import { Skeleton } from '../components/ui/Skeleton';
 import api from '../services/api';
-
-const PHP_PER_CREDIT = 25;
 
 interface CreditsData { credits: number; php_per_credit: number; }
 interface StatsData   { balance: number; }
 
 export default function Credits() {
   const { showToast } = useToast();
+  const { getSetting } = useSettings();
+  const PHP_PER_CREDIT = Number(getSetting('credit_php_per_credit', '25'));
   const [credits,    setCredits]    = useState<number | null>(null);
   const [balance,    setBalance]    = useState<number | null>(null);
   const [convertAmt, setConvertAmt] = useState('');

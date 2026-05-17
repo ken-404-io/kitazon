@@ -1,5 +1,6 @@
 import { useState, useEffect, ReactNode } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { useSettings } from '../context/SettingsContext';
 import { UserPlan } from '../types';
 import api from '../services/api';
 import styles from './Plans.module.css';
@@ -11,70 +12,62 @@ const SilverIcon  = () => <svg {...ic}><circle cx="12" cy="8" r="4"/><path d="M8
 const GoldIcon    = () => <svg {...ic}><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>;
 const DiamondIcon = () => <svg {...ic}><polygon points="12 2 22 9 18 20 6 20 2 9"/><line x1="2" y1="9" x2="22" y2="9"/><line x1="12" y1="2" x2="6" y2="20"/><line x1="12" y1="2" x2="18" y2="20"/></svg>;
 
-const PLANS: {
+const STATIC_PLANS: {
   plan: UserPlan;
   name: string;
   badge: ReactNode;
   color: string;
-  dailyLimit: number;
-  price: string;
-  priceNum: number;
   features: string[];
 }[] = [
   {
-    plan:       'free',
-    name:       'Free',
-    badge:      <FreeIcon />,
-    color:      'var(--text-muted)',
-    dailyLimit: 5,
-    price:      'Free',
-    priceNum:   0,
-    features:   ['Starts at ₱5 withdrawal', '40 correct answers to withdraw', '2 invites per withdrawal', 'GCash withdrawals', 'Task earnings', 'Referral bonuses'],
+    plan:     'free',
+    name:     'Free',
+    badge:    <FreeIcon />,
+    color:    'var(--text-muted)',
+    features: ['GCash withdrawals', 'Task earnings', 'Referral bonuses'],
   },
   {
-    plan:       'silver',
-    name:       'Silver',
-    badge:      <SilverIcon />,
-    color:      '#9ca3af',
-    dailyLimit: 20,
-    price:      '₱499/mo',
-    priceNum:   499,
-    features:   ['Starts at ₱20 withdrawal', '20 correct answers to withdraw', '1 invite per withdrawal', 'Choose your withdrawal amount', 'Priority support'],
+    plan:     'silver',
+    name:     'Silver',
+    badge:    <SilverIcon />,
+    color:    '#9ca3af',
+    features: ['Choose your withdrawal amount', 'Priority support'],
   },
   {
-    plan:       'gold',
-    name:       'Gold',
-    badge:      <GoldIcon />,
-    color:      '#f59e0b',
-    dailyLimit: 50,
-    price:      '₱1,299/mo',
-    priceNum:   1299,
-    features:   ['Starts at ₱50 withdrawal', 'No quiz required to withdraw', 'No invite required', 'Choose your withdrawal amount', 'Priority support'],
+    plan:     'gold',
+    name:     'Gold',
+    badge:    <GoldIcon />,
+    color:    '#f59e0b',
+    features: ['No quiz required to withdraw', 'No invite required', 'Choose your withdrawal amount', 'Priority support'],
   },
   {
-    plan:       'diamond',
-    name:       'Diamond',
-    badge:      <DiamondIcon />,
-    color:      '#60a5fa',
-    dailyLimit: 100,
-    price:      '₱1,999/mo',
-    priceNum:   1999,
-    features:   ['Starts at ₱100 withdrawal', 'No credits needed to withdraw', 'No quiz required', 'No invite required', 'Choose your withdrawal amount', 'VIP support'],
+    plan:     'diamond',
+    name:     'Diamond',
+    badge:    <DiamondIcon />,
+    color:    '#60a5fa',
+    features: ['No credits needed to withdraw', 'No quiz required', 'No invite required', 'Choose your withdrawal amount', 'VIP support'],
   },
 ];
 
-const GCASH_QR: Record<string, string> = {
-  silver:  'https://res.cloudinary.com/dtm4n2uk3/image/upload/v1778935459/4432f02f-79d9-4bf7-bd8f-39f0b63487ad_qbjxzx.jpg',
-  gold:    'https://res.cloudinary.com/dtm4n2uk3/image/upload/v1778935610/1593c9bc-c490-4854-826d-72ad2a5a79a1_cwdk3l.jpg',
-  diamond: 'https://res.cloudinary.com/dtm4n2uk3/image/upload/v1778935570/69504c45-6f87-43b1-aebe-83d55a30e5be_p6tncl.jpg',
-};
-
-const GCASH_NUMBER   = process.env.REACT_APP_GCASH_NUMBER   ?? '';
-const GCASH_NAME     = process.env.REACT_APP_GCASH_NAME     ?? 'Kitazon';
-
 export default function Plans() {
   const { user } = useAuth();
+  const { getSetting } = useSettings();
   const currentPlan = user?.plan ?? 'free';
+
+  const GCASH_NUMBER = getSetting('gcash_number', '');
+  const GCASH_NAME   = getSetting('gcash_name', 'Kitazon');
+  const GCASH_QR: Record<string, string> = {
+    silver:  getSetting('gcash_qr_silver', ''),
+    gold:    getSetting('gcash_qr_gold', ''),
+    diamond: getSetting('gcash_qr_diamond', ''),
+  };
+
+  const PLANS = STATIC_PLANS.map(p => {
+    const priceNum = p.plan === 'free' ? 0 : Number(getSetting(`plan_price_${p.plan}`, '0'));
+    const dailyLimit = Number(getSetting(`plan_limit_${p.plan}`, '0'));
+    const price = p.plan === 'free' ? 'Free' : `₱${priceNum.toLocaleString()}/mo`;
+    return { ...p, priceNum, dailyLimit, price };
+  });
 
   const [pendingPlans, setPendingPlans] = useState<string[]>([]);
 
