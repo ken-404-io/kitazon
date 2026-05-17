@@ -24,28 +24,28 @@ const STATIC_PLANS: {
     name:     'Free',
     badge:    <FreeIcon />,
     color:    'var(--text-muted)',
-    features: ['2 invites to withdraw', '40 correct answers to withdraw', 'GCash withdrawals', 'Task earnings', 'Referral bonuses'],
+    features: ['40 correct answers to withdraw', 'GCash withdrawals', 'Task earnings', 'Referral bonuses'],
   },
   {
     plan:     'silver',
     name:     'Silver',
     badge:    <SilverIcon />,
     color:    '#9ca3af',
-    features: ['1 invite to withdraw', '20 correct answers to withdraw', 'Choose your withdrawal amount', 'Priority support'],
+    features: ['20 correct answers to withdraw', 'Choose your withdrawal amount', 'Priority support'],
   },
   {
     plan:     'gold',
     name:     'Gold',
     badge:    <GoldIcon />,
     color:    '#f59e0b',
-    features: ['No quiz required to withdraw', 'No invite required', 'Choose your withdrawal amount', 'Priority support'],
+    features: ['No quiz required to withdraw', 'Choose your withdrawal amount', 'Priority support'],
   },
   {
     plan:     'diamond',
     name:     'Diamond',
     badge:    <DiamondIcon />,
     color:    '#60a5fa',
-    features: ['No credits needed to withdraw', 'No quiz required', 'No invite required', 'Choose your withdrawal amount', 'VIP support'],
+    features: ['No credits needed to withdraw', 'No quiz required', 'Choose your withdrawal amount', 'VIP support'],
   },
 ];
 
