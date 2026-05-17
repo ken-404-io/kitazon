@@ -484,6 +484,31 @@ export default function Admin() {
     }
   };
 
+  const exportWithdrawalsCSV = () => {
+    const headers = ['ID', 'Requested At', 'User Name', 'User Email', 'Amount', 'Fee', 'Net Amount', 'Channel', 'Account Number', 'Account Name', 'Status'];
+    const rows = withdrawals.map(w => [
+      w.id,
+      new Date(w.created_at).toLocaleString('en-PH', { timeZone: 'Asia/Manila' }),
+      w.user_name,
+      w.user_email,
+      Number(w.amount).toFixed(2),
+      Number(w.fee).toFixed(2),
+      Number(w.net_amount).toFixed(2),
+      w.channel,
+      w.account_number,
+      w.account_name ?? '',
+      w.status,
+    ]);
+    const csv = [headers, ...rows].map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `withdrawals_${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   const tabStyle = (t: Tab) => ({
     padding: '8px 18px',
     background: tab === t ? 'var(--gold)' : 'transparent',
@@ -800,6 +825,13 @@ export default function Admin() {
                 <option value="completed">Completed</option>
                 <option value="failed">Failed</option>
               </select>
+              <button
+                onClick={exportWithdrawalsCSV}
+                disabled={withdrawals.length === 0}
+                style={{ marginLeft: 'auto', padding: '6px 14px', borderRadius: 6, border: '1px solid #22c55e', background: 'rgba(34,197,94,0.1)', color: '#22c55e', fontSize: 12, fontWeight: 700, cursor: withdrawals.length === 0 ? 'default' : 'pointer', opacity: withdrawals.length === 0 ? 0.4 : 1 }}
+              >
+                ⬇ Export CSV
+              </button>
             </div>
           ) : (
             <div style={{
