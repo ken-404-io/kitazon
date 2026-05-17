@@ -243,7 +243,34 @@ export default function Admin() {
   const [rewardsResult, setRewardsResult] = useState<string | null>(null);
 
   // Site Settings
-  const [siteSettings, setSiteSettings] = useState<Record<string, string>>({});
+  const SETTINGS_DEFAULTS: Record<string, string> = {
+    gcash_number: '',
+    gcash_name: 'Kitazon',
+    gcash_qr_silver: '',
+    gcash_qr_gold: '',
+    gcash_qr_diamond: '',
+    credit_php_per_credit: '25',
+    withdrawal_min: '5',
+    quiz_gate_free: '40',
+    quiz_gate_silver: '20',
+    quiz_gate_gold: '0',
+    quiz_gate_diamond: '0',
+    referral_gate_free: '2',
+    referral_gate_silver: '1',
+    referral_gate_gold: '0',
+    referral_gate_diamond: '0',
+    plan_price_silver: '499',
+    plan_price_gold: '1299',
+    plan_price_diamond: '1999',
+    plan_limit_free: '5',
+    plan_limit_silver: '20',
+    plan_limit_gold: '50',
+    plan_limit_diamond: '100',
+    announcement_text: '',
+    announcement_color: '#f59e0b',
+    maintenance_mode: 'false',
+  };
+  const [siteSettings, setSiteSettings] = useState<Record<string, string>>(SETTINGS_DEFAULTS);
   const [settingsLoading, setSettingsLoading] = useState(false);
   const [settingsSaving, setSettingsSaving] = useState(false);
   const [settingsResult, setSettingsResult] = useState<string | null>(null);
@@ -350,8 +377,8 @@ export default function Admin() {
     setSettingsLoading(true);
     try {
       const res = await api.get<Record<string, string>>('/admin/settings');
-      setSiteSettings(res.data);
-    } finally { setSettingsLoading(false); }
+      setSiteSettings(prev => ({ ...prev, ...res.data }));
+    } catch { /* keep defaults */ } finally { setSettingsLoading(false); }
   }, []);
 
   const saveSiteSettings = async () => {
@@ -1630,181 +1657,261 @@ export default function Admin() {
       )}
       {/* ── Settings ── */}
       {tab === 'settings' && (
-        <div style={{ maxWidth: 680 }}>
-          {settingsLoading ? <p>Loading…</p> : (
-            <>
-              {/* GCash Config */}
-              <div className="card" style={{ marginBottom: '1.5rem' }}>
-                <h3 style={{ marginBottom: '1rem', fontSize: '1rem' }}>GCash Config</h3>
-                {[
-                  { key: 'gcash_number',    label: 'GCash Number' },
-                  { key: 'gcash_name',      label: 'GCash Account Name' },
-                  { key: 'gcash_qr_silver', label: 'Silver QR URL' },
-                  { key: 'gcash_qr_gold',   label: 'Gold QR URL' },
-                  { key: 'gcash_qr_diamond',label: 'Diamond QR URL' },
-                ].map(({ key, label }) => (
-                  <div key={key} className="form-group" style={{ marginBottom: '0.75rem' }}>
-                    <label style={{ fontSize: 12, fontWeight: 600, color: '#9ca3af' }}>{label}</label>
-                    <input
-                      type="text"
-                      value={siteSettings[key] ?? ''}
-                      onChange={e => setSetting(key, e.target.value)}
-                      style={{ padding: '7px 10px', borderRadius: 6, border: '1px solid var(--dark-border)', background: 'var(--dark-bg)', color: 'var(--text)', width: '100%', fontSize: 13 }}
-                    />
+        <div style={{ maxWidth: 860 }}>
+          {settingsLoading ? (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, color: 'var(--text-muted)', padding: '2rem 0' }}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ animation: 'spin 1s linear infinite' }}><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>
+              Loading settings…
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+
+              {/* ── GCash Config ── */}
+              <div style={{ background: 'var(--dark-card)', border: '1px solid var(--dark-border)', borderRadius: 16, overflow: 'hidden' }}>
+                <div style={{ padding: '1rem 1.25rem', borderBottom: '1px solid var(--dark-border)', display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <div style={{ width: 32, height: 32, borderRadius: 8, background: 'rgba(0,115,230,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#3b82f6' }}>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
                   </div>
-                ))}
-              </div>
-
-              {/* Plan Limits */}
-              <div className="card" style={{ marginBottom: '1.5rem' }}>
-                <h3 style={{ marginBottom: '1rem', fontSize: '1rem' }}>Plan Limits (max per request, ₱)</h3>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
-                  {(['free', 'silver', 'gold', 'diamond'] as const).map(plan => (
-                    <div key={plan}>
-                      <label style={{ fontSize: 11, fontWeight: 600, color: '#9ca3af', textTransform: 'capitalize' }}>{plan}</label>
-                      <input
-                        type="number"
-                        min={1}
-                        value={siteSettings[`plan_limit_${plan}`] ?? ''}
-                        onChange={e => setSetting(`plan_limit_${plan}`, e.target.value)}
-                        style={{ padding: '7px 10px', borderRadius: 6, border: '1px solid var(--dark-border)', background: 'var(--dark-bg)', color: 'var(--text)', width: '100%', fontSize: 13 }}
-                      />
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Plan Prices */}
-              <div className="card" style={{ marginBottom: '1.5rem' }}>
-                <h3 style={{ marginBottom: '1rem', fontSize: '1rem' }}>Plan Prices (₱/mo)</h3>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
-                  {(['silver', 'gold', 'diamond'] as const).map(plan => (
-                    <div key={plan}>
-                      <label style={{ fontSize: 11, fontWeight: 600, color: '#9ca3af', textTransform: 'capitalize' }}>{plan}</label>
-                      <input
-                        type="number"
-                        min={0}
-                        value={siteSettings[`plan_price_${plan}`] ?? ''}
-                        onChange={e => setSetting(`plan_price_${plan}`, e.target.value)}
-                        style={{ padding: '7px 10px', borderRadius: 6, border: '1px solid var(--dark-border)', background: 'var(--dark-bg)', color: 'var(--text)', width: '100%', fontSize: 13 }}
-                      />
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Withdrawal Gates */}
-              <div className="card" style={{ marginBottom: '1.5rem' }}>
-                <h3 style={{ marginBottom: '1rem', fontSize: '1rem' }}>Withdrawal Gates</h3>
-                <p style={{ fontSize: 12, color: '#9ca3af', marginBottom: '0.75rem' }}>Quiz gate — correct answers required before withdrawing (0 = disabled)</p>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: '1rem' }}>
-                  {(['free', 'silver', 'gold', 'diamond'] as const).map(plan => (
-                    <div key={plan}>
-                      <label style={{ fontSize: 11, fontWeight: 600, color: '#9ca3af', textTransform: 'capitalize' }}>{plan}</label>
-                      <input
-                        type="number"
-                        min={0}
-                        value={siteSettings[`quiz_gate_${plan}`] ?? ''}
-                        onChange={e => setSetting(`quiz_gate_${plan}`, e.target.value)}
-                        style={{ padding: '7px 10px', borderRadius: 6, border: '1px solid var(--dark-border)', background: 'var(--dark-bg)', color: 'var(--text)', width: '100%', fontSize: 13 }}
-                      />
-                    </div>
-                  ))}
-                </div>
-                <p style={{ fontSize: 12, color: '#9ca3af', marginBottom: '0.75rem' }}>Referral gate — invites required before withdrawing (0 = disabled)</p>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
-                  {(['free', 'silver', 'gold', 'diamond'] as const).map(plan => (
-                    <div key={plan}>
-                      <label style={{ fontSize: 11, fontWeight: 600, color: '#9ca3af', textTransform: 'capitalize' }}>{plan}</label>
-                      <input
-                        type="number"
-                        min={0}
-                        value={siteSettings[`referral_gate_${plan}`] ?? ''}
-                        onChange={e => setSetting(`referral_gate_${plan}`, e.target.value)}
-                        style={{ padding: '7px 10px', borderRadius: 6, border: '1px solid var(--dark-border)', background: 'var(--dark-bg)', color: 'var(--text)', width: '100%', fontSize: 13 }}
-                      />
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Credits */}
-              <div className="card" style={{ marginBottom: '1.5rem' }}>
-                <h3 style={{ marginBottom: '1rem', fontSize: '1rem' }}>Credits</h3>
-                <div className="form-group" style={{ marginBottom: 0 }}>
-                  <label style={{ fontSize: 12, fontWeight: 600, color: '#9ca3af' }}>PHP per credit (conversion rate)</label>
-                  <input
-                    type="number"
-                    min={1}
-                    value={siteSettings['credit_php_per_credit'] ?? ''}
-                    onChange={e => setSetting('credit_php_per_credit', e.target.value)}
-                    style={{ padding: '7px 10px', borderRadius: 6, border: '1px solid var(--dark-border)', background: 'var(--dark-bg)', color: 'var(--text)', width: '100%', fontSize: 13 }}
-                  />
-                </div>
-              </div>
-
-              {/* Site */}
-              <div className="card" style={{ marginBottom: '1.5rem' }}>
-                <h3 style={{ marginBottom: '1rem', fontSize: '1rem' }}>Site</h3>
-                <div className="form-group" style={{ marginBottom: '0.75rem' }}>
-                  <label style={{ fontSize: 12, fontWeight: 600, color: '#9ca3af' }}>Announcement Text (empty = no banner)</label>
-                  <input
-                    type="text"
-                    value={siteSettings['announcement_text'] ?? ''}
-                    onChange={e => setSetting('announcement_text', e.target.value)}
-                    placeholder="e.g. System maintenance on Friday 10pm–12am"
-                    style={{ padding: '7px 10px', borderRadius: 6, border: '1px solid var(--dark-border)', background: 'var(--dark-bg)', color: 'var(--text)', width: '100%', fontSize: 13 }}
-                  />
-                </div>
-                <div className="form-group" style={{ marginBottom: '0.75rem' }}>
-                  <label style={{ fontSize: 12, fontWeight: 600, color: '#9ca3af' }}>Announcement Color</label>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                    <input
-                      type="color"
-                      value={siteSettings['announcement_color'] ?? '#f59e0b'}
-                      onChange={e => setSetting('announcement_color', e.target.value)}
-                      style={{ width: 40, height: 34, borderRadius: 6, border: '1px solid var(--dark-border)', cursor: 'pointer', padding: 2 }}
-                    />
-                    <span style={{ fontSize: 13, color: '#9ca3af' }}>{siteSettings['announcement_color'] ?? '#f59e0b'}</span>
+                  <div>
+                    <p style={{ fontWeight: 700, fontSize: '0.9rem', margin: 0 }}>GCash Configuration</p>
+                    <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', margin: 0 }}>Payment account & QR codes shown to users</p>
                   </div>
                 </div>
-                <div className="form-group" style={{ marginBottom: '0.75rem' }}>
-                  <label style={{ fontSize: 12, fontWeight: 600, color: '#9ca3af' }}>Minimum Withdrawal Amount (₱)</label>
-                  <input
-                    type="number"
-                    min={1}
-                    value={siteSettings['withdrawal_min'] ?? ''}
-                    onChange={e => setSetting('withdrawal_min', e.target.value)}
-                    style={{ padding: '7px 10px', borderRadius: 6, border: '1px solid var(--dark-border)', background: 'var(--dark-bg)', color: 'var(--text)', width: '100%', fontSize: 13 }}
-                  />
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>
-                    <input
-                      type="checkbox"
-                      checked={siteSettings['maintenance_mode'] === 'true'}
-                      onChange={e => setSetting('maintenance_mode', e.target.checked ? 'true' : 'false')}
-                      style={{ width: 16, height: 16, cursor: 'pointer' }}
-                    />
-                    Maintenance Mode (non-admin users see maintenance page)
-                  </label>
+                <div style={{ padding: '1.25rem', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                  {[
+                    { key: 'gcash_number', label: 'GCash Number', placeholder: '09XXXXXXXXX', type: 'text', full: false },
+                    { key: 'gcash_name',   label: 'Account Name', placeholder: 'Kitazon', type: 'text', full: false },
+                    { key: 'gcash_qr_silver',  label: 'Silver Plan QR URL',  placeholder: 'https://...', type: 'text', full: true },
+                    { key: 'gcash_qr_gold',    label: 'Gold Plan QR URL',    placeholder: 'https://...', type: 'text', full: true },
+                    { key: 'gcash_qr_diamond', label: 'Diamond Plan QR URL', placeholder: 'https://...', type: 'text', full: true },
+                  ].map(({ key, label, placeholder, full }) => (
+                    <div key={key} style={{ gridColumn: full ? '1 / -1' : 'auto' }}>
+                      <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{label}</label>
+                      <input type="text" value={siteSettings[key] ?? ''} onChange={e => setSetting(key, e.target.value)} placeholder={placeholder}
+                        style={{ width: '100%', padding: '9px 12px', borderRadius: 10, border: '1.5px solid var(--dark-border)', background: 'var(--dark-bg)', color: 'var(--text)', fontSize: '0.85rem', outline: 'none', boxSizing: 'border-box' }} />
+                    </div>
+                  ))}
                 </div>
               </div>
 
-              {settingsResult && (
-                <p style={{ fontSize: 13, fontWeight: 600, color: settingsResult.startsWith('Settings saved') ? '#22c55e' : '#dc2626', marginBottom: '0.75rem' }}>
-                  {settingsResult}
-                </p>
-              )}
-              <button
-                className="btn-primary"
-                disabled={settingsSaving}
-                onClick={saveSiteSettings}
-                style={{ fontSize: 14, padding: '10px 24px' }}
-              >
-                {settingsSaving ? 'Saving…' : 'Save Settings'}
-              </button>
-            </>
+              {/* ── Plans ── */}
+              <div style={{ background: 'var(--dark-card)', border: '1px solid var(--dark-border)', borderRadius: 16, overflow: 'hidden' }}>
+                <div style={{ padding: '1rem 1.25rem', borderBottom: '1px solid var(--dark-border)', display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <div style={{ width: 32, height: 32, borderRadius: 8, background: 'rgba(249,115,22,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#f97316' }}>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+                  </div>
+                  <div>
+                    <p style={{ fontWeight: 700, fontSize: '0.9rem', margin: 0 }}>Plan Configuration</p>
+                    <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', margin: 0 }}>Prices and max withdrawal limits per plan</p>
+                  </div>
+                </div>
+                <div style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+                  {/* Plan grid table */}
+                  <div>
+                    <p style={{ fontSize: '0.7rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--text-muted)', marginBottom: '0.6rem' }}>Max Withdrawal per Request (₱)</p>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10 }}>
+                      {([
+                        { plan: 'free',    color: '#6b7280', label: 'Free' },
+                        { plan: 'silver',  color: '#9ca3af', label: 'Silver' },
+                        { plan: 'gold',    color: '#f59e0b', label: 'Gold' },
+                        { plan: 'diamond', color: '#60a5fa', label: 'Diamond' },
+                      ] as const).map(({ plan, color, label }) => (
+                        <div key={plan} style={{ background: 'var(--dark-bg)', borderRadius: 12, padding: '0.75rem', border: `1.5px solid ${color}22` }}>
+                          <p style={{ fontSize: '0.7rem', fontWeight: 700, color, marginBottom: 6, textTransform: 'uppercase' }}>{label}</p>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                            <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>₱</span>
+                            <input type="number" min={1} value={siteSettings[`plan_limit_${plan}`] ?? ''} onChange={e => setSetting(`plan_limit_${plan}`, e.target.value)}
+                              style={{ flex: 1, width: '100%', padding: '6px 8px', borderRadius: 8, border: '1.5px solid var(--dark-border)', background: 'transparent', color: 'var(--text)', fontSize: '0.9rem', fontWeight: 700, outline: 'none' }} />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  <div>
+                    <p style={{ fontSize: '0.7rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--text-muted)', marginBottom: '0.6rem' }}>Monthly Price (₱/mo) — paid plans only</p>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
+                      {([
+                        { plan: 'silver',  color: '#9ca3af', label: 'Silver' },
+                        { plan: 'gold',    color: '#f59e0b', label: 'Gold' },
+                        { plan: 'diamond', color: '#60a5fa', label: 'Diamond' },
+                      ] as const).map(({ plan, color, label }) => (
+                        <div key={plan} style={{ background: 'var(--dark-bg)', borderRadius: 12, padding: '0.75rem', border: `1.5px solid ${color}22` }}>
+                          <p style={{ fontSize: '0.7rem', fontWeight: 700, color, marginBottom: 6, textTransform: 'uppercase' }}>{label}</p>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                            <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>₱</span>
+                            <input type="number" min={0} value={siteSettings[`plan_price_${plan}`] ?? ''} onChange={e => setSetting(`plan_price_${plan}`, e.target.value)}
+                              style={{ flex: 1, width: '100%', padding: '6px 8px', borderRadius: 8, border: '1.5px solid var(--dark-border)', background: 'transparent', color: 'var(--text)', fontSize: '0.9rem', fontWeight: 700, outline: 'none' }} />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* ── Withdrawal Gates ── */}
+              <div style={{ background: 'var(--dark-card)', border: '1px solid var(--dark-border)', borderRadius: 16, overflow: 'hidden' }}>
+                <div style={{ padding: '1rem 1.25rem', borderBottom: '1px solid var(--dark-border)', display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <div style={{ width: 32, height: 32, borderRadius: 8, background: 'rgba(168,85,247,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#a855f7' }}>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                  </div>
+                  <div>
+                    <p style={{ fontWeight: 700, fontSize: '0.9rem', margin: 0 }}>Withdrawal Gates</p>
+                    <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', margin: 0 }}>Requirements users must meet before withdrawing · set 0 to disable</p>
+                  </div>
+                </div>
+                <div style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+                  {[
+                    { gateKey: 'quiz_gate', label: 'Quiz Gate', desc: 'Correct quiz answers required', icon: '🧠' },
+                    { gateKey: 'referral_gate', label: 'Referral Gate', desc: 'Friend invites required', icon: '👥' },
+                  ].map(({ gateKey, label, desc, icon }) => (
+                    <div key={gateKey}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: '0.6rem' }}>
+                        <span style={{ fontSize: '0.9rem' }}>{icon}</span>
+                        <div>
+                          <p style={{ fontSize: '0.82rem', fontWeight: 700, margin: 0 }}>{label}</p>
+                          <p style={{ fontSize: '0.72rem', color: 'var(--text-muted)', margin: 0 }}>{desc}</p>
+                        </div>
+                      </div>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10 }}>
+                        {([
+                          { plan: 'free', color: '#6b7280', label: 'Free' },
+                          { plan: 'silver', color: '#9ca3af', label: 'Silver' },
+                          { plan: 'gold', color: '#f59e0b', label: 'Gold' },
+                          { plan: 'diamond', color: '#60a5fa', label: 'Diamond' },
+                        ] as const).map(({ plan, color, label: planLabel }) => (
+                          <div key={plan} style={{ background: 'var(--dark-bg)', borderRadius: 10, padding: '0.65rem 0.75rem' }}>
+                            <p style={{ fontSize: '0.68rem', fontWeight: 700, color, marginBottom: 5, textTransform: 'uppercase' }}>{planLabel}</p>
+                            <input type="number" min={0} value={siteSettings[`${gateKey}_${plan}`] ?? ''} onChange={e => setSetting(`${gateKey}_${plan}`, e.target.value)}
+                              style={{ width: '100%', padding: '6px 8px', borderRadius: 8, border: '1.5px solid var(--dark-border)', background: 'transparent', color: 'var(--text)', fontSize: '0.9rem', fontWeight: 700, outline: 'none', boxSizing: 'border-box' }} />
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* ── Credits & Withdrawals ── */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.25rem' }}>
+                <div style={{ background: 'var(--dark-card)', border: '1px solid var(--dark-border)', borderRadius: 16, overflow: 'hidden' }}>
+                  <div style={{ padding: '1rem 1.25rem', borderBottom: '1px solid var(--dark-border)', display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <div style={{ width: 32, height: 32, borderRadius: 8, background: 'rgba(96,165,250,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#60a5fa' }}>
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M15 9.5a3.5 3.5 0 1 0-3 5.5"/></svg>
+                    </div>
+                    <div>
+                      <p style={{ fontWeight: 700, fontSize: '0.9rem', margin: 0 }}>Credits</p>
+                      <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', margin: 0 }}>Conversion rate</p>
+                    </div>
+                  </div>
+                  <div style={{ padding: '1.25rem' }}>
+                    <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)', marginBottom: 8 }}>₱ per Credit</label>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'var(--dark-bg)', borderRadius: 10, border: '1.5px solid var(--dark-border)', padding: '8px 12px' }}>
+                      <span style={{ fontSize: '1rem', fontWeight: 700, color: '#60a5fa' }}>₱</span>
+                      <input type="number" min={1} value={siteSettings['credit_php_per_credit'] ?? ''} onChange={e => setSetting('credit_php_per_credit', e.target.value)}
+                        style={{ flex: 1, border: 'none', background: 'transparent', color: 'var(--text)', fontSize: '1.1rem', fontWeight: 800, outline: 'none' }} />
+                      <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>= 1 credit</span>
+                    </div>
+                  </div>
+                </div>
+                <div style={{ background: 'var(--dark-card)', border: '1px solid var(--dark-border)', borderRadius: 16, overflow: 'hidden' }}>
+                  <div style={{ padding: '1rem 1.25rem', borderBottom: '1px solid var(--dark-border)', display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <div style={{ width: 32, height: 32, borderRadius: 8, background: 'rgba(34,197,94,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#22c55e' }}>
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
+                    </div>
+                    <div>
+                      <p style={{ fontWeight: 700, fontSize: '0.9rem', margin: 0 }}>Withdrawals</p>
+                      <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', margin: 0 }}>Minimum amount</p>
+                    </div>
+                  </div>
+                  <div style={{ padding: '1.25rem' }}>
+                    <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)', marginBottom: 8 }}>Minimum Amount (₱)</label>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'var(--dark-bg)', borderRadius: 10, border: '1.5px solid var(--dark-border)', padding: '8px 12px' }}>
+                      <span style={{ fontSize: '1rem', fontWeight: 700, color: '#22c55e' }}>₱</span>
+                      <input type="number" min={1} value={siteSettings['withdrawal_min'] ?? ''} onChange={e => setSetting('withdrawal_min', e.target.value)}
+                        style={{ flex: 1, border: 'none', background: 'transparent', color: 'var(--text)', fontSize: '1.1rem', fontWeight: 800, outline: 'none' }} />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* ── Site & Announcements ── */}
+              <div style={{ background: 'var(--dark-card)', border: '1px solid var(--dark-border)', borderRadius: 16, overflow: 'hidden' }}>
+                <div style={{ padding: '1rem 1.25rem', borderBottom: '1px solid var(--dark-border)', display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <div style={{ width: 32, height: 32, borderRadius: 8, background: 'rgba(245,158,11,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#f59e0b' }}>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                  </div>
+                  <div>
+                    <p style={{ fontWeight: 700, fontSize: '0.9rem', margin: 0 }}>Site & Announcements</p>
+                    <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', margin: 0 }}>Banner messages and maintenance mode</p>
+                  </div>
+                </div>
+                <div style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)', marginBottom: 8 }}>Announcement Banner Text <span style={{ fontWeight: 400, textTransform: 'none' }}>(leave empty to hide)</span></label>
+                    <input type="text" value={siteSettings['announcement_text'] ?? ''} onChange={e => setSetting('announcement_text', e.target.value)} placeholder="e.g. System maintenance on Friday 10pm–12am"
+                      style={{ width: '100%', padding: '9px 12px', borderRadius: 10, border: '1.5px solid var(--dark-border)', background: 'var(--dark-bg)', color: 'var(--text)', fontSize: '0.85rem', outline: 'none', boxSizing: 'border-box' }} />
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem' }}>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)', marginBottom: 8 }}>Banner Color</label>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10, background: 'var(--dark-bg)', borderRadius: 10, border: '1.5px solid var(--dark-border)', padding: '6px 12px' }}>
+                        <input type="color" value={siteSettings['announcement_color'] ?? '#f59e0b'} onChange={e => setSetting('announcement_color', e.target.value)}
+                          style={{ width: 28, height: 28, borderRadius: 6, border: 'none', cursor: 'pointer', background: 'none', padding: 0 }} />
+                        <span style={{ fontSize: '0.82rem', color: 'var(--text-muted)', fontFamily: 'monospace' }}>{siteSettings['announcement_color'] ?? '#f59e0b'}</span>
+                      </div>
+                    </div>
+                    {siteSettings['announcement_text'] && (
+                      <div style={{ flex: 1, padding: '8px 14px', borderRadius: 10, background: siteSettings['announcement_color'] ?? '#f59e0b', color: '#000', fontSize: '0.8rem', fontWeight: 600 }}>
+                        Preview: {siteSettings['announcement_text']}
+                      </div>
+                    )}
+                  </div>
+                  <div style={{ height: 1, background: 'var(--dark-border)' }} />
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.5rem 0' }}>
+                    <div>
+                      <p style={{ fontWeight: 600, fontSize: '0.88rem', margin: 0 }}>Maintenance Mode</p>
+                      <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', margin: 0, marginTop: 2 }}>Non-admin users will see a maintenance page</p>
+                    </div>
+                    <label style={{ position: 'relative', display: 'inline-flex', alignItems: 'center', cursor: 'pointer' }}>
+                      <input type="checkbox" checked={siteSettings['maintenance_mode'] === 'true'} onChange={e => setSetting('maintenance_mode', e.target.checked ? 'true' : 'false')} style={{ display: 'none' }} />
+                      <div style={{
+                        width: 44, height: 24, borderRadius: 12, transition: 'background 0.2s',
+                        background: siteSettings['maintenance_mode'] === 'true' ? '#ef4444' : 'var(--dark-border)',
+                        position: 'relative',
+                      }}>
+                        <div style={{
+                          position: 'absolute', top: 3, left: siteSettings['maintenance_mode'] === 'true' ? 23 : 3,
+                          width: 18, height: 18, borderRadius: '50%', background: '#fff', transition: 'left 0.2s',
+                        }} />
+                      </div>
+                    </label>
+                  </div>
+                </div>
+              </div>
+
+              {/* ── Save bar ── */}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'var(--dark-card)', border: '1px solid var(--dark-border)', borderRadius: 16, padding: '1rem 1.25rem' }}>
+                <div>
+                  {settingsResult && (
+                    <p style={{ margin: 0, fontSize: '0.85rem', fontWeight: 600, color: settingsResult.startsWith('Settings saved') ? '#22c55e' : '#ef4444', display: 'flex', alignItems: 'center', gap: 6 }}>
+                      {settingsResult.startsWith('Settings saved')
+                        ? <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                        : <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>}
+                      {settingsResult}
+                    </p>
+                  )}
+                  {!settingsResult && <p style={{ margin: 0, fontSize: '0.82rem', color: 'var(--text-muted)' }}>Changes apply immediately after saving</p>}
+                </div>
+                <button onClick={saveSiteSettings} disabled={settingsSaving}
+                  style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 24px', borderRadius: 12, border: 'none', background: 'var(--gold)', color: '#000', fontWeight: 700, fontSize: '0.88rem', cursor: settingsSaving ? 'not-allowed' : 'pointer', opacity: settingsSaving ? 0.6 : 1 }}>
+                  {settingsSaving
+                    ? <><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ animation: 'spin 1s linear infinite' }}><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg> Saving…</>
+                    : <><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg> Save Settings</>}
+                </button>
+              </div>
+
+            </div>
           )}
         </div>
       )}
