@@ -226,9 +226,14 @@ export default function Plans() {
                 <div className={styles.gcashInstruction}>
                   <p className={styles.instructionTitle}>Send exactly <strong style={{ color: '#0073e6' }}>₱{modal.priceNum.toLocaleString()}</strong> to this GCash account:</p>
 
-                  {GCASH_QR[modal.plan] && (
+                  {GCASH_QR[modal.plan] ? (
                     <div className={styles.qrWrapper}>
                       <img src={GCASH_QR[modal.plan]} alt={`${modal.name} GCash QR Code`} className={styles.qrImage} />
+                    </div>
+                  ) : (
+                    <div className={styles.qrPlaceholder}>
+                      <span className={styles.gcashIconLarge}>G</span>
+                      <p style={{ margin: '8px 0 0', fontSize: '0.78rem', color: 'var(--text-muted)' }}>QR code not configured</p>
                     </div>
                   )}
 
