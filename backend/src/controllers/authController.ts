@@ -388,13 +388,13 @@ export async function register(req: Request, res: Response, next: NextFunction):
       }
     }
 
-    // ── Device fingerprint guard: block if this browser fingerprint has 2+ accounts ──
+    // ── Device fingerprint guard: block if this browser fingerprint already has an account ──
     if (deviceFingerprint) {
       try {
         const fpCount = await db('users').whereRaw('device_fingerprint = ?', [deviceFingerprint]).count('id as cnt').first();
-        if (Number((fpCount as { cnt?: unknown })?.cnt ?? 0) >= 2) {
-          console.warn(`[FRAUD] register blocked: fingerprint=${deviceFingerprint} already has 2+ accounts`);
-          res.status(429).json({ message: 'Too many accounts registered from this device. Please contact support.' });
+        if (Number((fpCount as { cnt?: unknown })?.cnt ?? 0) >= 1) {
+          console.warn(`[FRAUD] register blocked: fingerprint=${deviceFingerprint} already has an account`);
+          res.status(409).json({ message: 'An account is already registered from this device. Each device can only have one account.' });
           return;
         }
       } catch { /* column may not exist yet — skip */ }

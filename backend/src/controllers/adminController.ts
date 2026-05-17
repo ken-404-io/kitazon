@@ -817,3 +817,91 @@ export async function setReferralCount(req: Request, res: Response, next: NextFu
     res.json({ message: `Referral count set to ${count}.`, referral_count: count });
   } catch (err) { next(err); }
 }
+
+// ─── Fraud Detection ──────────────────────────────────────────────────────────
+export async function fraudReport(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    // 1. Flagged withdrawals
+    const flaggedWithdrawals = await db('withdrawals as w')
+      .join('users as u', 'w.user_id', 'u.id')
+      .where('w.is_flagged', true)
+      .orderBy('w.created_at', 'desc')
+      .limit(100)
+      .select(
+        'w.id', 'w.user_id', 'w.amount', 'w.status', 'w.created_at',
+        'w.metadata', 'u.name as user_name', 'u.email as user_email',
+        'u.is_active'
+      ).catch(() => []);
+
+    // 2. Duplicate device fingerprints (multiple accounts sharing same fingerprint)
+    const dupDevices = await db('users as u1')
+      .join('users as u2', function() {
+        this.on('u1.device_fingerprint', '=', 'u2.device_fingerprint')
+            .andOn('u1.id', '<', 'u2.id');
+      })
+      .whereNotNull('u1.device_fingerprint')
+      .select(
+        'u1.device_fingerprint as fingerprint',
+        'u1.id as user1_id', 'u1.name as user1_name', 'u1.email as user1_email',
+        'u1.is_active as user1_active', 'u1.created_at as user1_created_at',
+        'u2.id as user2_id', 'u2.name as user2_name', 'u2.email as user2_email',
+        'u2.is_active as user2_active', 'u2.created_at as user2_created_at',
+      )
+      .orderBy('u1.created_at', 'desc')
+      .limit(100)
+      .catch(() => []);
+
+    // 3. Duplicate registration IPs (3+ accounts from same IP)
+    const dupIps = await db('users')
+      .whereNotNull('registration_ip')
+      .select('registration_ip')
+      .count('id as cnt')
+      .groupBy('registration_ip')
+      .havingRaw('COUNT(id) >= 3')
+      .orderBy('cnt', 'desc')
+      .limit(50)
+      .catch(() => []);
+
+    // Enrich duplicate IPs with user list
+    const dupIpUsers = await Promise.all(
+      (dupIps as { registration_ip: string; cnt: string | number }[]).map(async (row) => {
+        const users = await db('users')
+          .where('registration_ip', row.registration_ip)
+          .select('id', 'name', 'email', 'is_active', 'created_at', 'plan')
+          .orderBy('created_at', 'asc');
+        return { ip: row.registration_ip, count: Number(row.cnt), users };
+      })
+    );
+
+    // 4. Fraud referrals (referrer and referred share same device fingerprint or IP)
+    const fraudReferrals = await db('referrals as r')
+      .join('users as referrer', 'r.referrer_id', 'referrer.id')
+      .join('users as referred', 'r.referred_id', 'referred.id')
+      .where(function() {
+        this.where(function() {
+          this.whereNotNull('referrer.device_fingerprint')
+              .whereRaw('referrer.device_fingerprint = referred.device_fingerprint');
+        }).orWhere(function() {
+          this.whereNotNull('referrer.registration_ip')
+              .whereRaw('referrer.registration_ip = referred.registration_ip');
+        });
+      })
+      .select(
+        'r.id as referral_id', 'r.created_at',
+        'referrer.id as referrer_id', 'referrer.name as referrer_name', 'referrer.email as referrer_email',
+        'referred.id as referred_id', 'referred.name as referred_name', 'referred.email as referred_email',
+        db.raw(`CASE WHEN referrer.device_fingerprint = referred.device_fingerprint THEN true ELSE false END as same_device`),
+        db.raw(`CASE WHEN referrer.registration_ip = referred.registration_ip THEN true ELSE false END as same_ip`),
+      )
+      .orderBy('r.created_at', 'desc')
+      .limit(100)
+      .catch(() => []);
+
+    res.json({
+      flagged_withdrawals: flaggedWithdrawals,
+      duplicate_devices: dupDevices,
+      duplicate_ips: dupIpUsers,
+      fraud_referrals: fraudReferrals,
+    });
+  } catch (err) { next(err); }
+}
