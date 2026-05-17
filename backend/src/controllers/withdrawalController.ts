@@ -38,9 +38,12 @@ async function countReferralsForNextGate(userId: number): Promise<{ count: numbe
     .select('updated_at')
     .first();
 
-  let q = db('referrals').where({ referrer_id: userId });
-  if (lastCompleted) q = q.where('created_at', '>', lastCompleted.updated_at);
-  const row = await q.count('id as n').first();
+  let q = db('referrals')
+    .join('users as referred', 'referrals.referred_id', 'referred.id')
+    .where({ 'referrals.referrer_id': userId })
+    .where('referred.email_verified', true);
+  if (lastCompleted) q = q.where('referrals.created_at', '>', lastCompleted.updated_at);
+  const row = await q.count('referrals.id as n').first();
   return { count: Number((row as { n?: unknown } | undefined)?.n ?? 0), frozen: false };
 }
 
