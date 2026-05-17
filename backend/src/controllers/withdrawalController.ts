@@ -5,16 +5,18 @@ import { DbUser, DbOtpToken, WithdrawalChannel } from '../types';
 import { createOtp } from '../services/otp';
 import { sendWithdrawalOtp, sendWithdrawalSubmittedEmail, sendSuspiciousWithdrawalEmail } from '../services/email';
 import { logAudit } from '../services/audit';
+import { getAllSettings } from './settingsController';
 
 const VALID_CHANNELS: WithdrawalChannel[] = ['gcash'];
 // Philippine mobile number: 11 digits starting with 09 (e.g. 09171234567)
 // Also accept +63 prefix form (e.g. +639171234567)
 const ACCOUNT_PATTERN = /^(09\d{9}|\+639\d{9})$/;
 
-const QUIZ_GATE_BY_PLAN: Record<string, number> = {
+// Default fallbacks (used if settings table not yet migrated)
+const QUIZ_GATE_DEFAULTS: Record<string, number> = {
   free: 40, silver: 20, gold: 0, diamond: 0,
 };
-const REFERRAL_GATE_BY_PLAN: Record<string, number> = {
+const REFERRAL_GATE_DEFAULTS: Record<string, number> = {
   free: 2, silver: 1, gold: 0, diamond: 0,
 };
 
@@ -96,8 +98,9 @@ async function getWithdrawalEligibility(userId: number, user: DbUser) {
   const isFirstWithdrawal = !prevWithdrawal;
 
   const plan = (user.plan as string | undefined) ?? 'free';
-  const quizRequired     = QUIZ_GATE_BY_PLAN[plan]     ?? QUIZ_GATE_BY_PLAN.free;
-  const referralRequired = REFERRAL_GATE_BY_PLAN[plan] ?? REFERRAL_GATE_BY_PLAN.free;
+  const settings = await getAllSettings().catch(() => ({} as Record<string, string>));
+  const quizRequired     = Number(settings[`quiz_gate_${plan}`]     ?? QUIZ_GATE_DEFAULTS[plan]     ?? QUIZ_GATE_DEFAULTS.free);
+  const referralRequired = Number(settings[`referral_gate_${plan}`] ?? REFERRAL_GATE_DEFAULTS[plan] ?? REFERRAL_GATE_DEFAULTS.free);
 
   const { count: quizzesCompleted, frozen: quizGateFrozen }       = quizRequired > 0
     ? await countQuizzesForNextGate(userId)
@@ -226,8 +229,10 @@ export async function requestOtp(req: Request, res: Response, next: NextFunction
   try {
     const { amount } = req.body as { amount: string | number };
     const parsed = parseFloat(String(amount));
-    if (!parsed || isNaN(parsed) || parsed < 5) {
-      res.status(400).json({ message: 'Minimum withdrawal is ₱5.' });
+    const settings = await getAllSettings().catch(() => ({} as Record<string, string>));
+    const withdrawalMin = Number(settings['withdrawal_min'] ?? 5);
+    if (!parsed || isNaN(parsed) || parsed < withdrawalMin) {
+      res.status(400).json({ message: `Minimum withdrawal is ₱${withdrawalMin}.` });
       return;
     }
 
@@ -280,9 +285,11 @@ export async function create(req: Request, res: Response, next: NextFunction): P
       amount: string | number; channel: string; account_number: string; account_name?: string; otp: string;
     };
     const parsed = parseFloat(String(amount));
+    const settings2 = await getAllSettings().catch(() => ({} as Record<string, string>));
+    const withdrawalMin2 = Number(settings2['withdrawal_min'] ?? 5);
 
-    if (!parsed || isNaN(parsed) || parsed < 5) {
-      res.status(400).json({ message: 'Minimum withdrawal is ₱5.' });
+    if (!parsed || isNaN(parsed) || parsed < withdrawalMin2) {
+      res.status(400).json({ message: `Minimum withdrawal is ₱${withdrawalMin2}.` });
       return;
     }
     if (parsed > 50000) {
