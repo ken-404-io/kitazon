@@ -19,6 +19,7 @@ import googleAuthRoutes from './routes/googleAuth';
 import subscriptionRoutes from './routes/subscriptions';
 import creditsRoutes from './routes/credits';
 import kycRoutes from './routes/kyc';
+import { getPublicSettings } from './controllers/settingsController';
 
 // ─── Startup guards ────────────────────────────────────────────────────────────
 if (!process.env.JWT_SECRET || process.env.JWT_SECRET.length < 32) {
@@ -142,6 +143,7 @@ app.use(generalLimiter);
 app.use((_req, res, next) => { res.set('Cache-Control', 'no-store'); next(); });
 
 // ─── Routes ───────────────────────────────────────────────────────────────────
+app.get('/api/settings', getPublicSettings);
 app.use('/api/auth', authRoutes);
 app.use('/api/tasks', taskRoutes);
 app.use('/api/withdrawals', withdrawalRoutes);
