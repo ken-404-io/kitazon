@@ -46,6 +46,7 @@
   gap: 0.75rem;
 }
 .planEmoji { font-size: 2rem; line-height: 1; }
+.planIcon  { display: flex; align-items: center; flex-shrink: 0; }
 .planName  { font-size: 1.1rem; font-weight: 800; margin-bottom: 2px; }
 .planPrice { font-size: 0.82rem; color: var(--text-muted); }
 

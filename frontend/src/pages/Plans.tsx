@@ -1,13 +1,20 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, ReactNode } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { UserPlan } from '../types';
 import api from '../services/api';
 import styles from './Plans.module.css';
 
+const ic = { width: 28, height: 28, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 2, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const };
+
+const FreeIcon    = () => <svg {...ic}><circle cx="12" cy="12" r="10"/><path d="M8 12h8M12 8v8"/></svg>;
+const SilverIcon  = () => <svg {...ic}><circle cx="12" cy="8" r="4"/><path d="M8 14l-2 7h12l-2-7"/><path d="M10 14l.5 3.5M14 14l-.5 3.5"/></svg>;
+const GoldIcon    = () => <svg {...ic}><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>;
+const DiamondIcon = () => <svg {...ic}><polygon points="12 2 22 9 18 20 6 20 2 9"/><line x1="2" y1="9" x2="22" y2="9"/><line x1="12" y1="2" x2="6" y2="20"/><line x1="12" y1="2" x2="18" y2="20"/></svg>;
+
 const PLANS: {
   plan: UserPlan;
   name: string;
-  badge: string;
+  badge: ReactNode;
   color: string;
   dailyLimit: number;
   price: string;
@@ -17,7 +24,7 @@ const PLANS: {
   {
     plan:       'free',
     name:       'Free',
-    badge:      '🆓',
+    badge:      <FreeIcon />,
     color:      'var(--text-muted)',
     dailyLimit: 5,
     price:      'Free',
@@ -27,7 +34,7 @@ const PLANS: {
   {
     plan:       'silver',
     name:       'Silver',
-    badge:      '🥈',
+    badge:      <SilverIcon />,
     color:      '#9ca3af',
     dailyLimit: 20,
     price:      '₱499/mo',
@@ -37,7 +44,7 @@ const PLANS: {
   {
     plan:       'gold',
     name:       'Gold',
-    badge:      '🥇',
+    badge:      <GoldIcon />,
     color:      '#f59e0b',
     dailyLimit: 50,
     price:      '₱1,299/mo',
@@ -47,7 +54,7 @@ const PLANS: {
   {
     plan:       'diamond',
     name:       'Diamond',
-    badge:      '💎',
+    badge:      <DiamondIcon />,
     color:      '#60a5fa',
     dailyLimit: 100,
     price:      '₱1,999/mo',
@@ -150,7 +157,7 @@ export default function Plans() {
             >
               {isCurrent && <span className={styles.currentBadge}>Current Plan</span>}
               <div className={styles.cardTop}>
-                <span className={styles.planEmoji}>{p.badge}</span>
+                <span className={styles.planIcon} style={{ color: p.color }}>{p.badge}</span>
                 <div>
                   <h2 className={styles.planName} style={{ color: p.color }}>{p.name}</h2>
                   <p className={styles.planPrice}>{p.price}</p>
@@ -175,7 +182,10 @@ export default function Plans() {
               ) : p.plan === 'free' || isDowngrade ? (
                 <div className={styles.currentBtn} style={{ opacity: 0.4 }}>—</div>
               ) : pendingPlans.includes(p.plan) ? (
-                <div className={styles.reviewingBtn}>⏳ Reviewing…</div>
+                <div className={styles.reviewingBtn}>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ display: 'inline', verticalAlign: 'middle', marginRight: 5 }}><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                  Reviewing…
+                </div>
               ) : (
                 <button
                   className={styles.upgradeBtn}
@@ -213,7 +223,7 @@ export default function Plans() {
             ) : (
               <>
                 <div className={styles.modalHeader}>
-                  <span style={{ fontSize: '1.5rem' }}>{modal.badge}</span>
+                  <span style={{ color: modal.color, display: 'flex' }}>{modal.badge}</span>
                   <div>
                     <h3 style={{ margin: 0, color: modal.color }}>{modal.name} Plan</h3>
                     <p style={{ margin: 0, fontSize: '0.82rem', color: 'var(--text-muted)' }}>{modal.price}</p>
