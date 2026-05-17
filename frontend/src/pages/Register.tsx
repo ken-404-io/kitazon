@@ -18,10 +18,22 @@ interface FormState {
   name: string; email: string; password: string; referral_code: string; website: string;
 }
 
+const STORAGE_KEY = 'kitazon_ref';
+
 export default function Register() {
   const { register } = useAuth();
   const [params] = useSearchParams();
-  const refFromUrl = params.get('ref') ?? '';
+
+  // Persist ref code in localStorage so social media link previews don't lose it
+  const refFromUrl = (() => {
+    const urlRef = params.get('ref') ?? '';
+    if (urlRef) {
+      localStorage.setItem(STORAGE_KEY, urlRef);
+      return urlRef;
+    }
+    return localStorage.getItem(STORAGE_KEY) ?? '';
+  })();
+
   const [form, setForm] = useState<FormState>({
     name: '', email: '', password: '', referral_code: refFromUrl, website: '',
   });
@@ -80,6 +92,7 @@ export default function Register() {
         captcha_token = result?.response;
       }
       await register({ name, email, password: form.password, referral_code, captcha_token, website: form.website, _t: String(pageLoadTime.current), _fp: getFingerprint() });
+      localStorage.removeItem(STORAGE_KEY);
     } catch (err: unknown) {
       captchaRef.current?.resetCaptcha();
       const msg = (err as { response?: { data?: { message?: string } } }).response?.data?.message;
