@@ -96,18 +96,22 @@ export async function earningsChart(req: Request, res: Response, next: NextFunct
     const days = 7;
     const rows = await db('earnings')
       .where({ user_id: req.user!.id })
-      .where('created_at', '>=', db.raw(`NOW() - INTERVAL '${days} days'`))
-      .select(db.raw('DATE(created_at) as date'), db.raw('SUM(amount) as total'))
-      .groupByRaw('DATE(created_at)')
+      .whereRaw(`(created_at AT TIME ZONE 'Asia/Manila')::date >= (NOW() AT TIME ZONE 'Asia/Manila')::date - INTERVAL '${days - 1} days'`)
+      .select(
+        db.raw(`(created_at AT TIME ZONE 'Asia/Manila')::date as date`),
+        db.raw('SUM(amount) as total'),
+      )
+      .groupByRaw(`(created_at AT TIME ZONE 'Asia/Manila')::date`)
       .orderBy('date', 'asc');
 
-    // Fill missing days with 0
+    // Fill missing days with 0 using PH local date
     const result: { date: string; total: number }[] = [];
+    const nowPH = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Manila' }));
     for (let i = days - 1; i >= 0; i--) {
-      const d = new Date();
+      const d = new Date(nowPH);
       d.setDate(d.getDate() - i);
-      const key = d.toISOString().slice(0, 10);
-      const found = rows.find((r: { date: string; total: string }) => String(r.date).slice(0, 10) === key);
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+      const found = rows.find((r: { date: unknown; total: string }) => String(r.date).slice(0, 10) === key);
       result.push({ date: key, total: found ? Number(found.total) : 0 });
     }
     res.json(result);
