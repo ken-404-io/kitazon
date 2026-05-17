@@ -364,7 +364,12 @@ export default function Withdraw() {
         <div className={styles.creditsCard}>
           <div className={styles.creditsHeader}>
             <div className={styles.creditsInfo}>
-              <span className={styles.creditsIcon}>🎟️</span>
+              <span className={styles.creditsIcon}>
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="12" cy="12" r="10"/>
+                  <path d="M15 9.5a3.5 3.5 0 1 0-3 5.5"/>
+                </svg>
+              </span>
               <div>
                 <p className={styles.creditsTitle}>Get Withdrawal Credits</p>
                 <p className={styles.creditsSub}>Enter how many credits you want · 1 credit costs ₱25 · +1 credit per daily check-in</p>
