@@ -159,7 +159,7 @@ export default function Plans() {
 
               <p className={styles.limitLine}>
                 <span className={styles.limitAmt} style={{ color: p.color }}>₱{p.dailyLimit}</span>
-                <span className={styles.limitLabel}>/day withdrawal</span>
+                <span className={styles.limitLabel}>max per request</span>
               </p>
 
               <ul className={styles.featureList}>
