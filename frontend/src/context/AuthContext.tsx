@@ -42,13 +42,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .finally(() => setLoading(false));
   }, []);
 
-  // Re-validate session when the user returns to the tab after being away
+  // Silently refresh the access token every 12 minutes (token expires at 15 min)
+  useEffect(() => {
+    const interval = setInterval(() => {
+      api.post<{ token: string; user: User }>('/auth/refresh', {})
+        .then((res) => { setToken(res.data.token); setUser(res.data.user); })
+        .catch(() => {}); // Silently ignore — the 401 interceptor handles actual failures
+    }, 12 * 60 * 1000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Re-validate session when user returns to the tab
   useEffect(() => {
     const handleVisibility = () => {
       if (document.visibilityState !== 'visible') return;
       api.post<{ token: string; user: User }>('/auth/refresh', {})
         .then((res) => { setToken(res.data.token); setUser(res.data.user); })
-        .catch(() => { setToken(null); setUser(null); });
+        .catch(() => {}); // Don't clear state on failure — network blip should not log user out
     };
     document.addEventListener('visibilitychange', handleVisibility);
     return () => document.removeEventListener('visibilitychange', handleVisibility);
