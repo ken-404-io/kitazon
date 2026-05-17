@@ -10,8 +10,13 @@ const VALID_CHANNELS: WithdrawalChannel[] = ['gcash'];
 // Philippine mobile number: 11 digits starting with 09 (e.g. 09171234567)
 // Also accept +63 prefix form (e.g. +639171234567)
 const ACCOUNT_PATTERN = /^(09\d{9}|\+639\d{9})$/;
-const QUIZ_GATE_REQUIRED    = 35;
-const REFERRAL_GATE_REQUIRED = 2;
+
+const QUIZ_GATE_BY_PLAN: Record<string, number> = {
+  free: 40, silver: 20, gold: 0, diamond: 0,
+};
+const REFERRAL_GATE_BY_PLAN: Record<string, number> = {
+  free: 2, silver: 1, gold: 0, diamond: 0,
+};
 
 // Count referrals made since the last COMPLETED withdrawal.
 // - Frozen (returns 0) while any withdrawal is pending/processing.
@@ -90,15 +95,27 @@ async function getWithdrawalEligibility(userId: number, user: DbUser) {
   const prevWithdrawal = await db('withdrawals').where({ user_id: userId }).first();
   const isFirstWithdrawal = !prevWithdrawal;
 
-  const { count: quizzesCompleted, frozen: quizGateFrozen }       = await countQuizzesForNextGate(userId);
-  const { count: referralsCompleted, frozen: referralGateFrozen } = await countReferralsForNextGate(userId);
+  const plan = (user.plan as string | undefined) ?? 'free';
+  const quizRequired     = QUIZ_GATE_BY_PLAN[plan]     ?? QUIZ_GATE_BY_PLAN.free;
+  const referralRequired = REFERRAL_GATE_BY_PLAN[plan] ?? REFERRAL_GATE_BY_PLAN.free;
+
+  const { count: quizzesCompleted, frozen: quizGateFrozen }       = quizRequired > 0
+    ? await countQuizzesForNextGate(userId)
+    : { count: 0, frozen: false };
+  const { count: referralsCompleted, frozen: referralGateFrozen } = referralRequired > 0
+    ? await countReferralsForNextGate(userId)
+    : { count: 0, frozen: false };
 
   const reasons: string[] = [];
   if (!user.email_verified) reasons.push('email_not_verified');
-  if (quizGateFrozen) reasons.push('quiz_gate_frozen');
-  else if (quizzesCompleted < QUIZ_GATE_REQUIRED) reasons.push('quiz_gate_not_met');
-  if (referralGateFrozen) reasons.push('referral_gate_frozen');
-  else if (referralsCompleted < REFERRAL_GATE_REQUIRED) reasons.push('referral_gate_not_met');
+  if (quizRequired > 0) {
+    if (quizGateFrozen) reasons.push('quiz_gate_frozen');
+    else if (quizzesCompleted < quizRequired) reasons.push('quiz_gate_not_met');
+  }
+  if (referralRequired > 0) {
+    if (referralGateFrozen) reasons.push('referral_gate_frozen');
+    else if (referralsCompleted < referralRequired) reasons.push('referral_gate_not_met');
+  }
 
   return {
     eligible: reasons.length === 0,
@@ -106,10 +123,10 @@ async function getWithdrawalEligibility(userId: number, user: DbUser) {
     is_first_withdrawal: isFirstWithdrawal,
     withdrawal_credits: Number(user.withdrawal_credits ?? 0),
     quizzes_completed: quizzesCompleted,
-    quizzes_required: QUIZ_GATE_REQUIRED,
+    quizzes_required: quizRequired,
     quiz_gate_frozen: quizGateFrozen,
     referrals_completed: referralsCompleted,
-    referrals_required: REFERRAL_GATE_REQUIRED,
+    referrals_required: referralRequired,
     referral_gate_frozen: referralGateFrozen,
     reasons,
   };
@@ -236,17 +253,19 @@ export async function requestOtp(req: Request, res: Response, next: NextFunction
       return;
     }
 
-    // Credits pre-check so user gets feedback before receiving OTP
-    const userCredits = Number(user.withdrawal_credits ?? 0);
-    const creditsNeeded = Math.ceil(parsed);
-    if (userCredits < creditsNeeded) {
-      res.status(403).json({
-        message: `You need ${creditsNeeded} withdrawal credits to withdraw ₱${parsed}. You have ${userCredits} credits.`,
-        reason: 'insufficient_credits',
-        credits_available: userCredits,
-        credits_needed: creditsNeeded,
-      });
-      return;
+    // Credits pre-check so user gets feedback before receiving OTP (Diamond plan skips)
+    if (user.plan !== 'diamond') {
+      const userCredits = Number(user.withdrawal_credits ?? 0);
+      const creditsNeeded = Math.ceil(parsed);
+      if (userCredits < creditsNeeded) {
+        res.status(403).json({
+          message: `You need ${creditsNeeded} withdrawal credits to withdraw ₱${parsed}. You have ${userCredits} credits.`,
+          reason: 'insufficient_credits',
+          credits_available: userCredits,
+          credits_needed: creditsNeeded,
+        });
+        return;
+      }
     }
 
     const otp = await createOtp(user.id, 'withdrawal_otp', 10);
@@ -364,17 +383,19 @@ export async function create(req: Request, res: Response, next: NextFunction): P
       return;
     }
 
-    // Withdrawal credits check: need 1 credit per ₱1 withdrawn
-    const userCredits = Number(user.withdrawal_credits ?? 0);
-    const creditsNeeded = Math.ceil(parsed);
-    if (userCredits < creditsNeeded) {
-      res.status(403).json({
-        message: `You need ${creditsNeeded} withdrawal credits to withdraw ₱${parsed}. You have ${userCredits} credits.`,
-        reason: 'insufficient_credits',
-        credits_available: userCredits,
-        credits_needed: creditsNeeded,
-      });
-      return;
+    // Withdrawal credits check: need 1 credit per ₱1 withdrawn (Diamond plan skips)
+    const creditsNeeded = user.plan === 'diamond' ? 0 : Math.ceil(parsed);
+    if (creditsNeeded > 0) {
+      const userCredits = Number(user.withdrawal_credits ?? 0);
+      if (userCredits < creditsNeeded) {
+        res.status(403).json({
+          message: `You need ${creditsNeeded} withdrawal credits to withdraw ₱${parsed}. You have ${userCredits} credits.`,
+          reason: 'insufficient_credits',
+          credits_available: userCredits,
+          credits_needed: creditsNeeded,
+        });
+        return;
+      }
     }
 
     // Block if user already has a pending or processing withdrawal
