@@ -16,9 +16,6 @@ const ACCOUNT_PATTERN = /^(09\d{9}|\+639\d{9})$/;
 const QUIZ_GATE_DEFAULTS: Record<string, number> = {
   free: 40, silver: 20, gold: 0, diamond: 0,
 };
-const REFERRAL_GATE_DEFAULTS: Record<string, number> = {
-  free: 2, silver: 1, gold: 0, diamond: 0,
-};
 
 // Count referrals made since the last COMPLETED withdrawal.
 // - Frozen (returns 0) while any withdrawal is pending/processing.
@@ -102,14 +99,10 @@ async function getWithdrawalEligibility(userId: number, user: DbUser) {
 
   const plan = (user.plan as string | undefined) ?? 'free';
   const settings = await getAllSettings().catch(() => ({} as Record<string, string>));
-  const quizRequired     = Number(settings[`quiz_gate_${plan}`]     ?? QUIZ_GATE_DEFAULTS[plan]     ?? QUIZ_GATE_DEFAULTS.free);
-  const referralRequired = Number(settings[`referral_gate_${plan}`] ?? REFERRAL_GATE_DEFAULTS[plan] ?? REFERRAL_GATE_DEFAULTS.free);
+  const quizRequired = Number(settings[`quiz_gate_${plan}`] ?? QUIZ_GATE_DEFAULTS[plan] ?? QUIZ_GATE_DEFAULTS.free);
 
-  const { count: quizzesCompleted, frozen: quizGateFrozen }       = quizRequired > 0
+  const { count: quizzesCompleted, frozen: quizGateFrozen } = quizRequired > 0
     ? await countQuizzesForNextGate(userId)
-    : { count: 0, frozen: false };
-  const { count: referralsCompleted, frozen: referralGateFrozen } = referralRequired > 0
-    ? await countReferralsForNextGate(userId)
     : { count: 0, frozen: false };
 
   const reasons: string[] = [];
@@ -117,10 +110,6 @@ async function getWithdrawalEligibility(userId: number, user: DbUser) {
   if (quizRequired > 0) {
     if (quizGateFrozen) reasons.push('quiz_gate_frozen');
     else if (quizzesCompleted < quizRequired) reasons.push('quiz_gate_not_met');
-  }
-  if (referralRequired > 0) {
-    if (referralGateFrozen) reasons.push('referral_gate_frozen');
-    else if (referralsCompleted < referralRequired) reasons.push('referral_gate_not_met');
   }
 
   return {
@@ -131,9 +120,9 @@ async function getWithdrawalEligibility(userId: number, user: DbUser) {
     quizzes_completed: quizzesCompleted,
     quizzes_required: quizRequired,
     quiz_gate_frozen: quizGateFrozen,
-    referrals_completed: referralsCompleted,
-    referrals_required: referralRequired,
-    referral_gate_frozen: referralGateFrozen,
+    referrals_completed: 0,
+    referrals_required: 0,
+    referral_gate_frozen: false,
     reasons,
   };
 }
