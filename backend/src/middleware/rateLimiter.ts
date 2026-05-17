@@ -5,7 +5,7 @@ const json429 = (msg: string) => (_req: unknown, res: unknown) =>
 
 export const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 10,
+  max: 50,
   handler: json429('Too many attempts. Please try again in 15 minutes.'),
   standardHeaders: true,
   legacyHeaders: false,
@@ -13,7 +13,7 @@ export const authLimiter = rateLimit({
 
 export const registerLimiter = rateLimit({
   windowMs: 60 * 60 * 1000,
-  max: 5,
+  max: 10,
   handler: json429('Too many registrations from this IP. Please try again later.'),
   standardHeaders: true,
   legacyHeaders: false,
@@ -21,7 +21,7 @@ export const registerLimiter = rateLimit({
 
 export const generalLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 200,
+  max: 1000,
   handler: json429('Too many requests. Please slow down.'),
   standardHeaders: true,
   legacyHeaders: false,
