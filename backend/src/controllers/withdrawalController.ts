@@ -10,7 +10,31 @@ const VALID_CHANNELS: WithdrawalChannel[] = ['gcash'];
 // Philippine mobile number: 11 digits starting with 09 (e.g. 09171234567)
 // Also accept +63 prefix form (e.g. +639171234567)
 const ACCOUNT_PATTERN = /^(09\d{9}|\+639\d{9})$/;
-const QUIZ_GATE_REQUIRED = 35;
+const QUIZ_GATE_REQUIRED    = 35;
+const REFERRAL_GATE_REQUIRED = 2;
+
+// Count referrals made since the last settled withdrawal.
+// Frozen (returns 0) while any withdrawal is pending/processing.
+async function countReferralsForNextGate(userId: number): Promise<{ count: number; frozen: boolean }> {
+  const pending = await db('withdrawals')
+    .where({ user_id: userId })
+    .whereIn('status', ['pending', 'processing'])
+    .first();
+
+  if (pending) return { count: 0, frozen: true };
+
+  const lastSettled = await db('withdrawals')
+    .where({ user_id: userId })
+    .whereIn('status', ['completed', 'failed'])
+    .orderBy('updated_at', 'desc')
+    .select('updated_at')
+    .first();
+
+  let q = db('referrals').where({ referrer_id: userId });
+  if (lastSettled) q = q.where('created_at', '>', lastSettled.updated_at);
+  const row = await q.count('id as n').first();
+  return { count: Number((row as { n?: unknown } | undefined)?.n ?? 0), frozen: false };
+}
 
 // GCash account-name validation:
 //  - Required (so we can match against the user's GCash registration).
@@ -65,12 +89,15 @@ async function getWithdrawalEligibility(userId: number, user: DbUser) {
   const prevWithdrawal = await db('withdrawals').where({ user_id: userId }).first();
   const isFirstWithdrawal = !prevWithdrawal;
 
-  const { count: quizzesCompleted, frozen: quizGateFrozen } = await countQuizzesForNextGate(userId);
+  const { count: quizzesCompleted, frozen: quizGateFrozen }       = await countQuizzesForNextGate(userId);
+  const { count: referralsCompleted, frozen: referralGateFrozen } = await countReferralsForNextGate(userId);
 
   const reasons: string[] = [];
   if (!user.email_verified) reasons.push('email_not_verified');
   if (quizGateFrozen) reasons.push('quiz_gate_frozen');
   else if (quizzesCompleted < QUIZ_GATE_REQUIRED) reasons.push('quiz_gate_not_met');
+  if (referralGateFrozen) reasons.push('referral_gate_frozen');
+  else if (referralsCompleted < REFERRAL_GATE_REQUIRED) reasons.push('referral_gate_not_met');
 
   return {
     eligible: reasons.length === 0,
@@ -80,6 +107,9 @@ async function getWithdrawalEligibility(userId: number, user: DbUser) {
     quizzes_completed: quizzesCompleted,
     quizzes_required: QUIZ_GATE_REQUIRED,
     quiz_gate_frozen: quizGateFrozen,
+    referrals_completed: referralsCompleted,
+    referrals_required: REFERRAL_GATE_REQUIRED,
+    referral_gate_frozen: referralGateFrozen,
     reasons,
   };
 }
