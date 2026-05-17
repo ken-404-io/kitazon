@@ -22,7 +22,7 @@ const PLANS: {
     dailyLimit: 5,
     price:      'Free',
     priceNum:   0,
-    features:   ['₱5/day withdrawal limit', 'GCash withdrawals', 'Task earnings', 'Referral bonuses'],
+    features:   ['₱5/day withdrawal limit', '40 correct answers to withdraw', '2 invites per withdrawal', 'GCash withdrawals', 'Task earnings', 'Referral bonuses'],
   },
   {
     plan:       'silver',
@@ -32,7 +32,7 @@ const PLANS: {
     dailyLimit: 20,
     price:      '₱499/mo',
     priceNum:   499,
-    features:   ['₱20/day withdrawal limit', 'Choose your withdrawal amount', 'Priority support', 'All Free features'],
+    features:   ['₱20/day withdrawal limit', '20 correct answers to withdraw', '1 invite per withdrawal', 'Choose your withdrawal amount', 'Priority support', 'All Free features'],
   },
   {
     plan:       'gold',
@@ -42,7 +42,7 @@ const PLANS: {
     dailyLimit: 50,
     price:      '₱1,299/mo',
     priceNum:   1299,
-    features:   ['₱50/day withdrawal limit', 'Choose your withdrawal amount', 'Priority support', 'All Silver features'],
+    features:   ['₱50/day withdrawal limit', 'No quiz required to withdraw', 'No invite required', 'Choose your withdrawal amount', 'Priority support', 'All Silver features'],
   },
   {
     plan:       'diamond',
@@ -52,7 +52,7 @@ const PLANS: {
     dailyLimit: 100,
     price:      '₱1,999/mo',
     priceNum:   1999,
-    features:   ['₱100/day withdrawal limit', 'Choose your withdrawal amount', 'VIP support', 'All Gold features'],
+    features:   ['₱100/day withdrawal limit', 'No credits needed to withdraw', 'No quiz required', 'No invite required', 'Choose your withdrawal amount', 'VIP support', 'All Gold features'],
   },
 ];
 
