@@ -10,7 +10,7 @@ import { createOtp, verifyOtp } from '../services/otp';
 import { logAudit, logLoginEvent } from '../services/audit';
 import { verifyTotpLogin } from './totpController';
 
-const ACCESS_TOKEN_TTL = '15m';
+const ACCESS_TOKEN_TTL = '30d';
 const REFRESH_TOKEN_TTL_DAYS = 30;
 const MAX_PASSWORD_LENGTH = 128;
 
