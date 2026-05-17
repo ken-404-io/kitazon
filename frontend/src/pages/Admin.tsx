@@ -71,6 +71,8 @@ interface PlatformStats {
   pending_withdrawals: number;
   total_paid_out: number;
   total_earnings_distributed: number;
+  pending_kyc: number;
+  pending_gcash: number;
 }
 
 type PlanValue = 'free' | 'silver' | 'gold' | 'diamond';
@@ -133,11 +135,12 @@ interface AuditLog {
 }
 
 interface RevenueStats {
-  plan_counts: { free: number; silver: number; gold: number; diamond: number };
+  plan_breakdown: { free: number; silver: number; gold: number; diamond: number };
   active_subscribers: number;
-  total_paid_out: number;
+  total_withdrawals_paid: number;
   total_earnings_distributed: number;
   new_users_30d: number;
+  subscription_revenue: number;
 }
 
 const fmt = (n: number | string) => Number(n).toFixed(2);
@@ -509,22 +512,23 @@ export default function Admin() {
     URL.revokeObjectURL(url);
   };
 
-  const TABS: { id: Tab; label: string; icon: string }[] = [
-    { id: 'stats',                label: 'Stats',               icon: '📊' },
-    { id: 'revenue',              label: 'Revenue',             icon: '💰' },
-    { id: 'users',                label: 'Users',               icon: '👥' },
-    { id: 'pending-withdrawals',  label: 'Pending Withdrawals', icon: '⏳' },
-    { id: 'withdrawals',          label: 'All Withdrawals',     icon: '💸' },
-    { id: 'tasks',                label: 'Tasks',               icon: '✅' },
-    { id: 'kyc',                  label: 'KYC',                 icon: '🪪' },
-    { id: 'gcash-payments',       label: 'GCash Payments',      icon: '💳' },
-    { id: 'online',               label: 'Online',              icon: '🟢' },
-    { id: 'logs',                 label: 'Audit Logs',          icon: '📋' },
-    { id: 'broadcast',            label: 'Broadcast',           icon: '📢' },
+  const si = { width: 16, height: 16, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 2, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const };
+  const TABS: { id: Tab; label: string; icon: JSX.Element }[] = [
+    { id: 'stats',               label: 'Stats',               icon: <svg {...si}><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg> },
+    { id: 'revenue',             label: 'Revenue',             icon: <svg {...si}><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg> },
+    { id: 'users',               label: 'Users',               icon: <svg {...si}><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg> },
+    { id: 'pending-withdrawals', label: 'Pending Withdrawals', icon: <svg {...si}><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg> },
+    { id: 'withdrawals',         label: 'All Withdrawals',     icon: <svg {...si}><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg> },
+    { id: 'tasks',               label: 'Tasks',               icon: <svg {...si}><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg> },
+    { id: 'kyc',                 label: 'KYC',                 icon: <svg {...si}><rect x="3" y="4" width="18" height="16" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><path d="M9 12h6M9 16h4"/></svg> },
+    { id: 'gcash-payments',      label: 'GCash Payments',      icon: <svg {...si}><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg> },
+    { id: 'online',              label: 'Online',              icon: <svg {...si}><circle cx="12" cy="12" r="3"/><path d="M2 12C2 6.48 6.48 2 12 2s10 4.48 10 10-4.48 10-10 10"/></svg> },
+    { id: 'logs',                label: 'Audit Logs',          icon: <svg {...si}><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg> },
+    { id: 'broadcast',           label: 'Broadcast',           icon: <svg {...si}><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12 19.79 19.79 0 0 1 1.63 3.38 2 2 0 0 1 3.6 1.18h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 8.96a16 16 0 0 0 6.13 6.13l.96-.96a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg> },
   ];
 
   return (
-    <div style={{ maxWidth: 1200, margin: '2rem auto', padding: '0 1rem', display: 'flex', gap: '1.5rem', alignItems: 'flex-start' }}>
+    <div style={{ display: 'flex', minHeight: '100vh', alignItems: 'flex-start' }}>
       {toast && (
         <div style={{ position: 'fixed', top: 20, right: 20, background: '#16a34a', color: '#fff', padding: '10px 18px', borderRadius: 8, zIndex: 9999, fontWeight: 600 }}>
           {toast}
@@ -532,16 +536,17 @@ export default function Admin() {
       )}
 
       {/* ── Sidebar ── */}
-      <div style={{ width: 220, flexShrink: 0, background: 'var(--dark-card)', border: '1px solid var(--dark-border)', borderRadius: 16, padding: '1rem 0.75rem', position: 'sticky', top: '1rem' }}>
-        <div style={{ fontSize: '0.7rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--text-muted)', padding: '0 0.5rem', marginBottom: '0.75rem' }}>Admin Panel</div>
+      <div style={{ width: 230, flexShrink: 0, background: 'var(--dark-card)', borderRight: '1px solid var(--dark-border)', minHeight: '100vh', padding: '1.5rem 0.75rem', position: 'sticky', top: 0 }}>
+        <div style={{ fontSize: '0.65rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--text-muted)', padding: '0 0.5rem', marginBottom: '1rem' }}>Admin Panel</div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
           {TABS.map(t => {
             const isActive = tab === t.id;
-            const badge = t.id === 'pending-withdrawals' && stats?.pending_withdrawals
-              ? stats.pending_withdrawals
-              : t.id === 'online' && onlineCount !== null
-                ? onlineCount
-                : null;
+            const badge =
+              t.id === 'pending-withdrawals' ? (stats?.pending_withdrawals || null) :
+              t.id === 'kyc'                 ? (stats?.pending_kyc || null) :
+              t.id === 'gcash-payments'      ? (stats?.pending_gcash || null) :
+              t.id === 'online'              ? onlineCount :
+              null;
             return (
               <button
                 key={t.id}
@@ -551,14 +556,14 @@ export default function Admin() {
                   padding: '0.6rem 0.75rem', borderRadius: 10, border: 'none', cursor: 'pointer',
                   background: isActive ? 'var(--gold)' : 'transparent',
                   color: isActive ? '#000' : 'var(--text)',
-                  fontWeight: isActive ? 700 : 400, fontSize: '0.85rem',
+                  fontWeight: isActive ? 700 : 400, fontSize: '0.84rem',
                   textAlign: 'left', width: '100%', transition: 'background 0.15s',
                 }}
               >
-                <span style={{ fontSize: '1rem', lineHeight: 1 }}>{t.icon}</span>
+                <span style={{ flexShrink: 0, opacity: isActive ? 1 : 0.65 }}>{t.icon}</span>
                 <span style={{ flex: 1 }}>{t.label}</span>
-                {badge !== null && (
-                  <span style={{ background: isActive ? 'rgba(0,0,0,0.2)' : 'var(--gold)', color: isActive ? '#000' : '#000', fontSize: '0.7rem', fontWeight: 800, borderRadius: 999, padding: '1px 7px', minWidth: 20, textAlign: 'center' }}>
+                {badge !== null && badge > 0 && (
+                  <span style={{ background: isActive ? 'rgba(0,0,0,0.25)' : '#ef4444', color: '#fff', fontSize: '0.68rem', fontWeight: 800, borderRadius: 999, padding: '1px 6px', minWidth: 18, textAlign: 'center' }}>
                     {badge}
                   </span>
                 )}
@@ -569,7 +574,7 @@ export default function Admin() {
       </div>
 
       {/* ── Main content ── */}
-      <div style={{ flex: 1, minWidth: 0 }}>
+      <div style={{ flex: 1, minWidth: 0, padding: '2rem 1.5rem' }}>
         <h2 style={{ marginBottom: '1.5rem' }}>{TAB_LABELS[tab]}</h2>
 
       {/* ── Stats ── */}
@@ -1225,7 +1230,7 @@ export default function Admin() {
             <>
               <h4 style={{ marginBottom: '0.75rem', color: '#9ca3af', fontSize: 13, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Plan Breakdown</h4>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
-                {(Object.entries(revenueStats.plan_counts) as [PlanValue, number][]).map(([plan, count]) => (
+                {(Object.entries(revenueStats.plan_breakdown) as [PlanValue, number][]).map(([plan, count]) => (
                   <div key={plan} className="card" style={{ textAlign: 'center', borderTop: `3px solid ${PLAN_COLORS[plan]}` }}>
                     <div style={{ fontSize: 28, fontWeight: 700, color: PLAN_COLORS[plan] }}>{count}</div>
                     <div style={{ fontSize: 13, color: '#6b7280', marginTop: 4, textTransform: 'capitalize', fontWeight: 600 }}>{plan} Users</div>
@@ -1236,7 +1241,8 @@ export default function Admin() {
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '1rem' }}>
                 {[
                   { label: 'Active Subscribers', value: revenueStats.active_subscribers, color: '#60a5fa' },
-                  { label: 'Total Paid Out', value: `₱${fmt(revenueStats.total_paid_out)}`, color: '#f59e0b' },
+                  { label: 'Subscription Revenue', value: `₱${fmt(revenueStats.subscription_revenue)}`, color: '#f59e0b' },
+                  { label: 'Total Paid Out', value: `₱${fmt(revenueStats.total_withdrawals_paid)}`, color: '#f97316' },
                   { label: 'Earnings Distributed', value: `₱${fmt(revenueStats.total_earnings_distributed)}`, color: '#22c55e' },
                   { label: 'New Users (30d)', value: revenueStats.new_users_30d, color: '#a78bfa' },
                 ].map(s => (

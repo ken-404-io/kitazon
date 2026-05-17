@@ -21,6 +21,8 @@ export async function platformStats(req: Request, res: Response, next: NextFunct
     const [pendingWithdrawals] = await db('withdrawals').where({ status: 'pending' }).count('id as total');
     const [totalPaid] = await db('withdrawals').where({ status: 'completed' }).sum('net_amount as total');
     const [totalEarnings] = await db('earnings').sum('amount as total');
+    const [pendingKyc] = await db('kyc_submissions').where({ status: 'pending' }).count('id as total');
+    const [pendingGcash] = await db('gcash_payments').where({ status: 'pending' }).count('id as total');
 
     res.json({
       users: Number(users.total),
@@ -29,6 +31,8 @@ export async function platformStats(req: Request, res: Response, next: NextFunct
       pending_withdrawals: Number(pendingWithdrawals.total),
       total_paid_out: Number(totalPaid.total ?? 0),
       total_earnings_distributed: Number(totalEarnings.total ?? 0),
+      pending_kyc: Number(pendingKyc.total ?? 0),
+      pending_gcash: Number(pendingGcash.total ?? 0),
     });
   } catch (err) { next(err); }
 }
