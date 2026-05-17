@@ -42,6 +42,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .finally(() => setLoading(false));
   }, []);
 
+  // Re-validate session when the user returns to the tab after being away
+  useEffect(() => {
+    const handleVisibility = () => {
+      if (document.visibilityState !== 'visible') return;
+      api.post<{ token: string; user: User }>('/auth/refresh', {})
+        .then((res) => { setToken(res.data.token); setUser(res.data.user); })
+        .catch(() => { setToken(null); setUser(null); });
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+    return () => document.removeEventListener('visibilitychange', handleVisibility);
+  }, []);
+
   const login = async (email: string, password: string, captchaToken?: string, totpCode?: string): Promise<void> => {
     setAuthTransition('signing-in');
     try {
