@@ -834,17 +834,26 @@ export default function Admin() {
               </button>
             </div>
           ) : (
-            <div style={{
-              marginBottom: '1rem', padding: '10px 14px', borderRadius: 8,
-              background: 'rgba(245,158,11,0.12)', border: '1px solid #f59e0b',
-              fontSize: 13, fontWeight: 600, color: '#f59e0b',
-            }}>
-              ⏳ Showing pending withdrawals only.
-              {stats?.pending_withdrawals !== undefined && (
-                <span style={{ fontWeight: 400, marginLeft: 6 }}>
-                  Total pending: {stats.pending_withdrawals}
-                </span>
-              )}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: '1rem', flexWrap: 'wrap' }}>
+              <div style={{
+                flex: 1, padding: '10px 14px', borderRadius: 8,
+                background: 'rgba(245,158,11,0.12)', border: '1px solid #f59e0b',
+                fontSize: 13, fontWeight: 600, color: '#f59e0b',
+              }}>
+                ⏳ Showing pending withdrawals only.
+                {stats?.pending_withdrawals !== undefined && (
+                  <span style={{ fontWeight: 400, marginLeft: 6 }}>
+                    Total pending: {stats.pending_withdrawals}
+                  </span>
+                )}
+              </div>
+              <button
+                onClick={exportWithdrawalsCSV}
+                disabled={withdrawals.length === 0}
+                style={{ padding: '6px 14px', borderRadius: 6, border: '1px solid #22c55e', background: 'rgba(34,197,94,0.1)', color: '#22c55e', fontSize: 12, fontWeight: 700, cursor: withdrawals.length === 0 ? 'default' : 'pointer', opacity: withdrawals.length === 0 ? 0.4 : 1, whiteSpace: 'nowrap' }}
+              >
+                ⬇ Export CSV
+              </button>
             </div>
           )}
 
