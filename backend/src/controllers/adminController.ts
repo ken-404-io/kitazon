@@ -909,29 +909,32 @@ export async function fraudReport(req: Request, res: Response, next: NextFunctio
 // ─── Suspend all fraud accounts ───────────────────────────────────────────────
 export async function suspendAllFraud(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
+    const { sendAccountSuspendedEmail } = await import('../services/email');
+    const reason = (typeof (req.body as { reason?: string }).reason === 'string' && (req.body as { reason?: string }).reason!.trim())
+      ? (req.body as { reason: string }).reason.trim()
+      : 'Multiple accounts or fraudulent activity detected on your device or network.';
+
     const userIds = new Set<number>();
 
-    // Duplicate device fingerprints
+    // 1. Duplicate device fingerprints
     const dupDevices = await db('users as u1')
-      .join('users as u2', function() {
+      .join('users as u2', function () {
         this.on('u1.device_fingerprint', '=', 'u2.device_fingerprint')
             .andOn('u1.id', '<', 'u2.id');
       })
       .whereNotNull('u1.device_fingerprint')
-      .select('u1.id as id1', 'u2.id as id2')
-      .catch(() => []);
+      .select('u1.id as id1', 'u2.id as id2');
     for (const r of dupDevices as { id1: number; id2: number }[]) {
       userIds.add(r.id1);
       userIds.add(r.id2);
     }
 
-    // Duplicate IPs (3+ accounts)
-    const dupIps = await db('users')
+    // 2. Shared registration IPs (3+ accounts)
+    const allIpUsers = await db('users')
       .whereNotNull('registration_ip')
-      .select('registration_ip', 'id')
-      .catch(() => []) as { registration_ip: string; id: number }[];
+      .select('registration_ip', 'id') as { registration_ip: string; id: number }[];
     const ipGroups: Record<string, number[]> = {};
-    for (const u of dupIps) {
+    for (const u of allIpUsers) {
       if (!ipGroups[u.registration_ip]) ipGroups[u.registration_ip] = [];
       ipGroups[u.registration_ip].push(u.id);
     }
@@ -939,33 +942,49 @@ export async function suspendAllFraud(req: Request, res: Response, next: NextFun
       if (ids.length >= 3) ids.forEach(id => userIds.add(id));
     }
 
-    // Fraud referrals — ban the referred (fake) account
+    // 3. Fraud referrals — same device or same IP between referrer and referred
     const fraudRefs = await db('referrals as r')
       .join('users as referrer', 'r.referrer_id', 'referrer.id')
       .join('users as referred', 'r.referred_id', 'referred.id')
-      .where(function() {
-        this.where(function() {
+      .where(function () {
+        this.where(function () {
           this.whereNotNull('referrer.device_fingerprint')
               .whereRaw('referrer.device_fingerprint = referred.device_fingerprint');
-        }).orWhere(function() {
+        }).orWhere(function () {
           this.whereNotNull('referrer.registration_ip')
               .whereRaw('referrer.registration_ip = referred.registration_ip');
         });
       })
-      .select('r.referred_id')
-      .catch(() => []) as { referred_id: number }[];
-    for (const r of fraudRefs) userIds.add(r.referred_id);
+      .select('r.referrer_id', 'r.referred_id') as { referrer_id: number; referred_id: number }[];
+    for (const r of fraudRefs) {
+      userIds.add(r.referrer_id);
+      userIds.add(r.referred_id);
+    }
 
-    // Skip admins
-    const ids = Array.from(userIds);
-    if (ids.length === 0) { res.json({ suspended: 0 }); return; }
+    if (userIds.size === 0) { res.json({ suspended: 0 }); return; }
 
-    const count = await db('users')
-      .whereIn('id', ids)
-      .where({ is_admin: false })
+    // Fetch non-admin, currently active targets so we only email/count real changes
+    const targets = await db<DbUser>('users')
+      .whereIn('id', Array.from(userIds))
+      .where({ is_admin: false, is_active: true })
+      .select('id', 'name', 'email');
+
+    if (targets.length === 0) { res.json({ suspended: 0 }); return; }
+
+    // Bulk deactivate in one query
+    await db('users')
+      .whereIn('id', targets.map(u => u.id))
       .update({ is_active: false });
 
-    await logAudit(req.user!.id, 'admin_suspend_all_fraud', req, { metadata: { user_ids: ids, count } });
-    res.json({ suspended: count, user_ids: ids });
+    // Send suspension emails concurrently (failures don't abort the response)
+    await Promise.allSettled(
+      targets.map(u => sendAccountSuspendedEmail(u.email, u.name, reason))
+    );
+
+    await logAudit(req.user!.id, 'admin_suspend_all_fraud', req, {
+      metadata: { suspended_ids: targets.map(u => u.id), count: targets.length, reason },
+    });
+
+    res.json({ suspended: targets.length, user_ids: targets.map(u => u.id) });
   } catch (err) { next(err); }
 }
