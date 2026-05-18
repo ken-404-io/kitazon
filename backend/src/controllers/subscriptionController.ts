@@ -3,7 +3,7 @@ import { v2 as cloudinary } from 'cloudinary';
 import db from '../../config/database';
 import { DbUser, UserPlan, DbWithdrawal, WithdrawalStatus } from '../types';
 import { logAudit } from '../services/audit';
-import { sendPlanUpgradeEmail, sendWithdrawalStatusEmail, sendGcashPaymentNotificationEmail, sendGcashPaymentReceivedEmail, sendAdminPlanPurchaseEmail } from '../services/email';
+import { sendPlanUpgradeEmail, sendWithdrawalStatusEmail, sendGcashPaymentNotificationEmail, sendGcashPaymentReceivedEmail } from '../services/email';
 import { paypalBase, getPayPalToken } from '../services/paypal';
 
 cloudinary.config({
@@ -153,14 +153,9 @@ export async function captureOrder(req: Request, res: Response, next: NextFuncti
     const user = await db<DbUser>('users').where({ id: req.user!.id }).first();
     console.log(`[Plan upgrade] userId=${req.user!.id} plan=${plan} db_plan=${user?.plan}`);
 
-    // Send upgrade confirmation email + admin notification (fire-and-forget)
+    // Send upgrade confirmation email (fire-and-forget)
     if (user) {
-      const cfg = PLAN_PRICES[plan as Exclude<UserPlan, 'free'>];
       sendPlanUpgradeEmail(user.email, user.name, plan, planExpiresAt).catch(() => {});
-      const adminEmail = process.env.ADMIN_EMAIL;
-      if (adminEmail) {
-        sendAdminPlanPurchaseEmail(adminEmail, user.name, user.email, user.id, plan, 'PayPal', cfg?.amount ?? '0.00').catch(() => {});
-      }
     }
 
     res.json({ message: 'Plan upgraded successfully.', plan, user: { plan: user?.plan } });
@@ -200,12 +195,7 @@ export async function paypalWebhook(req: Request, res: Response, next: NextFunct
 
             const user = await db<DbUser>('users').where({ id: userId }).first();
             if (user) {
-              const cfg = PLAN_PRICES[plan as Exclude<UserPlan, 'free'>];
               sendPlanUpgradeEmail(user.email, user.name, plan, planExpiresAt).catch(() => {});
-              const adminEmail = process.env.ADMIN_EMAIL;
-              if (adminEmail) {
-                sendAdminPlanPurchaseEmail(adminEmail, user.name, user.email, user.id, plan, 'PayPal (webhook)', cfg?.amount ?? '0.00').catch(() => {});
-              }
             }
 
             console.log(`[PayPal Webhook] Plan upgraded: userId=${userId} plan=${plan}`);
