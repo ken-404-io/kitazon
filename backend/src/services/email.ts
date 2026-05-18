@@ -295,6 +295,23 @@ export async function sendGcashPaymentNotificationEmail(
   `));
 }
 
+export async function sendGcashPaymentRejectedEmail(to: string, name: string, plan: string, amount: string, note: string | null): Promise<void> {
+  const planLabel = plan.charAt(0).toUpperCase() + plan.slice(1);
+  const plansLink = `${BASE}/plans`;
+  await send(to, `Your ${planLabel} plan payment was not approved`, layout('Payment Not Approved', `
+    ${h2(`Hi ${name.split(' ')[0]}, your payment was not approved`)}
+    ${p(`Unfortunately your GCash payment for the <strong style="color:#f97316;">${planLabel} Plan</strong> could not be verified and has been rejected.`)}
+    ${table(
+      row('Plan', `<span style="color:#f97316;font-weight:700;">${planLabel}</span>`) +
+      row('Amount', `₱${amount}`) +
+      (note ? row('Reason', `<span style="color:#fca5a5;">${escapeHtml(note)}</span>`) : '')
+    )}
+    ${p('Please double-check your reference number and screenshot, then resubmit your payment. If you believe this is a mistake, contact our support team.')}
+    <div style="text-align:center;margin:24px 0;">${btn(plansLink, 'Resubmit Payment')}</div>
+    ${p('Need help? Reply to this email or message us on Facebook.')}
+  `));
+}
+
 export async function sendAccountSuspendedEmail(to: string, name: string, reason: string): Promise<void> {
   await send(to, 'Your Kitazon account has been suspended', layout('Account Suspended', `
     ${h2('Account Suspended')}
