@@ -8,6 +8,7 @@ import styles from './Plans.module.css';
 const ic = { width: 28, height: 28, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 2, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const };
 
 const FreeIcon    = () => <svg {...ic}><circle cx="12" cy="12" r="10"/><path d="M8 12h8M12 8v8"/></svg>;
+const BronzeIcon  = () => <svg {...ic}><circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3"/><path d="M7 17l2-2"/></svg>;
 const SilverIcon  = () => <svg {...ic}><circle cx="12" cy="8" r="4"/><path d="M8 14l-2 7h12l-2-7"/><path d="M10 14l.5 3.5M14 14l-.5 3.5"/></svg>;
 const GoldIcon    = () => <svg {...ic}><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>;
 const DiamondIcon = () => <svg {...ic}><polygon points="12 2 22 9 18 20 6 20 2 9"/><line x1="2" y1="9" x2="22" y2="9"/><line x1="12" y1="2" x2="6" y2="20"/><line x1="12" y1="2" x2="18" y2="20"/></svg>;
@@ -27,25 +28,32 @@ const STATIC_PLANS: {
     features: ['40 correct answers to withdraw', 'GCash withdrawals', 'Task earnings', 'Referral bonuses'],
   },
   {
+    plan:     'bronze',
+    name:     'Bronze',
+    badge:    <BronzeIcon />,
+    color:    '#cd7f32',
+    features: ['40 correct answers to withdraw', 'GCash withdrawals', 'Task earnings', 'Referral bonuses', 'No ads', 'No waiting between questions'],
+  },
+  {
     plan:     'silver',
     name:     'Silver',
     badge:    <SilverIcon />,
     color:    '#9ca3af',
-    features: ['20 correct answers to withdraw', 'Choose your withdrawal amount', 'Priority support'],
+    features: ['20 correct answers to withdraw', 'Choose your withdrawal amount', 'Priority support', 'No ads', 'No waiting between questions'],
   },
   {
     plan:     'gold',
     name:     'Gold',
     badge:    <GoldIcon />,
     color:    '#f59e0b',
-    features: ['No quiz required to withdraw', 'Choose your withdrawal amount', 'Priority support'],
+    features: ['No quiz required to withdraw', 'Choose your withdrawal amount', 'Priority support', 'No ads', 'No waiting between questions'],
   },
   {
     plan:     'diamond',
     name:     'Diamond',
     badge:    <DiamondIcon />,
     color:    '#60a5fa',
-    features: ['No credits needed to withdraw', 'No quiz required', 'Choose your withdrawal amount', 'VIP support'],
+    features: ['No credits needed to withdraw', 'No quiz required', 'Choose your withdrawal amount', 'VIP support', 'No ads', 'No waiting between questions'],
   },
 ];
 
@@ -57,6 +65,7 @@ export default function Plans() {
   const GCASH_NUMBER = getSetting('gcash_number', '');
   const GCASH_NAME   = getSetting('gcash_name', 'Kitazon');
   const GCASH_QR: Record<string, string> = {
+    bronze:  getSetting('gcash_qr_bronze',  ''),
     silver:  getSetting('gcash_qr_silver', 'https://res.cloudinary.com/dtm4n2uk3/image/upload/v1778935459/4432f02f-79d9-4bf7-bd8f-39f0b63487ad_qbjxzx.jpg'),
     gold:    getSetting('gcash_qr_gold',   'https://res.cloudinary.com/dtm4n2uk3/image/upload/v1778935610/1593c9bc-c490-4854-826d-72ad2a5a79a1_cwdk3l.jpg'),
     diamond: getSetting('gcash_qr_diamond','https://res.cloudinary.com/dtm4n2uk3/image/upload/v1778935570/69504c45-6f87-43b1-aebe-83d55a30e5be_p6tncl.jpg'),

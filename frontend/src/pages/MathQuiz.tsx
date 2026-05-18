@@ -7,6 +7,7 @@ import styles from './MathQuiz.module.css';
 
 const PLAN_LIMITS: Record<string, string> = {
   free:    '₱150/day',
+  bronze:  '₱150/day',
   silver:  '₱500/day',
   gold:    '₱2,000/day',
   diamond: '₱4,000/day',
@@ -150,6 +151,9 @@ function AdBreak({ onDone, onAbandoned }: { onDone: () => void; onAbandoned: () 
 /* ── Main quiz component ─────────────────────────────────────────────────── */
 function QuizInner() {
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const noAds = !!(user?.plan && user.plan !== 'free');
+
   const [question,      setQuestion]      = useState<Question>(makeQuestion);
   const [qNum,          setQNum]          = useState(1);
   const [selected,      setSelected]      = useState<number | null>(null);
@@ -204,8 +208,8 @@ function QuizInner() {
 
     if (isCorrect) {
       setCorrect(c => c + 1);
-      if (qNum >= QUESTIONS_PER_ROUND) {
-        // Last question — no ad, credit immediately
+      if (qNum >= QUESTIONS_PER_ROUND || noAds) {
+        // Last question OR paid plan — credit immediately, no ad
         if (!capped) {
           try {
             const r = await api.post<{ amount: number; capped: boolean }>('/tasks/quiz/correct', {});
@@ -214,13 +218,14 @@ function QuizInner() {
           } catch {}
         }
       } else {
-        // Defer reward until after ad completes
+        // Free plan: defer reward until after ad completes
         setPendingReward(true);
       }
     }
 
     setTimeout(() => {
       if (qNum >= QUESTIONS_PER_ROUND) setPhase('result');
+      else if (noAds) { setQuestion(makeQuestion()); setQNum(n => n + 1); setSelected(null); setPhase('question'); }
       else setPhase('ad');
     }, 900);
   }, [selected, question.answer, capped, qNum]);

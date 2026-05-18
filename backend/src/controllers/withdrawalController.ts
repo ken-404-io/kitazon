@@ -14,7 +14,7 @@ const ACCOUNT_PATTERN = /^(09\d{9}|\+639\d{9})$/;
 
 // Default fallbacks (used if settings table not yet migrated)
 const QUIZ_GATE_DEFAULTS: Record<string, number> = {
-  free: 40, silver: 20, gold: 0, diamond: 0,
+  free: 40, bronze: 40, silver: 20, gold: 0, diamond: 0,
 };
 
 // Count referrals made since the last COMPLETED withdrawal.

@@ -1,4 +1,4 @@
-export type UserPlan = 'free' | 'silver' | 'gold' | 'diamond';
+export type UserPlan = 'free' | 'bronze' | 'silver' | 'gold' | 'diamond';
 
 export interface User {
   id: number;

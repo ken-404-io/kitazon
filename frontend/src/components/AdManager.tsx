@@ -4,8 +4,10 @@ import { useAuth } from '../context/AuthContext';
 export default function AdManager() {
   const { user } = useAuth();
 
+  const isPaidPlan = user?.plan && user.plan !== 'free';
+
   useEffect(() => {
-    if (!user || user.is_admin) return;
+    if (!user || user.is_admin || isPaidPlan) return;
 
     const scripts: HTMLScriptElement[] = [];
 
