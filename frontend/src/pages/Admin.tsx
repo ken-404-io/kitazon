@@ -114,6 +114,7 @@ interface AdminWithdrawal {
   user_id: number;
   user_name: string;
   user_email: string;
+  user_plan?: string;
   daily_completed_count: number;
 }
 
@@ -1065,11 +1066,23 @@ export default function Admin() {
               disabled={batchBusy}
             />
           </div>
-          {wLoading ? <p>Loading...</p> : (
+          {wLoading ? <p>Loading...</p> : (() => {
+            const PAID_PLANS = ['bronze', 'silver', 'gold', 'diamond'];
+            const PLAN_COLOR: Record<string, string> = { bronze: '#cd7f32', silver: '#9ca3af', gold: '#f59e0b', diamond: '#60a5fa' };
+            const PLAN_BADGE: Record<string, string> = { bronze: '🥉', silver: '🥈', gold: '🥇', diamond: '💎' };
+
+            const paidWithdrawals = tab === 'pending-withdrawals'
+              ? withdrawals.filter(w => w.user_plan && PAID_PLANS.includes(w.user_plan))
+              : withdrawals;
+            const freeWithdrawals = tab === 'pending-withdrawals'
+              ? withdrawals.filter(w => !w.user_plan || !PAID_PLANS.includes(w.user_plan))
+              : [];
+
+            const renderTable = (rows: AdminWithdrawal[], headerBg?: string) => (
             <div style={{ overflowX: 'auto' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
                 <thead>
-                  <tr style={{ borderBottom: '2px solid #e5e7eb', background: '#f9fafb' }}>
+                  <tr style={{ borderBottom: '2px solid #e5e7eb', background: headerBg ?? '#f9fafb' }}>
                     <th style={{ padding: '8px 10px', textAlign: 'left' }}>
                       <input
                         type="checkbox"
@@ -1079,13 +1092,15 @@ export default function Admin() {
                         aria-label="Select all approvable withdrawals"
                       />
                     </th>
-                    {['ID', 'User', 'Amount', 'Net', 'Channel', 'Account', 'Status', 'Requested At', 'Daily Success', 'Update Status'].map(h => (
+                    {['ID', 'User', 'Plan', 'Amount', 'Net', 'Channel', 'Account', 'Status', 'Requested At', 'Daily Success', 'Update Status'].map(h => (
                       <th key={h} style={{ padding: '8px 10px', textAlign: 'left', whiteSpace: 'nowrap' }}>{h}</th>
                     ))}
                   </tr>
                 </thead>
                 <tbody>
-                  {withdrawals.map(w => {
+                  {rows.length === 0 ? (
+                    <tr><td colSpan={12} style={{ padding: '1.5rem', textAlign: 'center', color: '#9ca3af', fontSize: 13 }}>No withdrawals in this group.</td></tr>
+                  ) : rows.map(w => {
                     const selectable = w.status === 'pending' || w.status === 'processing';
                     return (
                     <tr key={w.id} style={{ borderBottom: '1px solid #f3f4f6', background: selectedW.has(w.id) ? 'rgba(34,197,94,0.06)' : undefined }}>
@@ -1102,6 +1117,12 @@ export default function Admin() {
                       <td style={{ padding: '8px 10px' }}>
                         <div>{w.user_name}</div>
                         <div style={{ fontSize: 11, color: '#9ca3af' }}>{w.user_email}</div>
+                      </td>
+                      <td style={{ padding: '8px 10px' }}>
+                        {w.user_plan && PAID_PLANS.includes(w.user_plan)
+                          ? <span style={{ padding: '2px 8px', borderRadius: 20, fontSize: 11, fontWeight: 700, background: `${PLAN_COLOR[w.user_plan]}22`, color: PLAN_COLOR[w.user_plan], whiteSpace: 'nowrap' }}>{PLAN_BADGE[w.user_plan]} {w.user_plan.charAt(0).toUpperCase() + w.user_plan.slice(1)}</span>
+                          : <span style={{ fontSize: 11, color: '#9ca3af' }}>Free</span>
+                        }
                       </td>
                       <td style={{ padding: '8px 10px' }}>₱{fmt(w.amount)}</td>
                       <td style={{ padding: '8px 10px' }}>₱{fmt(w.net_amount)}</td>
@@ -1155,7 +1176,34 @@ export default function Admin() {
                 </tbody>
               </table>
             </div>
-          )}
+            );
+
+            if (tab === 'pending-withdrawals') {
+              return (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+                  {/* Paid plan users — priority */}
+                  <div style={{ border: '1.5px solid rgba(245,158,11,0.4)', borderRadius: 12, overflow: 'hidden' }}>
+                    <div style={{ padding: '10px 14px', background: 'rgba(245,158,11,0.08)', display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <span style={{ fontSize: '1rem' }}>⭐</span>
+                      <span style={{ fontWeight: 700, fontSize: 13, color: '#f59e0b' }}>Priority — Paid Plan Users</span>
+                      <span style={{ marginLeft: 'auto', background: '#f59e0b', color: '#fff', borderRadius: 20, padding: '1px 10px', fontSize: 12, fontWeight: 700 }}>{paidWithdrawals.length}</span>
+                    </div>
+                    {renderTable(paidWithdrawals, 'rgba(245,158,11,0.05)')}
+                  </div>
+                  {/* Free plan users */}
+                  <div style={{ border: '1px solid var(--dark-border)', borderRadius: 12, overflow: 'hidden' }}>
+                    <div style={{ padding: '10px 14px', background: 'rgba(107,114,128,0.08)', display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <span style={{ fontSize: '1rem' }}>🆓</span>
+                      <span style={{ fontWeight: 700, fontSize: 13, color: '#9ca3af' }}>Free Plan Users</span>
+                      <span style={{ marginLeft: 'auto', background: '#6b7280', color: '#fff', borderRadius: 20, padding: '1px 10px', fontSize: 12, fontWeight: 700 }}>{freeWithdrawals.length}</span>
+                    </div>
+                    {renderTable(freeWithdrawals)}
+                  </div>
+                </div>
+              );
+            }
+            return renderTable(withdrawals);
+          })()}
           <div style={{ display: 'flex', gap: 8, marginTop: '1rem', alignItems: 'center' }}>
             <button className="btn-outline" disabled={wPage <= 1} onClick={() => setWPage(p => p - 1)}>Prev</button>
             <span style={{ fontSize: 13 }}>Page {wPage} of {wPages}</span>
