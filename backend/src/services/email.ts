@@ -192,11 +192,31 @@ export async function sendPlanUpgradeEmail(to: string, name: string, plan: strin
   const planLabel = plan.charAt(0).toUpperCase() + plan.slice(1);
   const expiryStr = expiresAt.toLocaleDateString('en-PH', { year: 'numeric', month: 'long', day: 'numeric' });
   const dashboardLink = `${BASE}/dashboard`;
+
+  const PLAN_COLOR: Record<string, string> = {
+    bronze: '#cd7f32', silver: '#9ca3af', gold: '#f59e0b', diamond: '#60a5fa',
+  };
+  const PLAN_BENEFITS: Record<string, string[]> = {
+    bronze:  ['No ads while using Kitazon', 'No waiting period between quiz questions', '40 correct quiz answers to withdraw', 'GCash withdrawals', 'Task earnings', 'Referral bonuses'],
+    silver:  ['No ads while using Kitazon', 'No waiting period between quiz questions', '20 correct quiz answers to withdraw', 'Choose your withdrawal amount', 'Priority support'],
+    gold:    ['No ads while using Kitazon', 'No waiting period between quiz questions', 'No quiz required to withdraw', 'Choose your withdrawal amount', 'Priority support'],
+    diamond: ['No ads while using Kitazon', 'No waiting period between quiz questions', 'No credits needed to withdraw', 'No quiz required to withdraw', 'Choose your withdrawal amount', 'VIP support'],
+  };
+
+  const color = PLAN_COLOR[plan] ?? '#f97316';
+  const benefits = PLAN_BENEFITS[plan] ?? [];
+  const benefitsList = benefits.length
+    ? `<ul style="margin:12px 0 0;padding-left:20px;color:#d1d5db;font-size:14px;line-height:1.9;">
+        ${benefits.map(b => `<li>${b}</li>`).join('')}
+       </ul>`
+    : '';
+
   await send(to, `You're now on Kitazon ${planLabel}! 🎉`, layout(`Plan Upgraded to ${planLabel}`, `
     ${h2(`Welcome to ${planLabel}, ${name.split(' ')[0]}! 🚀`)}
-    ${p(`Your Kitazon account has been upgraded to the <strong style="color:#f97316;">${planLabel} Plan</strong>. Enjoy your new benefits!`)}
+    ${p(`Your Kitazon account has been upgraded to the <strong style="color:${color};">${planLabel} Plan</strong>. Here are your new benefits:`)}
+    ${benefitsList}
     ${table(
-      row('Plan', `<span style="color:#f97316;font-weight:800;">${planLabel}</span>`) +
+      row('Plan', `<span style="color:${color};font-weight:800;">${planLabel}</span>`) +
       row('Valid Until', expiryStr)
     )}
     ${p('Your plan will automatically revert to Free at the end of the period. Renew anytime to keep your benefits.')}
