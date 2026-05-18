@@ -255,6 +255,37 @@ export default function Admin() {
   const [suspendingAll, setSuspendingAll] = useState(false);
   const [showSuspendModal, setShowSuspendModal] = useState(false);
   const [suspendReason, setSuspendReason] = useState('');
+  const [suspendCategory, setSuspendCategory] = useState<'all' | 'devices' | 'ips' | 'referrals' | 'flagged'>('all');
+
+  const SUSPEND_REASONS: Record<string, string> = {
+    all:       'Multiple accounts or fraudulent activity detected on your device or network.',
+    devices:   'Your account was suspended because multiple accounts were found registered from the same device. Each device may only have one Kitazon account.',
+    ips:       'Your account was suspended because multiple accounts were registered from the same IP address, which violates our one-account-per-household policy.',
+    referrals: 'Your account was suspended due to suspicious referral activity. Self-referrals or referrals made from the same device or network are not permitted.',
+    flagged:   'Your account was suspended due to suspicious withdrawal activity flagged by our fraud prevention system.',
+  };
+  const SUSPEND_LABELS: Record<string, string> = {
+    all:       'All Fraud Accounts',
+    devices:   'Duplicate Device Accounts',
+    ips:       'Shared IP Accounts',
+    referrals: 'Suspicious Referral Accounts',
+    flagged:   'Flagged Withdrawal Accounts',
+  };
+
+  function getCategoryUserIds(category: string): number[] | null {
+    if (!fraudData || category === 'all') return null;
+    if (category === 'devices') return [...new Set(fraudData.duplicate_devices.flatMap(d => [d.user1_id, d.user2_id]))];
+    if (category === 'ips')     return [...new Set(fraudData.duplicate_ips.flatMap(g => g.users.map(u => u.id)))];
+    if (category === 'referrals') return [...new Set(fraudData.fraud_referrals.flatMap(r => [r.referrer_id, r.referred_id]))];
+    if (category === 'flagged') return [...new Set(fraudData.flagged_withdrawals.map(w => w.user_id))];
+    return null;
+  }
+
+  function openSuspendModal(category: 'all' | 'devices' | 'ips' | 'referrals' | 'flagged') {
+    setSuspendCategory(category);
+    setSuspendReason(SUSPEND_REASONS[category]);
+    setShowSuspendModal(true);
+  }
 
   // Site Settings
   const SETTINGS_DEFAULTS: Record<string, string> = {
@@ -1698,7 +1729,7 @@ export default function Admin() {
               </button>
               <button
                 disabled={suspendingAll || fraudLoading}
-                onClick={() => { setSuspendReason(''); setShowSuspendModal(true); }}
+                onClick={() => openSuspendModal('all')}
                 style={{ padding: '7px 16px', borderRadius: 10, border: 'none', background: '#ef4444', color: '#fff', cursor: 'pointer', fontSize: '0.82rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6, opacity: suspendingAll ? 0.7 : 1 }}
               >
                 {suspendingAll
@@ -1707,28 +1738,40 @@ export default function Admin() {
                 }
               </button>
 
-              {/* Suspend All Modal */}
+              {/* Suspend Modal (shared for global + per-category) */}
               {showSuspendModal && (
                 <div style={{ position: 'fixed', inset: 0, zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.7)' }}
                   onClick={e => { if (e.target === e.currentTarget) setShowSuspendModal(false); }}
                 >
-                  <div style={{ background: 'var(--dark-card)', border: '1.5px solid #ef4444', borderRadius: 18, padding: '2rem', width: '100%', maxWidth: 440, display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                  <div style={{ background: 'var(--dark-card)', border: '1.5px solid #ef4444', borderRadius: 18, padding: '2rem', width: '100%', maxWidth: 480, display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                       <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#ef4444" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-                      <span style={{ fontWeight: 800, fontSize: '1.1rem', color: '#ef4444' }}>Suspend All Fraud Accounts</span>
+                      <span style={{ fontWeight: 800, fontSize: '1.05rem', color: '#ef4444' }}>Suspend: {SUSPEND_LABELS[suspendCategory]}</span>
                     </div>
-                    <p style={{ margin: 0, fontSize: '0.88rem', color: 'var(--text-muted)', lineHeight: 1.5 }}>
-                      This will deactivate all accounts flagged by duplicate devices, shared IPs, and fraud referrals. Each user will receive an email notification with your reason below.
+                    <p style={{ margin: 0, fontSize: '0.87rem', color: 'var(--text-muted)', lineHeight: 1.5 }}>
+                      {suspendCategory === 'all'
+                        ? 'Deactivates all accounts flagged across duplicate devices, shared IPs, and fraud referrals.'
+                        : `Deactivates only the accounts in the "${SUSPEND_LABELS[suspendCategory]}" category.`}
+                      {' '}Each affected user receives an email with the reason below.
                     </p>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                      <label style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text)' }}>Suspension Reason <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>(sent in the email)</span></label>
+                      <label style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text)' }}>
+                        Suspension Reason <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>(sent in the email — editable)</span>
+                      </label>
                       <textarea
-                        rows={3}
+                        rows={4}
                         value={suspendReason}
                         onChange={e => setSuspendReason(e.target.value)}
-                        placeholder="Multiple accounts or fraudulent activity detected on your device or network."
-                        style={{ resize: 'vertical', padding: '10px 12px', borderRadius: 10, border: '1.5px solid var(--dark-border)', background: 'var(--dark-bg)', color: 'var(--text)', fontSize: '0.85rem', fontFamily: 'inherit', outline: 'none', minHeight: 72 }}
+                        style={{ resize: 'vertical', padding: '10px 12px', borderRadius: 10, border: '1.5px solid var(--dark-border)', background: 'var(--dark-bg)', color: 'var(--text)', fontSize: '0.85rem', fontFamily: 'inherit', outline: 'none', minHeight: 88 }}
                       />
+                      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                        {Object.entries(SUSPEND_REASONS).map(([cat, text]) => (
+                          <button key={cat} onClick={() => setSuspendReason(text)}
+                            style={{ padding: '3px 10px', borderRadius: 20, border: '1px solid var(--dark-border)', background: suspendReason === text ? 'rgba(239,68,68,0.15)' : 'transparent', color: suspendReason === text ? '#ef4444' : 'var(--text-muted)', cursor: 'pointer', fontSize: '0.72rem', fontWeight: 600 }}>
+                            {SUSPEND_LABELS[cat]}
+                          </button>
+                        ))}
+                      </div>
                     </div>
                     <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 4 }}>
                       <button onClick={() => setShowSuspendModal(false)} style={{ padding: '8px 18px', borderRadius: 10, border: '1.5px solid var(--dark-border)', background: 'transparent', color: 'var(--text)', cursor: 'pointer', fontSize: '0.85rem' }}>Cancel</button>
@@ -1738,8 +1781,11 @@ export default function Admin() {
                           setShowSuspendModal(false);
                           setSuspendingAll(true);
                           try {
-                            const reason = suspendReason.trim() || 'Multiple accounts or fraudulent activity detected on your device or network.';
-                            const res = await api.post<{ suspended: number }>('/admin/fraud/suspend-all', { reason });
+                            const reason = suspendReason.trim() || SUSPEND_REASONS[suspendCategory];
+                            const userIds = getCategoryUserIds(suspendCategory);
+                            const payload: { reason: string; user_ids?: number[] } = { reason };
+                            if (userIds) payload.user_ids = userIds;
+                            const res = await api.post<{ suspended: number }>('/admin/fraud/suspend-all', payload);
                             showToast(`${res.data.suspended} account${res.data.suspended !== 1 ? 's' : ''} suspended. Email notifications sent.`);
                             await loadFraud();
                           } catch { showToast('Failed to suspend accounts.'); }
@@ -1747,7 +1793,7 @@ export default function Admin() {
                         }}
                         style={{ padding: '8px 20px', borderRadius: 10, border: 'none', background: '#ef4444', color: '#fff', cursor: 'pointer', fontSize: '0.85rem', fontWeight: 700, opacity: suspendingAll ? 0.7 : 1 }}
                       >
-                        {suspendingAll ? 'Suspending…' : 'Confirm Suspend All'}
+                        {suspendingAll ? 'Suspending…' : 'Confirm Suspend'}
                       </button>
                     </div>
                   </div>
@@ -1774,7 +1820,15 @@ export default function Admin() {
                     <p style={{ fontWeight: 700, fontSize: '0.9rem', margin: 0 }}>Flagged Withdrawals</p>
                     <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', margin: 0 }}>Withdrawals marked suspicious by the fraud engine</p>
                   </div>
-                  <span style={{ background: '#ef4444', color: '#fff', borderRadius: 20, padding: '2px 10px', fontSize: '0.75rem', fontWeight: 700 }}>{fraudData.flagged_withdrawals.length}</span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span style={{ background: '#ef4444', color: '#fff', borderRadius: 20, padding: '2px 10px', fontSize: '0.75rem', fontWeight: 700 }}>{fraudData.flagged_withdrawals.length}</span>
+                    {fraudData.flagged_withdrawals.length > 0 && (
+                      <button onClick={() => openSuspendModal('flagged')} disabled={suspendingAll}
+                        style={{ padding: '4px 12px', borderRadius: 8, border: 'none', background: '#ef4444', color: '#fff', cursor: 'pointer', fontSize: '0.72rem', fontWeight: 700, whiteSpace: 'nowrap', opacity: suspendingAll ? 0.6 : 1 }}>
+                        Suspend All
+                      </button>
+                    )}
+                  </div>
                 </div>
                 {fraudData.flagged_withdrawals.length === 0 ? (
                   <p style={{ padding: '1.25rem', color: 'var(--text-muted)', fontSize: '0.85rem', margin: 0 }}>No flagged withdrawals.</p>
@@ -1824,7 +1878,15 @@ export default function Admin() {
                     <p style={{ fontWeight: 700, fontSize: '0.9rem', margin: 0 }}>Duplicate Device Registrations</p>
                     <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', margin: 0 }}>Multiple accounts sharing the same browser fingerprint</p>
                   </div>
-                  <span style={{ background: '#f59e0b', color: '#fff', borderRadius: 20, padding: '2px 10px', fontSize: '0.75rem', fontWeight: 700 }}>{fraudData.duplicate_devices.length}</span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span style={{ background: '#f59e0b', color: '#fff', borderRadius: 20, padding: '2px 10px', fontSize: '0.75rem', fontWeight: 700 }}>{fraudData.duplicate_devices.length}</span>
+                    {fraudData.duplicate_devices.length > 0 && (
+                      <button onClick={() => openSuspendModal('devices')} disabled={suspendingAll}
+                        style={{ padding: '4px 12px', borderRadius: 8, border: 'none', background: '#f59e0b', color: '#fff', cursor: 'pointer', fontSize: '0.72rem', fontWeight: 700, whiteSpace: 'nowrap', opacity: suspendingAll ? 0.6 : 1 }}>
+                        Suspend All
+                      </button>
+                    )}
+                  </div>
                 </div>
                 {fraudData.duplicate_devices.length === 0 ? (
                   <p style={{ padding: '1.25rem', color: 'var(--text-muted)', fontSize: '0.85rem', margin: 0 }}>No duplicate device fingerprints found.</p>
@@ -1861,7 +1923,15 @@ export default function Admin() {
                     <p style={{ fontWeight: 700, fontSize: '0.9rem', margin: 0 }}>Shared Registration IPs</p>
                     <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', margin: 0 }}>IPs used to register 3 or more accounts</p>
                   </div>
-                  <span style={{ background: '#60a5fa', color: '#fff', borderRadius: 20, padding: '2px 10px', fontSize: '0.75rem', fontWeight: 700 }}>{fraudData.duplicate_ips.length}</span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span style={{ background: '#60a5fa', color: '#fff', borderRadius: 20, padding: '2px 10px', fontSize: '0.75rem', fontWeight: 700 }}>{fraudData.duplicate_ips.length}</span>
+                    {fraudData.duplicate_ips.length > 0 && (
+                      <button onClick={() => openSuspendModal('ips')} disabled={suspendingAll}
+                        style={{ padding: '4px 12px', borderRadius: 8, border: 'none', background: '#60a5fa', color: '#fff', cursor: 'pointer', fontSize: '0.72rem', fontWeight: 700, whiteSpace: 'nowrap', opacity: suspendingAll ? 0.6 : 1 }}>
+                        Suspend All
+                      </button>
+                    )}
+                  </div>
                 </div>
                 {fraudData.duplicate_ips.length === 0 ? (
                   <p style={{ padding: '1.25rem', color: 'var(--text-muted)', fontSize: '0.85rem', margin: 0 }}>No suspicious IPs found.</p>
@@ -1904,7 +1974,15 @@ export default function Admin() {
                     <p style={{ fontWeight: 700, fontSize: '0.9rem', margin: 0 }}>Suspicious Referrals</p>
                     <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', margin: 0 }}>Referrer and referred share same device or IP address</p>
                   </div>
-                  <span style={{ background: '#a855f7', color: '#fff', borderRadius: 20, padding: '2px 10px', fontSize: '0.75rem', fontWeight: 700 }}>{fraudData.fraud_referrals.length}</span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span style={{ background: '#a855f7', color: '#fff', borderRadius: 20, padding: '2px 10px', fontSize: '0.75rem', fontWeight: 700 }}>{fraudData.fraud_referrals.length}</span>
+                    {fraudData.fraud_referrals.length > 0 && (
+                      <button onClick={() => openSuspendModal('referrals')} disabled={suspendingAll}
+                        style={{ padding: '4px 12px', borderRadius: 8, border: 'none', background: '#a855f7', color: '#fff', cursor: 'pointer', fontSize: '0.72rem', fontWeight: 700, whiteSpace: 'nowrap', opacity: suspendingAll ? 0.6 : 1 }}>
+                        Suspend All
+                      </button>
+                    )}
+                  </div>
                 </div>
                 {fraudData.fraud_referrals.length === 0 ? (
                   <p style={{ padding: '1.25rem', color: 'var(--text-muted)', fontSize: '0.85rem', margin: 0 }}>No suspicious referrals found.</p>
