@@ -328,9 +328,12 @@ export async function submitGcashPayment(req: Request, res: Response, next: Next
       if (adminEmail) {
         sendGcashPaymentNotificationEmail(
           adminEmail, user.name, user.email, user.id, plan, cfg.amount, ref,
-        ).catch(() => {});
+        ).catch((err) => console.error('[GCash] Admin notification email failed:', err?.message ?? err));
+      } else {
+        console.warn('[GCash] ADMIN_EMAIL env var is not set — skipping admin notification');
       }
-      sendGcashPaymentReceivedEmail(user.email, user.name, plan, cfg.amount, ref).catch(() => {});
+      sendGcashPaymentReceivedEmail(user.email, user.name, plan, cfg.amount, ref)
+        .catch((err) => console.error('[GCash] User confirmation email failed:', err?.message ?? err));
     }
 
     res.json({ message: 'Payment submitted! Admin will verify your GCash payment and activate your plan within 24 hours.' });

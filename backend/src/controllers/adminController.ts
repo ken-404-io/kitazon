@@ -2,7 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import db from '../../config/database';
 import { DbUser, DbWithdrawal, WithdrawalStatus, UserPlan } from '../types';
 import { logAudit } from '../services/audit';
-import { sendWithdrawalStatusEmail, sendBroadcastEmail, sendPlanUpgradeEmail } from '../services/email';
+import { sendWithdrawalStatusEmail, sendBroadcastEmail, sendPlanUpgradeEmail, sendGcashPaymentRejectedEmail } from '../services/email';
 
 // Maximum withdrawals approvable in a single bulk approve call. Throttling at
 // 5s per email means a batch of 100 takes ~8 minutes, so keep the cap modest.
@@ -758,7 +758,8 @@ export async function approveGcashPayment(req: Request, res: Response, next: Nex
     });
 
     const user = await db<DbUser>('users').where({ id: payment.user_id }).select('email', 'name').first();
-    if (user) sendPlanUpgradeEmail(user.email, user.name, payment.plan, expiresAt).catch(() => {});
+    if (user) sendPlanUpgradeEmail(user.email, user.name, payment.plan, expiresAt)
+      .catch((err) => console.error('[GCash Approve] User email failed:', err?.message ?? err));
 
     res.json({ message: 'Payment approved and plan activated.' });
   } catch (err) { next(err); }
@@ -785,6 +786,10 @@ export async function rejectGcashPayment(req: Request, res: Response, next: Next
     await logAudit(req.user!.id, 'gcash_payment_rejected', req, {
       metadata: { payment_id: id, user_id: payment.user_id, note },
     });
+
+    const user = await db<DbUser>('users').where({ id: payment.user_id }).select('email', 'name').first();
+    if (user) sendGcashPaymentRejectedEmail(user.email, user.name, payment.plan, payment.amount, note?.trim() ?? null)
+      .catch((err) => console.error('[GCash Reject] User email failed:', err?.message ?? err));
 
     res.json({ message: 'Payment rejected.' });
   } catch (err) { next(err); }
