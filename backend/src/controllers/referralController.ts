@@ -4,15 +4,16 @@ import { DbUser } from '../types';
 
 export async function leaderboard(_req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const rows = await db('referrals as r')
-      .join('users as u', 'r.referrer_id', 'u.id')
+    const rows = await db('users as u')
+      .leftJoin('referrals as r', 'r.referrer_id', 'u.id')
       .select(
         'u.name',
-        db.raw('COUNT(r.id) + COALESCE(u.referral_count_adjustment, 0) as referral_count'),
-        db.raw('SUM(r.commission_earned) as total_earned')
+        db.raw('COUNT(r.id) + COALESCE(u.referral_count_adjustment, 0) AS referral_count'),
+        db.raw('COALESCE(SUM(r.commission_earned), 0) AS total_earned')
       )
-      .groupBy('r.referrer_id', 'u.name', 'u.referral_count_adjustment')
-      .orderBy('referral_count', 'desc')
+      .groupBy('u.id', 'u.name', 'u.referral_count_adjustment')
+      .havingRaw('COUNT(r.id) + COALESCE(u.referral_count_adjustment, 0) > 0')
+      .orderByRaw('COUNT(r.id) + COALESCE(u.referral_count_adjustment, 0) DESC')
       .limit(20);
 
     res.json(rows.map((r: { name: string; referral_count: string; total_earned: string }, i: number) => ({
