@@ -295,6 +295,32 @@ export async function sendGcashPaymentNotificationEmail(
   `));
 }
 
+export async function sendAdminPlanPurchaseEmail(
+  adminEmail: string,
+  userName: string,
+  userEmail: string,
+  userId: number,
+  plan: string,
+  method: string,
+  amount: string,
+): Promise<void> {
+  const planLabel = plan.charAt(0).toUpperCase() + plan.slice(1);
+  const adminLink = `${BASE}/admin`;
+  await send(adminEmail, `New Plan Purchase – ${userName} subscribed to ${planLabel}`, layout('New Plan Purchase', `
+    ${h2('New Plan Purchase 🎉')}
+    ${p('A user has successfully subscribed to a paid plan.')}
+    ${table(
+      row('User', userName) +
+      row('Email', userEmail) +
+      row('User ID', `#${userId}`) +
+      row('Plan', `<strong style="color:#f97316;">${planLabel}</strong>`) +
+      row('Amount Paid', `<strong style="color:#22c55e;">₱${amount}</strong>`) +
+      row('Payment Method', method)
+    )}
+    <div style="text-align:center;margin:24px 0;">${btn(adminLink, 'Go to Admin Panel')}</div>
+  `));
+}
+
 export async function sendAccountSuspendedEmail(to: string, name: string, reason: string): Promise<void> {
   await send(to, 'Your Kitazon account has been suspended', layout('Account Suspended', `
     ${h2('Account Suspended')}
