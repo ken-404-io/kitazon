@@ -98,8 +98,7 @@ export async function listWithdrawals(req: Request, res: Response, next: NextFun
       .select(
         'w.id', 'w.amount', 'w.fee', 'w.net_amount', 'w.channel',
         'w.account_number', 'w.account_name', 'w.status', 'w.created_at',
-        'u.id as user_id', 'u.name as user_name', 'u.email as user_email',
-        db.raw('COALESCE(w.plan_at_withdrawal, u.plan) as user_plan')
+        'u.id as user_id', 'u.name as user_name', 'u.email as user_email', 'u.plan as user_plan'
       )
       .orderBy('w.created_at', 'desc')
       .limit(limit)
