@@ -91,6 +91,7 @@ export async function listWithdrawals(req: Request, res: Response, next: NextFun
     const limit = 50;
     const offset = (page - 1) * limit;
     const status = req.query.status as string | undefined;
+    const search = (req.query.search as string | undefined)?.trim() ?? '';
 
     let query = db('withdrawals as w')
       .join('users as u', 'w.user_id', 'u.id')
@@ -106,11 +107,25 @@ export async function listWithdrawals(req: Request, res: Response, next: NextFun
     if (status && VALID_STATUSES.includes(status as WithdrawalStatus)) {
       query = query.where('w.status', status);
     }
+    if (search) {
+      query = query.where(function () {
+        this.whereILike('u.name', `%${search}%`)
+            .orWhereILike('u.email', `%${search}%`)
+            .orWhereILike('w.account_number', `%${search}%`)
+            .orWhereILike('w.account_name', `%${search}%`);
+      });
+    }
 
     const [rows, [count]] = await Promise.all([
       query,
-      db('withdrawals').count('id as total').modify((q) => {
-        if (status && VALID_STATUSES.includes(status as WithdrawalStatus)) q.where({ status });
+      db('withdrawals as w').join('users as u', 'w.user_id', 'u.id').count('w.id as total').modify((q) => {
+        if (status && VALID_STATUSES.includes(status as WithdrawalStatus)) q.where('w.status', status);
+        if (search) q.where(function () {
+          this.whereILike('u.name', `%${search}%`)
+              .orWhereILike('u.email', `%${search}%`)
+              .orWhereILike('w.account_number', `%${search}%`)
+              .orWhereILike('w.account_name', `%${search}%`);
+        });
       }),
     ]);
 

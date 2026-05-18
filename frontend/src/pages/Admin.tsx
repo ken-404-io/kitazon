@@ -177,6 +177,7 @@ export default function Admin() {
   const [wPage, setWPage] = useState(1);
   const [wPages, setWPages] = useState(1);
   const [wFilter, setWFilter] = useState('');
+  const [wSearch, setWSearch] = useState('');
   const [wLoading, setWLoading] = useState(false);
   const [selectedW, setSelectedW] = useState<Set<number>>(new Set());
   const [batchBusy, setBatchBusy] = useState(false);
@@ -338,12 +339,14 @@ export default function Admin() {
     if (user && !user.is_admin) navigate('/dashboard', { replace: true });
   }, [user, navigate]);
 
-  // Reset pagination and selection when entering either withdrawals view,
-  // so state from the other view doesn't carry over to a smaller result set.
+  // Reset pagination, selection, and data when switching withdrawal tabs
+  // so stale data from one view never bleeds into the other.
   useEffect(() => {
     if (tab === 'withdrawals' || tab === 'pending-withdrawals') {
       setWPage(1);
       setSelectedW(new Set());
+      setWithdrawals([]);
+      setWSearch('');
     }
   }, [tab]);
 
@@ -363,11 +366,14 @@ export default function Admin() {
     } finally { setUserLoading(false); }
   }, []);
 
-  const loadWithdrawals = useCallback(async (page: number, status: string) => {
+  const loadWithdrawals = useCallback(async (page: number, status: string, search = '') => {
     setWLoading(true);
     try {
+      const params = new URLSearchParams({ page: String(page) });
+      if (status) params.set('status', status);
+      if (search.trim()) params.set('search', search.trim());
       const res = await api.get<{ withdrawals: AdminWithdrawal[]; pages: number }>(
-        `/admin/withdrawals?page=${page}${status ? `&status=${status}` : ''}`
+        `/admin/withdrawals?${params.toString()}`
       );
       setWithdrawals(res.data.withdrawals);
       setWPages(res.data.pages);
@@ -463,8 +469,8 @@ export default function Admin() {
   useEffect(() => {
     if (tab === 'stats' && !stats) loadStats();
     if (tab === 'users') loadUsers(userPage, userSearch);
-    if (tab === 'withdrawals') loadWithdrawals(wPage, wFilter);
-    if (tab === 'pending-withdrawals') loadWithdrawals(wPage, 'pending');
+    if (tab === 'withdrawals') loadWithdrawals(wPage, wFilter, wSearch);
+    if (tab === 'pending-withdrawals') loadWithdrawals(wPage, 'pending', wSearch);
     if (tab === 'tasks') loadTasks();
     if (tab === 'logs') loadLogs(logPage);
     if (tab === 'revenue' && !revenueStats) loadRevenue();
@@ -473,7 +479,7 @@ export default function Admin() {
     if (tab === 'online') loadOnline();
     if (tab === 'fraud' && !fraudData) loadFraud();
     if (tab === 'settings') loadSiteSettings();
-  }, [tab, userPage, wPage, wFilter, logPage, kycFilter, gcashFilter, stats, revenueStats, fraudData, loadStats, loadUsers, loadWithdrawals, loadTasks, loadLogs, loadRevenue, loadKyc, loadGcashPayments, loadOnline, loadFraud, loadSiteSettings]);
+  }, [tab, userPage, wPage, wFilter, wSearch, logPage, kycFilter, gcashFilter, stats, revenueStats, fraudData, loadStats, loadUsers, loadWithdrawals, loadTasks, loadLogs, loadRevenue, loadKyc, loadGcashPayments, loadOnline, loadFraud, loadSiteSettings]);
 
   // Auto-refresh online tab every 30 seconds
   useEffect(() => {
@@ -539,7 +545,7 @@ export default function Admin() {
       if (trimmed) message = trimmed.slice(0, 1000);
     }
     await api.patch(`/admin/withdrawals/${id}/status`, message ? { status, message } : { status });
-    loadWithdrawals(wPage, wFilter);
+    loadWithdrawals(wPage, tab === 'pending-withdrawals' ? 'pending' : wFilter, wSearch);
   };
 
   // Pending and processing rows are eligible for bulk approve.
@@ -594,7 +600,7 @@ export default function Admin() {
       setTimeout(() => setToast(''), 6000);
       setSelectedW(new Set());
       setApproveMessage('');
-      loadWithdrawals(wPage, wFilter);
+      loadWithdrawals(wPage, tab === 'pending-withdrawals' ? 'pending' : wFilter, wSearch);
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { message?: string } } }).response?.data?.message ?? 'Bulk approve failed.';
       setToast(msg);
@@ -995,26 +1001,42 @@ export default function Admin() {
               </button>
             </div>
           ) : (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: '1rem', flexWrap: 'wrap' }}>
-              <div style={{
-                flex: 1, padding: '10px 14px', borderRadius: 8,
-                background: 'rgba(245,158,11,0.12)', border: '1px solid #f59e0b',
-                fontSize: 13, fontWeight: 600, color: '#f59e0b',
-              }}>
-                ⏳ Showing pending withdrawals only.
-                {stats?.pending_withdrawals !== undefined && (
-                  <span style={{ fontWeight: 400, marginLeft: 6 }}>
-                    Total pending: {stats.pending_withdrawals}
-                  </span>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: '1rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+                <div style={{
+                  flex: 1, padding: '10px 14px', borderRadius: 8,
+                  background: 'rgba(245,158,11,0.12)', border: '1px solid #f59e0b',
+                  fontSize: 13, fontWeight: 600, color: '#f59e0b',
+                }}>
+                  ⏳ Showing pending withdrawals only.
+                  {stats?.pending_withdrawals !== undefined && (
+                    <span style={{ fontWeight: 400, marginLeft: 6 }}>
+                      Total pending: {stats.pending_withdrawals}
+                    </span>
+                  )}
+                </div>
+                <button
+                  onClick={exportWithdrawalsCSV}
+                  disabled={withdrawals.length === 0}
+                  style={{ padding: '6px 14px', borderRadius: 6, border: '1px solid #22c55e', background: 'rgba(34,197,94,0.1)', color: '#22c55e', fontSize: 12, fontWeight: 700, cursor: withdrawals.length === 0 ? 'default' : 'pointer', opacity: withdrawals.length === 0 ? 0.4 : 1, whiteSpace: 'nowrap' }}
+                >
+                  ⬇ Export CSV
+                </button>
+              </div>
+              {/* Search bar */}
+              <div style={{ position: 'relative', maxWidth: 360 }}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)', pointerEvents: 'none' }}><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                <input
+                  type="text"
+                  placeholder="Search by name, email, or account…"
+                  value={wSearch}
+                  onChange={e => { setWSearch(e.target.value); setWPage(1); }}
+                  style={{ width: '100%', paddingLeft: 32, paddingRight: wSearch ? 32 : 10, paddingTop: 7, paddingBottom: 7, borderRadius: 8, border: '1px solid var(--dark-border)', background: 'var(--dark-bg)', color: 'var(--text)', fontSize: 13, outline: 'none', boxSizing: 'border-box' }}
+                />
+                {wSearch && (
+                  <button onClick={() => { setWSearch(''); setWPage(1); }} style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', fontSize: 14, padding: 0, lineHeight: 1 }}>✕</button>
                 )}
               </div>
-              <button
-                onClick={exportWithdrawalsCSV}
-                disabled={withdrawals.length === 0}
-                style={{ padding: '6px 14px', borderRadius: 6, border: '1px solid #22c55e', background: 'rgba(34,197,94,0.1)', color: '#22c55e', fontSize: 12, fontWeight: 700, cursor: withdrawals.length === 0 ? 'default' : 'pointer', opacity: withdrawals.length === 0 ? 0.4 : 1, whiteSpace: 'nowrap' }}
-              >
-                ⬇ Export CSV
-              </button>
             </div>
           )}
 
