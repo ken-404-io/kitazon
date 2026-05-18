@@ -905,3 +905,67 @@ export async function fraudReport(req: Request, res: Response, next: NextFunctio
     });
   } catch (err) { next(err); }
 }
+
+// ─── Suspend all fraud accounts ───────────────────────────────────────────────
+export async function suspendAllFraud(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const userIds = new Set<number>();
+
+    // Duplicate device fingerprints
+    const dupDevices = await db('users as u1')
+      .join('users as u2', function() {
+        this.on('u1.device_fingerprint', '=', 'u2.device_fingerprint')
+            .andOn('u1.id', '<', 'u2.id');
+      })
+      .whereNotNull('u1.device_fingerprint')
+      .select('u1.id as id1', 'u2.id as id2')
+      .catch(() => []);
+    for (const r of dupDevices as { id1: number; id2: number }[]) {
+      userIds.add(r.id1);
+      userIds.add(r.id2);
+    }
+
+    // Duplicate IPs (3+ accounts)
+    const dupIps = await db('users')
+      .whereNotNull('registration_ip')
+      .select('registration_ip', 'id')
+      .catch(() => []) as { registration_ip: string; id: number }[];
+    const ipGroups: Record<string, number[]> = {};
+    for (const u of dupIps) {
+      if (!ipGroups[u.registration_ip]) ipGroups[u.registration_ip] = [];
+      ipGroups[u.registration_ip].push(u.id);
+    }
+    for (const ids of Object.values(ipGroups)) {
+      if (ids.length >= 3) ids.forEach(id => userIds.add(id));
+    }
+
+    // Fraud referrals — ban the referred (fake) account
+    const fraudRefs = await db('referrals as r')
+      .join('users as referrer', 'r.referrer_id', 'referrer.id')
+      .join('users as referred', 'r.referred_id', 'referred.id')
+      .where(function() {
+        this.where(function() {
+          this.whereNotNull('referrer.device_fingerprint')
+              .whereRaw('referrer.device_fingerprint = referred.device_fingerprint');
+        }).orWhere(function() {
+          this.whereNotNull('referrer.registration_ip')
+              .whereRaw('referrer.registration_ip = referred.registration_ip');
+        });
+      })
+      .select('r.referred_id')
+      .catch(() => []) as { referred_id: number }[];
+    for (const r of fraudRefs) userIds.add(r.referred_id);
+
+    // Skip admins
+    const ids = Array.from(userIds);
+    if (ids.length === 0) { res.json({ suspended: 0 }); return; }
+
+    const count = await db('users')
+      .whereIn('id', ids)
+      .where({ is_admin: false })
+      .update({ is_active: false });
+
+    await logAudit(req.user!.id, 'admin_suspend_all_fraud', req, { metadata: { user_ids: ids, count } });
+    res.json({ suspended: count, user_ids: ids });
+  } catch (err) { next(err); }
+}
