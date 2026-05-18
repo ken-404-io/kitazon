@@ -481,10 +481,10 @@ export default function Admin() {
     if (tab === 'settings') loadSiteSettings();
   }, [tab, userPage, wPage, wFilter, wSearch, logPage, kycFilter, gcashFilter, stats, revenueStats, fraudData, loadStats, loadUsers, loadWithdrawals, loadTasks, loadLogs, loadRevenue, loadKyc, loadGcashPayments, loadOnline, loadFraud, loadSiteSettings]);
 
-  // Auto-refresh online tab every 30 seconds
+  // Auto-refresh online tab every 1 minute
   useEffect(() => {
     if (tab !== 'online') return;
-    const interval = setInterval(loadOnline, 30_000);
+    const interval = setInterval(loadOnline, 60_000);
     return () => clearInterval(interval);
   }, [tab, loadOnline]);
 
