@@ -307,7 +307,7 @@ export default function Admin() {
     referral_gate_silver: '1',
     referral_gate_gold: '0',
     referral_gate_diamond: '0',
-    plan_price_bronze: '199',
+    plan_price_bronze: '49',
     plan_price_silver: '499',
     plan_price_gold: '1299',
     plan_price_diamond: '1999',
