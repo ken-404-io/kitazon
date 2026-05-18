@@ -910,55 +910,63 @@ export async function fraudReport(req: Request, res: Response, next: NextFunctio
 export async function suspendAllFraud(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     const { sendAccountSuspendedEmail } = await import('../services/email');
-    const reason = (typeof (req.body as { reason?: string }).reason === 'string' && (req.body as { reason?: string }).reason!.trim())
-      ? (req.body as { reason: string }).reason.trim()
+    const body = req.body as { reason?: string; user_ids?: number[] };
+    const reason = (typeof body.reason === 'string' && body.reason.trim())
+      ? body.reason.trim()
       : 'Multiple accounts or fraudulent activity detected on your device or network.';
 
     const userIds = new Set<number>();
 
-    // 1. Duplicate device fingerprints
-    const dupDevices = await db('users as u1')
-      .join('users as u2', function () {
-        this.on('u1.device_fingerprint', '=', 'u2.device_fingerprint')
-            .andOn('u1.id', '<', 'u2.id');
-      })
-      .whereNotNull('u1.device_fingerprint')
-      .select('u1.id as id1', 'u2.id as id2');
-    for (const r of dupDevices as { id1: number; id2: number }[]) {
-      userIds.add(r.id1);
-      userIds.add(r.id2);
-    }
+    // If the frontend passes explicit user IDs (per-category suspension), use those directly.
+    if (Array.isArray(body.user_ids) && body.user_ids.length > 0) {
+      body.user_ids.forEach((id: number) => userIds.add(id));
+    } else {
+      // Full scan: collect from all three fraud signals.
 
-    // 2. Shared registration IPs (3+ accounts)
-    const allIpUsers = await db('users')
-      .whereNotNull('registration_ip')
-      .select('registration_ip', 'id') as { registration_ip: string; id: number }[];
-    const ipGroups: Record<string, number[]> = {};
-    for (const u of allIpUsers) {
-      if (!ipGroups[u.registration_ip]) ipGroups[u.registration_ip] = [];
-      ipGroups[u.registration_ip].push(u.id);
-    }
-    for (const ids of Object.values(ipGroups)) {
-      if (ids.length >= 3) ids.forEach(id => userIds.add(id));
-    }
+      // 1. Duplicate device fingerprints
+      const dupDevices = await db('users as u1')
+        .join('users as u2', function () {
+          this.on('u1.device_fingerprint', '=', 'u2.device_fingerprint')
+              .andOn('u1.id', '<', 'u2.id');
+        })
+        .whereNotNull('u1.device_fingerprint')
+        .select('u1.id as id1', 'u2.id as id2');
+      for (const r of dupDevices as { id1: number; id2: number }[]) {
+        userIds.add(r.id1);
+        userIds.add(r.id2);
+      }
 
-    // 3. Fraud referrals — same device or same IP between referrer and referred
-    const fraudRefs = await db('referrals as r')
-      .join('users as referrer', 'r.referrer_id', 'referrer.id')
-      .join('users as referred', 'r.referred_id', 'referred.id')
-      .where(function () {
-        this.where(function () {
-          this.whereNotNull('referrer.device_fingerprint')
-              .whereRaw('referrer.device_fingerprint = referred.device_fingerprint');
-        }).orWhere(function () {
-          this.whereNotNull('referrer.registration_ip')
-              .whereRaw('referrer.registration_ip = referred.registration_ip');
-        });
-      })
-      .select('r.referrer_id', 'r.referred_id') as { referrer_id: number; referred_id: number }[];
-    for (const r of fraudRefs) {
-      userIds.add(r.referrer_id);
-      userIds.add(r.referred_id);
+      // 2. Shared registration IPs (3+ accounts)
+      const allIpUsers = await db('users')
+        .whereNotNull('registration_ip')
+        .select('registration_ip', 'id') as { registration_ip: string; id: number }[];
+      const ipGroups: Record<string, number[]> = {};
+      for (const u of allIpUsers) {
+        if (!ipGroups[u.registration_ip]) ipGroups[u.registration_ip] = [];
+        ipGroups[u.registration_ip].push(u.id);
+      }
+      for (const ids of Object.values(ipGroups)) {
+        if (ids.length >= 3) ids.forEach(id => userIds.add(id));
+      }
+
+      // 3. Fraud referrals — same device or same IP between referrer and referred
+      const fraudRefs = await db('referrals as r')
+        .join('users as referrer', 'r.referrer_id', 'referrer.id')
+        .join('users as referred', 'r.referred_id', 'referred.id')
+        .where(function () {
+          this.where(function () {
+            this.whereNotNull('referrer.device_fingerprint')
+                .whereRaw('referrer.device_fingerprint = referred.device_fingerprint');
+          }).orWhere(function () {
+            this.whereNotNull('referrer.registration_ip')
+                .whereRaw('referrer.registration_ip = referred.registration_ip');
+          });
+        })
+        .select('r.referrer_id', 'r.referred_id') as { referrer_id: number; referred_id: number }[];
+      for (const r of fraudRefs) {
+        userIds.add(r.referrer_id);
+        userIds.add(r.referred_id);
+      }
     }
 
     if (userIds.size === 0) { res.json({ suspended: 0 }); return; }
