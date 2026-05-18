@@ -291,23 +291,28 @@ export default function Admin() {
   const SETTINGS_DEFAULTS: Record<string, string> = {
     gcash_number: '',
     gcash_name: 'Kitazon',
+    gcash_qr_bronze:  '',
     gcash_qr_silver: 'https://res.cloudinary.com/dtm4n2uk3/image/upload/v1778935459/4432f02f-79d9-4bf7-bd8f-39f0b63487ad_qbjxzx.jpg',
     gcash_qr_gold: 'https://res.cloudinary.com/dtm4n2uk3/image/upload/v1778935610/1593c9bc-c490-4854-826d-72ad2a5a79a1_cwdk3l.jpg',
     gcash_qr_diamond: 'https://res.cloudinary.com/dtm4n2uk3/image/upload/v1778935570/69504c45-6f87-43b1-aebe-83d55a30e5be_p6tncl.jpg',
     credit_php_per_credit: '25',
     withdrawal_min: '5',
     quiz_gate_free: '40',
+    quiz_gate_bronze: '40',
     quiz_gate_silver: '20',
     quiz_gate_gold: '0',
     quiz_gate_diamond: '0',
     referral_gate_free: '2',
+    referral_gate_bronze: '2',
     referral_gate_silver: '1',
     referral_gate_gold: '0',
     referral_gate_diamond: '0',
+    plan_price_bronze: '199',
     plan_price_silver: '499',
     plan_price_gold: '1299',
     plan_price_diamond: '1999',
     plan_limit_free: '5',
+    plan_limit_bronze: '5',
     plan_limit_silver: '20',
     plan_limit_gold: '50',
     plan_limit_diamond: '100',
@@ -2048,6 +2053,7 @@ export default function Admin() {
                   {[
                     { key: 'gcash_number', label: 'GCash Number', placeholder: '09XXXXXXXXX', full: false },
                     { key: 'gcash_name',   label: 'Account Name', placeholder: 'Kitazon', full: false },
+                    { key: 'gcash_qr_bronze',  label: 'Bronze Plan QR URL',  placeholder: 'https://...', full: true },
                     { key: 'gcash_qr_silver',  label: 'Silver Plan QR URL',  placeholder: 'https://...', full: true },
                     { key: 'gcash_qr_gold',    label: 'Gold Plan QR URL',    placeholder: 'https://...', full: true },
                     { key: 'gcash_qr_diamond', label: 'Diamond Plan QR URL', placeholder: 'https://...', full: true },
@@ -2076,9 +2082,10 @@ export default function Admin() {
                   {/* Plan grid table */}
                   <div>
                     <p style={{ fontSize: '0.7rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--text-muted)', marginBottom: '0.6rem' }}>Max Withdrawal per Request (₱)</p>
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10 }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 10 }}>
                       {([
                         { plan: 'free',    color: '#6b7280', label: 'Free' },
+                        { plan: 'bronze',  color: '#cd7f32', label: 'Bronze' },
                         { plan: 'silver',  color: '#9ca3af', label: 'Silver' },
                         { plan: 'gold',    color: '#f59e0b', label: 'Gold' },
                         { plan: 'diamond', color: '#60a5fa', label: 'Diamond' },
@@ -2096,8 +2103,9 @@ export default function Admin() {
                   </div>
                   <div>
                     <p style={{ fontSize: '0.7rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--text-muted)', marginBottom: '0.6rem' }}>Monthly Price (₱/mo) — paid plans only</p>
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10 }}>
                       {([
+                        { plan: 'bronze',  color: '#cd7f32', label: 'Bronze' },
                         { plan: 'silver',  color: '#9ca3af', label: 'Silver' },
                         { plan: 'gold',    color: '#f59e0b', label: 'Gold' },
                         { plan: 'diamond', color: '#60a5fa', label: 'Diamond' },
@@ -2140,11 +2148,12 @@ export default function Admin() {
                           <p style={{ fontSize: '0.72rem', color: 'var(--text-muted)', margin: 0 }}>{desc}</p>
                         </div>
                       </div>
-                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10 }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 10 }}>
                         {([
-                          { plan: 'free', color: '#6b7280', label: 'Free' },
-                          { plan: 'silver', color: '#9ca3af', label: 'Silver' },
-                          { plan: 'gold', color: '#f59e0b', label: 'Gold' },
+                          { plan: 'free',    color: '#6b7280', label: 'Free' },
+                          { plan: 'bronze',  color: '#cd7f32', label: 'Bronze' },
+                          { plan: 'silver',  color: '#9ca3af', label: 'Silver' },
+                          { plan: 'gold',    color: '#f59e0b', label: 'Gold' },
                           { plan: 'diamond', color: '#60a5fa', label: 'Diamond' },
                         ] as const).map(({ plan, color, label: planLabel }) => (
                           <div key={plan} style={{ background: 'var(--dark-bg)', borderRadius: 10, padding: '0.65rem 0.75rem' }}>

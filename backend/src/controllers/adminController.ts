@@ -430,7 +430,7 @@ export async function bulkImportTasks(req: Request, res: Response, next: NextFun
 }
 
 // ─── Plan management ──────────────────────────────────────────────────────────
-const VALID_PLANS: UserPlan[] = ['free', 'silver', 'gold', 'diamond'];
+const VALID_PLANS: UserPlan[] = ['free', 'bronze', 'silver', 'gold', 'diamond'];
 
 export async function updateUserPlan(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
@@ -438,7 +438,7 @@ export async function updateUserPlan(req: Request, res: Response, next: NextFunc
     const { plan, plan_expires_at } = req.body as { plan?: string; plan_expires_at?: string };
 
     if (!plan || !VALID_PLANS.includes(plan as UserPlan)) {
-      res.status(400).json({ message: 'Invalid plan. Must be one of: free, silver, gold, diamond.' });
+      res.status(400).json({ message: 'Invalid plan. Must be one of: free, bronze, silver, gold, diamond.' });
       return;
     }
 
@@ -607,7 +607,7 @@ export async function revenueStats(req: Request, res: Response, next: NextFuncti
         .first(),
     ]);
 
-    const planBreakdown: Record<string, number> = { free: 0, silver: 0, gold: 0, diamond: 0 };
+    const planBreakdown: Record<string, number> = { free: 0, bronze: 0, silver: 0, gold: 0, diamond: 0 };
     for (const row of planBreakdownRows) {
       planBreakdown[String(row.plan)] = Number((row as unknown as { cnt: unknown }).cnt);
     }

@@ -21,6 +21,7 @@ const LockIcon  = () => <svg {...sz} width={16} height={16}><rect x="3" y="11" w
 /* ─── plan config ────────────────────────────────────────────────────────────── */
 const PLAN_CONFIG: Record<UserPlan, { name: string; color: string; dailyLimit: number; badge: string; presets: number[] | null }> = {
   free:    { name: 'Free',    color: 'var(--text-muted)', badge: '🆓', dailyLimit: 5,   presets: null },
+  bronze:  { name: 'Bronze',  color: '#cd7f32',           badge: '🥉', dailyLimit: 5,   presets: null },
   silver:  { name: 'Silver',  color: '#9ca3af',           badge: '🥈', dailyLimit: 20,  presets: [5, 10, 15, 20] },
   gold:    { name: 'Gold',    color: 'var(--gold)',        badge: '🥇', dailyLimit: 50,  presets: [10, 20, 30, 50] },
   diamond: { name: 'Diamond', color: '#60a5fa',            badge: '💎', dailyLimit: 100, presets: [20, 50, 75, 100] },

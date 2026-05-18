@@ -13,6 +13,7 @@ cloudinary.config({
 });
 
 const PLAN_PRICES: Record<Exclude<UserPlan, 'free'>, { amount: string; label: string }> = {
+  bronze:  { amount: '199.00', label: 'Kitazon Bronze Plan' },
   silver:  { amount: '499.00', label: 'Kitazon Silver Plan' },
   gold:    { amount: '1299.00', label: 'Kitazon Gold Plan' },
   diamond: { amount: '1999.00', label: 'Kitazon Diamond Plan' },
