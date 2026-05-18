@@ -508,6 +508,7 @@ export async function create(req: Request, res: Response, next: NextFunction): P
           ip_address: ip || null,
           is_flagged: isSuspicious,
           is_first_withdrawal: elig.is_first_withdrawal,
+          plan_at_withdrawal: user.plan ?? 'free',
           metadata: JSON.stringify({ flags: flags.length > 0 ? flags : undefined, is_first: elig.is_first_withdrawal }),
         });
         await trx.raw('RELEASE SAVEPOINT sp_withdrawal');
@@ -518,6 +519,7 @@ export async function create(req: Request, res: Response, next: NextFunction): P
           await trx('withdrawals').insert({
             user_id: req.user!.id, amount: parsed, fee, net_amount: netAmount,
             channel, account_number: normalizedAccount, account_name: accountNameTrimmed, status: 'pending',
+            plan_at_withdrawal: user.plan ?? 'free',
           });
           await trx.raw('RELEASE SAVEPOINT sp_withdrawal_min');
         } catch {
