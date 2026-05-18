@@ -99,8 +99,8 @@ export default function Withdraw() {
   const totalAmt    = Number(stats?.total   ?? 0);
   const emailOk     = user?.email_verified ?? false;
 
-  // Free plan: fixed ₱5. VIP plans: chosen preset (default to dailyLimit).
-  const amount = plan === 'free' ? 5 : (preset ?? planCfg.dailyLimit);
+  // Free/Bronze plan: fixed ₱5. VIP plans: chosen preset (default to dailyLimit).
+  const amount = (plan === 'free' || plan === 'bronze') ? 5 : (preset ?? planCfg.dailyLimit);
 
   // Philippine mobile: 11 digits starting with 09 (e.g. 09171234567)
   // Also accept +63 prefix.
@@ -200,7 +200,7 @@ export default function Withdraw() {
           <span>{planCfg.badge}</span>
           <span style={{ fontWeight: 700, color: planCfg.color }}>{planCfg.name} Plan</span>
           <span style={{ color: 'var(--text-muted)', fontSize: '0.78rem' }}>· ₱{planCfg.dailyLimit}/day limit</span>
-          {plan === 'free' && <Link to="/plans" className={styles.upgradeLink}>Upgrade →</Link>}
+          {(plan === 'free' || plan === 'bronze') && <Link to="/plans" className={styles.upgradeLink}>Upgrade →</Link>}
         </div>
 
         {/* ── Withdrawal requirements checklist ── */}
@@ -622,21 +622,19 @@ export default function Withdraw() {
                 </span>
               </h4>
 
-              {plan === 'free' ? (
-                /* Free plan — locked */
+              {(plan === 'free' || plan === 'bronze') ? (
+                /* Free/Bronze plan — fixed ₱5 */
                 <div className={styles.lockedAmount}>
                   <LockIcon />
                   <div>
                     <p className={styles.lockedValue}>₱5.00 / day</p>
                     <p className={styles.lockedNote}>
-                      Free plan is fixed at ₱5/day.{' '}
-                      <Link to="/plans" style={{ color: 'var(--primary)' }}>Upgrade your plan</Link>
-                      {' '}to withdraw more.
+                      {plan === 'free' ? <>Free plan is fixed at ₱5/day.{' '}<Link to="/plans" style={{ color: 'var(--primary)' }}>Upgrade your plan</Link>{' '}to withdraw more.</> : 'Bronze plan is fixed at ₱5/day.'}
                     </p>
                   </div>
                 </div>
               ) : (
-                /* VIP plan — choose from presets */
+                /* Silver/Gold/Diamond — choose from presets */
                 <div className={styles.presetGrid}>
                   {planCfg.presets!.map(p => (
                     <button
