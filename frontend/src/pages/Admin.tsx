@@ -252,6 +252,9 @@ export default function Admin() {
   interface FraudReport { flagged_withdrawals: FlaggedWithdrawal[]; duplicate_devices: DupDevice[]; duplicate_ips: DupIpGroup[]; fraud_referrals: FraudReferral[]; }
   const [fraudData, setFraudData] = useState<FraudReport | null>(null);
   const [fraudLoading, setFraudLoading] = useState(false);
+  const [suspendingAll, setSuspendingAll] = useState(false);
+  const [showSuspendModal, setShowSuspendModal] = useState(false);
+  const [suspendReason, setSuspendReason] = useState('');
 
   // Site Settings
   const SETTINGS_DEFAULTS: Record<string, string> = {
@@ -1688,10 +1691,69 @@ export default function Admin() {
               <h2 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 700 }}>Fraud Detection</h2>
               <p style={{ margin: '2px 0 0', fontSize: '0.8rem', color: 'var(--text-muted)' }}>Suspicious accounts, duplicate devices, and flagged activity</p>
             </div>
-            <button onClick={loadFraud} disabled={fraudLoading} style={{ padding: '7px 16px', borderRadius: 10, border: '1.5px solid var(--dark-border)', background: 'transparent', color: 'var(--text)', cursor: 'pointer', fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: 6 }}>
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={fraudLoading ? { animation: 'spin 1s linear infinite' } : {}}><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>
-              Refresh
-            </button>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button onClick={loadFraud} disabled={fraudLoading} style={{ padding: '7px 16px', borderRadius: 10, border: '1.5px solid var(--dark-border)', background: 'transparent', color: 'var(--text)', cursor: 'pointer', fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: 6 }}>
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={fraudLoading ? { animation: 'spin 1s linear infinite' } : {}}><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>
+                Refresh
+              </button>
+              <button
+                disabled={suspendingAll || fraudLoading}
+                onClick={() => { setSuspendReason(''); setShowSuspendModal(true); }}
+                style={{ padding: '7px 16px', borderRadius: 10, border: 'none', background: '#ef4444', color: '#fff', cursor: 'pointer', fontSize: '0.82rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6, opacity: suspendingAll ? 0.7 : 1 }}
+              >
+                {suspendingAll
+                  ? <><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ animation: 'spin 1s linear infinite' }}><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg> Suspending…</>
+                  : <><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg> Suspend All</>
+                }
+              </button>
+
+              {/* Suspend All Modal */}
+              {showSuspendModal && (
+                <div style={{ position: 'fixed', inset: 0, zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.7)' }}
+                  onClick={e => { if (e.target === e.currentTarget) setShowSuspendModal(false); }}
+                >
+                  <div style={{ background: 'var(--dark-card)', border: '1.5px solid #ef4444', borderRadius: 18, padding: '2rem', width: '100%', maxWidth: 440, display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#ef4444" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                      <span style={{ fontWeight: 800, fontSize: '1.1rem', color: '#ef4444' }}>Suspend All Fraud Accounts</span>
+                    </div>
+                    <p style={{ margin: 0, fontSize: '0.88rem', color: 'var(--text-muted)', lineHeight: 1.5 }}>
+                      This will deactivate all accounts flagged by duplicate devices, shared IPs, and fraud referrals. Each user will receive an email notification with your reason below.
+                    </p>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                      <label style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text)' }}>Suspension Reason <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>(sent in the email)</span></label>
+                      <textarea
+                        rows={3}
+                        value={suspendReason}
+                        onChange={e => setSuspendReason(e.target.value)}
+                        placeholder="Multiple accounts or fraudulent activity detected on your device or network."
+                        style={{ resize: 'vertical', padding: '10px 12px', borderRadius: 10, border: '1.5px solid var(--dark-border)', background: 'var(--dark-bg)', color: 'var(--text)', fontSize: '0.85rem', fontFamily: 'inherit', outline: 'none', minHeight: 72 }}
+                      />
+                    </div>
+                    <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 4 }}>
+                      <button onClick={() => setShowSuspendModal(false)} style={{ padding: '8px 18px', borderRadius: 10, border: '1.5px solid var(--dark-border)', background: 'transparent', color: 'var(--text)', cursor: 'pointer', fontSize: '0.85rem' }}>Cancel</button>
+                      <button
+                        disabled={suspendingAll}
+                        onClick={async () => {
+                          setShowSuspendModal(false);
+                          setSuspendingAll(true);
+                          try {
+                            const reason = suspendReason.trim() || 'Multiple accounts or fraudulent activity detected on your device or network.';
+                            const res = await api.post<{ suspended: number }>('/admin/fraud/suspend-all', { reason });
+                            showToast(`${res.data.suspended} account${res.data.suspended !== 1 ? 's' : ''} suspended. Email notifications sent.`);
+                            await loadFraud();
+                          } catch { showToast('Failed to suspend accounts.'); }
+                          finally { setSuspendingAll(false); }
+                        }}
+                        style={{ padding: '8px 20px', borderRadius: 10, border: 'none', background: '#ef4444', color: '#fff', cursor: 'pointer', fontSize: '0.85rem', fontWeight: 700, opacity: suspendingAll ? 0.7 : 1 }}
+                      >
+                        {suspendingAll ? 'Suspending…' : 'Confirm Suspend All'}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
 
           {fraudLoading ? (
