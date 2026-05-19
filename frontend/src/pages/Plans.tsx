@@ -25,14 +25,14 @@ const STATIC_PLANS: {
     name:     'Free',
     badge:    <FreeIcon />,
     color:    'var(--text-muted)',
-    features: ['40 correct answers to withdraw', 'GCash withdrawals', 'Task earnings', 'Referral bonuses'],
+    features: ['40 correct answers to withdraw', '₱25 lifetime withdrawal limit', 'GCash withdrawals', 'Task earnings', 'Referral bonuses'],
   },
   {
     plan:     'bronze',
     name:     'Bronze',
     badge:    <BronzeIcon />,
     color:    '#cd7f32',
-    features: ['No ads', 'No waiting between questions', '40 correct answers to withdraw', 'GCash withdrawals', 'Task earnings', 'Referral bonuses'],
+    features: ['No ads', 'No waiting between questions', '40 correct answers to withdraw', 'No monthly withdrawal limit', 'GCash withdrawals', 'Task earnings', 'Referral bonuses'],
   },
   {
     plan:     'silver',

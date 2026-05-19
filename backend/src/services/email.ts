@@ -197,7 +197,7 @@ export async function sendPlanUpgradeEmail(to: string, name: string, plan: strin
     bronze: '#cd7f32', silver: '#9ca3af', gold: '#f59e0b', diamond: '#60a5fa',
   };
   const PLAN_BENEFITS: Record<string, string[]> = {
-    bronze:  ['No ads while using Kitazon', 'No waiting period between quiz questions', '40 correct quiz answers to withdraw', 'GCash withdrawals', 'Task earnings', 'Referral bonuses'],
+    bronze:  ['No ads while using Kitazon', 'No waiting period between quiz questions', '40 correct quiz answers to withdraw', 'No monthly withdrawal limit', 'GCash withdrawals', 'Task earnings', 'Referral bonuses'],
     silver:  ['No ads while using Kitazon', 'No waiting period between quiz questions', '20 correct quiz answers to withdraw', 'Choose your withdrawal amount', 'Priority support'],
     gold:    ['No ads while using Kitazon', 'No waiting period between quiz questions', 'No quiz required to withdraw', 'Choose your withdrawal amount', 'Priority support'],
     diamond: ['No ads while using Kitazon', 'No waiting period between quiz questions', 'No credits needed to withdraw', 'No quiz required to withdraw', 'Choose your withdrawal amount', 'VIP support'],
