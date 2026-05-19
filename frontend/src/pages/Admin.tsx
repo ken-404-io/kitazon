@@ -232,6 +232,33 @@ export default function Admin() {
   const [referralInput, setReferralInput] = useState('');
   const [referralLoading, setReferralLoading] = useState(false);
 
+  // Suspended users batch selection
+  const [selectedSuspended, setSelectedSuspended] = useState<Set<number>>(new Set());
+  const [batchEnableBusy, setBatchEnableBusy] = useState(false);
+  const toggleSuspendedSelect = (id: number) =>
+    setSelectedSuspended(prev => { const s = new Set(prev); s.has(id) ? s.delete(id) : s.add(id); return s; });
+  const allSuspendedSelected = users.length > 0 && users.every(u => selectedSuspended.has(u.id));
+  const toggleSelectAllSuspended = () =>
+    setSelectedSuspended(allSuspendedSelected ? new Set() : new Set(users.map(u => u.id)));
+  const batchEnable = async () => {
+    if (selectedSuspended.size === 0) return;
+    if (!window.confirm(`Enable ${selectedSuspended.size} account${selectedSuspended.size !== 1 ? 's' : ''}? Each user will receive a reactivation email (sent with a 5 s gap to avoid delivery issues).`)) return;
+    setBatchEnableBusy(true);
+    try {
+      const res = await api.post<{ enabled: number }>('/admin/users/batch-enable', {
+        user_ids: Array.from(selectedSuspended),
+      });
+      setSelectedSuspended(new Set());
+      loadUsers(userPage, userSearch, 'suspended');
+      loadStats();
+      showToast(`${res.data.enabled} account${res.data.enabled !== 1 ? 's' : ''} enabled. Reactivation emails queued.`);
+    } catch (err: unknown) {
+      showToast((err as { response?: { data?: { message?: string } } }).response?.data?.message ?? 'Batch enable failed.');
+    } finally {
+      setBatchEnableBusy(false);
+    }
+  };
+
   // User activity log
   interface UserAuditEntry { id: number; action: string; amount: number | null; ip_address: string | null; metadata: Record<string, unknown> | string | null; created_at: string; }
   const [viewingLogUser, setViewingLogUser] = useState<number | null>(null);
@@ -522,13 +549,22 @@ export default function Admin() {
     return () => clearInterval(interval);
   }, [tab, loadOnline]);
 
-  const toggleActive = async (userId: number) => {
+  // Disable reason selector state (Users tab)
+  const [disablingUser, setDisablingUser] = useState<number | null>(null);
+  const [disableReason, setDisableReason] = useState('');
+  const DISABLE_REASONS = [
+    'Multiple accounts or fraudulent activity detected.',
+    'Violation of our Terms of Service.',
+    'Suspicious referral or withdrawal activity.',
+    'Account flagged for manual review.',
+    'Duplicate device or IP address registration.',
+  ];
+
+  const doToggleActive = async (userId: number, reason = '') => {
     try {
-      const res = await api.patch<{ is_active: boolean }>(`/admin/users/${userId}/toggle-active`, {});
+      const res = await api.patch<{ is_active: boolean }>(`/admin/users/${userId}/toggle-active`, { reason });
       const newActive = res.data.is_active;
-      // Update in-place so the button flips immediately
       setUsers(prev => prev.map(u => u.id === userId ? { ...u, is_active: newActive } : u));
-      // Refresh stats badge and, if on suspended tab, reload that list
       loadStats();
       if (tab === 'suspended') loadUsers(userPage, userSearch, 'suspended');
     } catch (err: unknown) {
@@ -536,31 +572,81 @@ export default function Admin() {
     }
   };
 
-  const toggleFraudUser = async (userId: number) => {
+  const toggleActive = async (userId: number, currentActive: boolean) => {
+    if (currentActive) {
+      // Disabling — show inline reason picker instead of acting immediately
+      setDisablingUser(userId);
+      setDisableReason('');
+    } else {
+      // Enabling — no reason needed, act immediately
+      await doToggleActive(userId, '');
+    }
+  };
+
+  const confirmDisable = async () => {
+    if (!disablingUser) return;
+    if (!disableReason.trim()) { showToast('Please select or enter a reason.'); return; }
+    const uid = disablingUser;
+    const reason = disableReason.trim();
+    setDisablingUser(null);
+    setDisableReason('');
     try {
-      await api.patch(`/admin/users/${userId}/toggle-active`, {});
-      // Update fraudData in-place so the fraud tab reflects the change immediately
+      await api.patch(`/admin/users/${uid}/toggle-active`, { reason });
+      setUsers(prev => prev.map(u => u.id === uid ? { ...u, is_active: false } : u));
       setFraudData(prev => {
         if (!prev) return prev;
-        const flip = (active: boolean) => !active;
         return {
           ...prev,
           duplicate_devices: prev.duplicate_devices.map(d => ({
             ...d,
-            user1_active: d.user1_id === userId ? flip(d.user1_active) : d.user1_active,
-            user2_active: d.user2_id === userId ? flip(d.user2_active) : d.user2_active,
+            user1_active: d.user1_id === uid ? false : d.user1_active,
+            user2_active: d.user2_id === uid ? false : d.user2_active,
           })),
           duplicate_ips: prev.duplicate_ips.map(g => ({
             ...g,
-            users: g.users.map(u => u.id === userId ? { ...u, is_active: flip(u.is_active) } : u),
+            users: g.users.map(u => u.id === uid ? { ...u, is_active: false } : u),
           })),
           fraud_referrals: prev.fraud_referrals,
-          flagged_withdrawals: prev.flagged_withdrawals.map(w => w.user_id === userId ? { ...w, is_active: !w.is_active } : w),
+          flagged_withdrawals: prev.flagged_withdrawals.map(w => w.user_id === uid ? { ...w, is_active: false } : w),
         };
       });
-      showToast('User status updated.');
+      loadStats();
+      showToast('Account disabled. Suspension email sent.');
     } catch (err: unknown) {
-      showToast((err as { response?: { data?: { message?: string } } }).response?.data?.message ?? 'Failed to toggle user status.');
+      showToast((err as { response?: { data?: { message?: string } } }).response?.data?.message ?? 'Failed to disable account.');
+    }
+  };
+
+  const toggleFraudUser = async (userId: number, currentActive: boolean) => {
+    if (currentActive) {
+      setDisablingUser(userId);
+      setDisableReason('');
+    } else {
+      try {
+        const res = await api.patch<{ is_active: boolean }>(`/admin/users/${userId}/toggle-active`, { reason: '' });
+        const newActive = res.data.is_active;
+        setFraudData(prev => {
+          if (!prev) return prev;
+          return {
+            ...prev,
+            duplicate_devices: prev.duplicate_devices.map(d => ({
+              ...d,
+              user1_active: d.user1_id === userId ? newActive : d.user1_active,
+              user2_active: d.user2_id === userId ? newActive : d.user2_active,
+            })),
+            duplicate_ips: prev.duplicate_ips.map(g => ({
+              ...g,
+              users: g.users.map(u => u.id === userId ? { ...u, is_active: newActive } : u),
+            })),
+            fraud_referrals: prev.fraud_referrals,
+            flagged_withdrawals: prev.flagged_withdrawals.map(w => w.user_id === userId ? { ...w, is_active: newActive } : w),
+          };
+        });
+        showToast('User reactivated. Email notification sent.');
+        loadStats();
+      } catch (err: unknown) {
+        showToast((err as { response?: { data?: { message?: string } } }).response?.data?.message ?? 'Failed to toggle user status.');
+      }
     }
   };
 
@@ -1055,7 +1141,7 @@ export default function Admin() {
                             <button
                               className="btn-outline"
                               style={{ fontSize: 12, padding: '4px 10px', borderColor: u.is_active ? '#dc2626' : 'green', color: u.is_active ? '#dc2626' : 'green' }}
-                              onClick={() => toggleActive(u.id)}
+                              onClick={() => toggleActive(u.id, u.is_active)}
                             >
                               {u.is_active ? 'Disable' : 'Enable'}
                             </button>
@@ -1170,6 +1256,32 @@ export default function Admin() {
                             </div>
                           </div>
                         )}
+                        {disablingUser === u.id && (
+                          <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 6, minWidth: 220, background: 'rgba(220,38,38,0.05)', border: '1px solid rgba(220,38,38,0.2)', borderRadius: 8, padding: '10px 12px' }}>
+                            <p style={{ margin: 0, fontSize: 12, fontWeight: 700, color: '#dc2626' }}>Select suspension reason:</p>
+                            {DISABLE_REASONS.map(r => (
+                              <label key={r} style={{ display: 'flex', alignItems: 'flex-start', gap: 6, cursor: 'pointer', fontSize: 12 }}>
+                                <input type="radio" name={`disable-reason-${u.id}`} value={r} checked={disableReason === r} onChange={() => setDisableReason(r)} style={{ marginTop: 2, accentColor: '#dc2626' }} />
+                                <span style={{ color: 'var(--text)', lineHeight: 1.4 }}>{r}</span>
+                              </label>
+                            ))}
+                            <input
+                              type="text"
+                              placeholder="Or type a custom reason…"
+                              value={DISABLE_REASONS.includes(disableReason) ? '' : disableReason}
+                              onChange={e => setDisableReason(e.target.value)}
+                              style={{ padding: '5px 8px', borderRadius: 6, border: '1px solid rgba(220,38,38,0.3)', fontSize: 12, width: '100%', background: 'transparent', color: 'var(--text)' }}
+                            />
+                            <div style={{ display: 'flex', gap: 6 }}>
+                              <button className="btn-primary" style={{ fontSize: 12, padding: '4px 10px', flex: 1, background: '#dc2626' }} onClick={confirmDisable}>
+                                Confirm Disable
+                              </button>
+                              <button className="btn-outline" style={{ fontSize: 12, padding: '4px 10px' }} onClick={() => { setDisablingUser(null); setDisableReason(''); }}>
+                                Cancel
+                              </button>
+                            </div>
+                          </div>
+                        )}
                       </td>
                     </tr>
                     {viewingLogUser === u.id && (
@@ -1249,16 +1361,35 @@ export default function Admin() {
       {/* ── Suspended Users ── */}
       {tab === 'suspended' && (
         <div>
-          <div style={{ display: 'flex', gap: 8, marginBottom: '1rem' }}>
+          {/* Search + batch toolbar */}
+          <div style={{ display: 'flex', gap: 8, marginBottom: '0.75rem', flexWrap: 'wrap', alignItems: 'center' }}>
             <input
-              style={{ flex: 1, padding: '8px 12px', borderRadius: 6, border: '1px solid #e5e7eb' }}
+              style={{ flex: 1, minWidth: 180, padding: '8px 12px', borderRadius: 6, border: '1px solid #e5e7eb' }}
               placeholder="Search by name or email..."
               value={userSearch}
               onChange={e => { setUserSearch(e.target.value); setUserPage(1); }}
-              onKeyDown={e => { if (e.key === 'Enter') loadUsers(1, userSearch, 'suspended'); }}
+              onKeyDown={e => { if (e.key === 'Enter') { setSelectedSuspended(new Set()); loadUsers(1, userSearch, 'suspended'); } }}
             />
-            <button className="btn-primary" onClick={() => loadUsers(1, userSearch, 'suspended')}>Search</button>
+            <button className="btn-primary" onClick={() => { setSelectedSuspended(new Set()); loadUsers(1, userSearch, 'suspended'); }}>Search</button>
           </div>
+
+          {selectedSuspended.size > 0 && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, background: 'rgba(22,163,74,0.08)', border: '1px solid rgba(22,163,74,0.3)', borderRadius: 8, padding: '8px 14px', marginBottom: '0.75rem' }}>
+              <span style={{ fontSize: 13, fontWeight: 600, color: '#16a34a' }}>{selectedSuspended.size} selected</span>
+              <button
+                className="btn-primary"
+                style={{ fontSize: 12, padding: '4px 14px', background: '#16a34a', opacity: batchEnableBusy ? 0.6 : 1 }}
+                disabled={batchEnableBusy}
+                onClick={batchEnable}
+              >
+                {batchEnableBusy ? 'Enabling…' : `Enable ${selectedSuspended.size} Account${selectedSuspended.size !== 1 ? 's' : ''}`}
+              </button>
+              <button className="btn-outline" style={{ fontSize: 12, padding: '4px 10px' }} onClick={() => setSelectedSuspended(new Set())}>
+                Clear
+              </button>
+            </div>
+          )}
+
           {userLoading ? <p>Loading...</p> : users.length === 0 ? (
             <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>
               <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.4, marginBottom: 8 }}><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>
@@ -1269,40 +1400,49 @@ export default function Admin() {
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
                 <thead>
                   <tr style={{ borderBottom: '2px solid #e5e7eb', background: '#f9fafb' }}>
+                    <th style={{ padding: '8px 10px', width: 36 }}>
+                      <input type="checkbox" checked={allSuspendedSelected} onChange={toggleSelectAllSuspended} title="Select all on this page" />
+                    </th>
                     {['ID', 'Name', 'Email', 'Balance', 'Plan', 'Verified', 'Joined', 'Action'].map(h => (
                       <th key={h} style={{ padding: '8px 10px', textAlign: 'left', whiteSpace: 'nowrap' }}>{h}</th>
                     ))}
                   </tr>
                 </thead>
                 <tbody>
-                  {users.map(u => (
-                    <tr key={u.id} style={{ borderBottom: '1px solid #f3f4f6', opacity: u.is_active ? 1 : 0.75 }}>
-                      <td style={{ padding: '8px 10px' }}>{u.id}</td>
-                      <td style={{ padding: '8px 10px', fontWeight: 600 }}>{u.name}</td>
-                      <td style={{ padding: '8px 10px', color: 'var(--text-muted)' }}>{u.email}</td>
-                      <td style={{ padding: '8px 10px' }}>₱{fmt(u.balance)}</td>
-                      <td style={{ padding: '8px 10px' }}>
-                        <span style={{ padding: '2px 8px', borderRadius: 12, fontSize: 11, fontWeight: 700, background: PLAN_COLORS[(u.plan ?? 'free') as PlanValue] + '22', color: PLAN_COLORS[(u.plan ?? 'free') as PlanValue], border: `1px solid ${PLAN_COLORS[(u.plan ?? 'free') as PlanValue]}`, textTransform: 'uppercase' }}>
-                          {u.plan ?? 'free'}
-                        </span>
-                      </td>
-                      <td style={{ padding: '8px 10px', color: u.email_verified ? 'green' : '#d97706' }}>
-                        {u.email_verified ? 'Yes' : 'No'}
-                      </td>
-                      <td style={{ padding: '8px 10px', whiteSpace: 'nowrap' }}>
-                        {new Date(u.created_at).toLocaleDateString()}
-                      </td>
-                      <td style={{ padding: '8px 10px' }}>
-                        <button
-                          className="btn-outline"
-                          style={{ fontSize: 12, padding: '4px 12px', borderColor: '#16a34a', color: '#16a34a', fontWeight: 700 }}
-                          onClick={() => toggleActive(u.id)}
-                        >
-                          Enable Account
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
+                  {users.map(u => {
+                    const isSelected = selectedSuspended.has(u.id);
+                    return (
+                      <tr key={u.id} style={{ borderBottom: '1px solid #f3f4f6', background: isSelected ? 'rgba(22,163,74,0.05)' : undefined }}>
+                        <td style={{ padding: '8px 10px' }}>
+                          <input type="checkbox" checked={isSelected} onChange={() => toggleSuspendedSelect(u.id)} />
+                        </td>
+                        <td style={{ padding: '8px 10px' }}>{u.id}</td>
+                        <td style={{ padding: '8px 10px', fontWeight: 600 }}>{u.name}</td>
+                        <td style={{ padding: '8px 10px', color: 'var(--text-muted)' }}>{u.email}</td>
+                        <td style={{ padding: '8px 10px' }}>₱{fmt(u.balance)}</td>
+                        <td style={{ padding: '8px 10px' }}>
+                          <span style={{ padding: '2px 8px', borderRadius: 12, fontSize: 11, fontWeight: 700, background: PLAN_COLORS[(u.plan ?? 'free') as PlanValue] + '22', color: PLAN_COLORS[(u.plan ?? 'free') as PlanValue], border: `1px solid ${PLAN_COLORS[(u.plan ?? 'free') as PlanValue]}`, textTransform: 'uppercase' }}>
+                            {u.plan ?? 'free'}
+                          </span>
+                        </td>
+                        <td style={{ padding: '8px 10px', color: u.email_verified ? 'green' : '#d97706' }}>
+                          {u.email_verified ? 'Yes' : 'No'}
+                        </td>
+                        <td style={{ padding: '8px 10px', whiteSpace: 'nowrap' }}>
+                          {new Date(u.created_at).toLocaleDateString()}
+                        </td>
+                        <td style={{ padding: '8px 10px' }}>
+                          <button
+                            className="btn-outline"
+                            style={{ fontSize: 12, padding: '4px 12px', borderColor: '#16a34a', color: '#16a34a', fontWeight: 700 }}
+                            onClick={() => toggleActive(u.id, false)}
+                          >
+                            Enable
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
@@ -2330,7 +2470,7 @@ export default function Admin() {
                             </div>
                             <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{u.email}</div>
                             <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: 2 }}>Joined {new Date(u.created_at).toLocaleDateString()}</div>
-                            <button onClick={() => toggleFraudUser(u.id)} style={{ marginTop: 8, padding: '4px 10px', borderRadius: 8, border: '1px solid var(--dark-border)', background: 'transparent', color: u.active ? '#ef4444' : '#16a34a', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 600 }}>
+                            <button onClick={() => toggleFraudUser(u.id, u.active)} style={{ marginTop: 8, padding: '4px 10px', borderRadius: 8, border: '1px solid var(--dark-border)', background: 'transparent', color: u.active ? '#ef4444' : '#16a34a', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 600 }}>
                               {u.active ? 'Ban Account' : 'Unban Account'}
                             </button>
                           </div>
@@ -2380,7 +2520,7 @@ export default function Admin() {
                               </div>
                               <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>{u.email}</div>
                               <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', marginTop: 1 }}>{u.plan} · {new Date(u.created_at).toLocaleDateString()}</div>
-                              <button onClick={() => toggleFraudUser(u.id)} style={{ marginTop: 6, padding: '3px 8px', borderRadius: 6, border: '1px solid var(--dark-border)', background: 'transparent', color: u.is_active ? '#ef4444' : '#16a34a', cursor: 'pointer', fontSize: '0.7rem', fontWeight: 600 }}>
+                              <button onClick={() => toggleFraudUser(u.id, u.is_active)} style={{ marginTop: 6, padding: '3px 8px', borderRadius: 6, border: '1px solid var(--dark-border)', background: 'transparent', color: u.is_active ? '#ef4444' : '#16a34a', cursor: 'pointer', fontSize: '0.7rem', fontWeight: 600 }}>
                                 {u.is_active ? 'Ban' : 'Unban'}
                               </button>
                             </div>

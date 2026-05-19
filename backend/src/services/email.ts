@@ -235,6 +235,28 @@ export async function sendBroadcastEmail(to: string, name: string, subject: stri
   `));
 }
 
+export async function sendAccountSuspendedEmail(to: string, name: string, reason: string): Promise<void> {
+  await send(to, 'Your Kitazon account has been suspended', layout('Account Suspended', `
+    ${h2(`Hi ${name.split(' ')[0]}, your account has been suspended`)}
+    ${p('Your Kitazon account has been suspended by our moderation team.')}
+    <div style="background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.25);border-radius:12px;padding:16px 20px;margin:16px 0;">
+      <p style="margin:0 0 4px;font-size:11px;color:#9ca3af;text-transform:uppercase;letter-spacing:1px;">Reason</p>
+      <p style="margin:0;font-size:14px;color:#e8e8e8;line-height:1.6;">${reason}</p>
+    </div>
+    ${p('If you believe this is a mistake, please contact our support team at <a href="mailto:support@kitazon.com" style="color:#f97316;">support@kitazon.com</a> and we will review your case.')}
+  `));
+}
+
+export async function sendAccountReactivatedEmail(to: string, name: string): Promise<void> {
+  const dashboardLink = `${BASE}/dashboard`;
+  await send(to, 'Your Kitazon account has been reactivated', layout('Account Reactivated', `
+    ${h2(`Good news, ${name.split(' ')[0]}!`)}
+    ${p('Your Kitazon account has been reviewed and is now <strong style="color:#22c55e;">reactivated</strong>. You can log in and continue earning.')}
+    <div style="text-align:center;margin:24px 0;">${btn(dashboardLink, 'Go to Dashboard')}</div>
+    ${p('Thank you for your patience. If you have any questions, contact us at <a href="mailto:support@kitazon.com" style="color:#f97316;">support@kitazon.com</a>.')}
+  `));
+}
+
 export async function sendReferralEarnedEmail(to: string, name: string, referredName: string, amount: number): Promise<void> {
   const dashboardLink = `${BASE}/dashboard`;
   await send(to, `You earned ₱${amount.toFixed(2)} from a referral!`, layout('Referral Bonus Earned', `
