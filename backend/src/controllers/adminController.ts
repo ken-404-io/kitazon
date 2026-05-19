@@ -116,9 +116,18 @@ export async function listWithdrawals(req: Request, res: Response, next: NextFun
         'w.account_number', 'w.account_name', 'w.status', 'w.created_at',
         'u.id as user_id', 'u.name as user_name', 'u.email as user_email', 'u.plan as user_plan'
       )
-      .orderBy('w.created_at', 'desc')
       .limit(limit)
       .offset(offset);
+
+    if (status === 'pending') {
+      // Paid plan users always appear before free plan users so Priority fills page 1.
+      // Within each group, oldest first so the admin processes in submission order.
+      query = query.orderByRaw(
+        `CASE WHEN u.plan IN ('bronze','silver','gold','diamond') THEN 0 ELSE 1 END ASC, w.created_at ASC`
+      );
+    } else {
+      query = query.orderBy('w.created_at', 'desc');
+    }
 
     if (status && VALID_STATUSES.includes(status as WithdrawalStatus)) {
       query = query.where('w.status', status);
