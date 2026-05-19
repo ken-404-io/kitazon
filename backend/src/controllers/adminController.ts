@@ -638,7 +638,7 @@ export async function broadcastEmail(req: Request, res: Response, next: NextFunc
       res.status(400).json({ message: 'message must be 2000 characters or fewer.' }); return;
     }
 
-    let query = db<DbUser>('users').where({ is_active: true }).select('email', 'name').limit(500);
+    let query = db<DbUser>('users').where({ is_active: true }).select('id', 'email', 'name').limit(500);
 
     if (target === 'verified') {
       query = query.where({ email_verified: true });
@@ -654,6 +654,14 @@ export async function broadcastEmail(req: Request, res: Response, next: NextFunc
     await logAudit(req.user!.id, 'admin_broadcast_email', req, {
       metadata: { target, subject: subjectStr, recipient_count: users.length },
     });
+
+    // Bulk-insert in-app notifications immediately (no delay needed for DB).
+    if (users.length > 0) {
+      const now = new Date();
+      await db('notifications').insert(
+        users.map(u => ({ user_id: u.id, type: 'broadcast', title: subjectStr, message: messageStr, created_at: now, updated_at: now }))
+      ).catch(() => {});
+    }
 
     // Respond immediately; send emails sequentially in the background with
     // a 5 s gap between each so we never flood the email API.
