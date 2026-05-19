@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import authMiddleware from '../middleware/auth';
 import adminAuth from '../middleware/adminAuth';
-import { platformStats, listUsers, toggleUserActive, toggleUserAdmin, listWithdrawals, updateWithdrawalStatus, listAuditLogs, getUserAuditLogs, listTasks, createTask, updateTask, updateUserPlan, adjustBalance, broadcastEmail, revenueStats, bulkImportTasks, grantLeaderboardRewards, listOnlineUsers, bulkApproveWithdrawals, listGcashPayments, approveGcashPayment, rejectGcashPayment, setReferralCount, fraudReport, suspendAllFraud } from '../controllers/adminController';
+import { platformStats, listUsers, toggleUserActive, batchEnableUsers, toggleUserAdmin, listWithdrawals, updateWithdrawalStatus, listAuditLogs, getUserAuditLogs, listTasks, createTask, updateTask, updateUserPlan, adjustBalance, broadcastEmail, revenueStats, bulkImportTasks, grantLeaderboardRewards, listOnlineUsers, bulkApproveWithdrawals, listGcashPayments, approveGcashPayment, rejectGcashPayment, setReferralCount, fraudReport, suspendAllFraud } from '../controllers/adminController';
 import { getPublicSettings, adminUpdateSettings } from '../controllers/settingsController';
 
 const router = Router();
@@ -12,6 +12,7 @@ router.get('/stats', platformStats);
 router.get('/online', listOnlineUsers);
 router.get('/users', listUsers);
 router.patch('/users/:id/toggle-active', toggleUserActive);
+router.post('/users/batch-enable', batchEnableUsers);
 router.get('/users/:id/audit-logs', getUserAuditLogs);
 router.patch('/users/:id/toggle-admin', toggleUserAdmin);
 router.patch('/users/:id/plan', updateUserPlan);

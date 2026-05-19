@@ -242,21 +242,21 @@ export default function Admin() {
     setSelectedSuspended(allSuspendedSelected ? new Set() : new Set(users.map(u => u.id)));
   const batchEnable = async () => {
     if (selectedSuspended.size === 0) return;
-    if (!window.confirm(`Enable ${selectedSuspended.size} account${selectedSuspended.size !== 1 ? 's' : ''}? Each user will receive a reactivation email.`)) return;
+    if (!window.confirm(`Enable ${selectedSuspended.size} account${selectedSuspended.size !== 1 ? 's' : ''}? Each user will receive a reactivation email (sent with a 5 s gap to avoid delivery issues).`)) return;
     setBatchEnableBusy(true);
-    let enabled = 0;
-    for (const uid of selectedSuspended) {
-      try {
-        // reason is empty string — backend only requires it when disabling
-        await api.patch(`/admin/users/${uid}/toggle-active`, { reason: '' });
-        enabled++;
-      } catch { /* skip individual failures */ }
+    try {
+      const res = await api.post<{ enabled: number }>('/admin/users/batch-enable', {
+        user_ids: Array.from(selectedSuspended),
+      });
+      setSelectedSuspended(new Set());
+      loadUsers(userPage, userSearch, 'suspended');
+      loadStats();
+      showToast(`${res.data.enabled} account${res.data.enabled !== 1 ? 's' : ''} enabled. Reactivation emails queued.`);
+    } catch (err: unknown) {
+      showToast((err as { response?: { data?: { message?: string } } }).response?.data?.message ?? 'Batch enable failed.');
+    } finally {
+      setBatchEnableBusy(false);
     }
-    setSelectedSuspended(new Set());
-    loadUsers(userPage, userSearch, 'suspended');
-    loadStats();
-    setBatchEnableBusy(false);
-    showToast(`${enabled} account${enabled !== 1 ? 's' : ''} enabled. Reactivation emails sent.`);
   };
 
   // User activity log

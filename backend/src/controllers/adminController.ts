@@ -100,6 +100,41 @@ export async function toggleUserActive(req: Request, res: Response, next: NextFu
   } catch (err) { next(err); }
 }
 
+export async function batchEnableUsers(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const rawIds: unknown = req.body?.user_ids;
+    if (!Array.isArray(rawIds) || rawIds.length === 0) {
+      res.status(400).json({ message: 'user_ids array is required.' });
+      return;
+    }
+    const userIds = (rawIds as unknown[]).map(Number).filter(n => !isNaN(n) && n > 0);
+    if (userIds.length === 0) { res.status(400).json({ message: 'No valid user IDs provided.' }); return; }
+
+    const targets = await db<DbUser>('users')
+      .whereIn('id', userIds)
+      .where({ is_active: false })
+      .select('id', 'name', 'email');
+
+    if (targets.length === 0) { res.json({ enabled: 0 }); return; }
+
+    await db('users').whereIn('id', targets.map(u => u.id)).update({ is_active: true });
+    await logAudit(req.user!.id, 'admin_batch_enable_users', req, {
+      metadata: { enabled_ids: targets.map(u => u.id), count: targets.length },
+    });
+
+    // Respond immediately; drip-send reactivation emails in the background.
+    res.json({ enabled: targets.length });
+
+    (async () => {
+      for (let i = 0; i < targets.length; i++) {
+        const u = targets[i];
+        try { await sendAccountReactivatedEmail(u.email, u.name); } catch { /* skip */ }
+        if (i < targets.length - 1) await sleep(BULK_APPROVE_EMAIL_GAP_MS);
+      }
+    })().catch(() => {});
+  } catch (err) { next(err); }
+}
+
 export async function toggleUserAdmin(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     const userId = Number(req.params.id);
@@ -616,16 +651,21 @@ export async function broadcastEmail(req: Request, res: Response, next: NextFunc
     const subjectStr = String(subject).trim();
     const messageStr = String(message).trim();
 
-    // Fire-and-forget
-    Promise.allSettled(
-      users.map((u) => sendBroadcastEmail(u.email, u.name, subjectStr, messageStr))
-    ).catch(() => {});
-
     await logAudit(req.user!.id, 'admin_broadcast_email', req, {
       metadata: { target, subject: subjectStr, recipient_count: users.length },
     });
 
+    // Respond immediately; send emails sequentially in the background with
+    // a 5 s gap between each so we never flood the email API.
     res.json({ queued: users.length });
+
+    (async () => {
+      for (let i = 0; i < users.length; i++) {
+        const u = users[i];
+        try { await sendBroadcastEmail(u.email, u.name, subjectStr, messageStr); } catch { /* skip */ }
+        if (i < users.length - 1) await sleep(BULK_APPROVE_EMAIL_GAP_MS);
+      }
+    })().catch(() => {});
   } catch (err) { next(err); }
 }
 
@@ -1068,15 +1108,20 @@ export async function suspendAllFraud(req: Request, res: Response, next: NextFun
       .whereIn('id', targets.map(u => u.id))
       .update({ is_active: false });
 
-    // Send suspension emails concurrently (failures don't abort the response)
-    await Promise.allSettled(
-      targets.map(u => sendAccountSuspendedEmail(u.email, u.name, reason))
-    );
-
     await logAudit(req.user!.id, 'admin_suspend_all_fraud', req, {
       metadata: { suspended_ids: targets.map(u => u.id), count: targets.length, reason },
     });
 
+    // Respond immediately; drip-send suspension emails in the background
+    // with a 5 s gap so the email API is never overwhelmed.
     res.json({ suspended: targets.length, user_ids: targets.map(u => u.id) });
+
+    (async () => {
+      for (let i = 0; i < targets.length; i++) {
+        const u = targets[i];
+        try { await sendAccountSuspendedEmail(u.email, u.name, reason); } catch { /* skip */ }
+        if (i < targets.length - 1) await sleep(BULK_APPROVE_EMAIL_GAP_MS);
+      }
+    })().catch(() => {});
   } catch (err) { next(err); }
 }
