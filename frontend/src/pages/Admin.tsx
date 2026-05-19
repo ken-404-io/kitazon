@@ -780,7 +780,7 @@ export default function Admin() {
       Number(w.fee).toFixed(2),
       Number(w.net_amount).toFixed(2),
       w.channel,
-      w.account_number,
+      /^\d{10}$/.test(w.account_number) ? '0' + w.account_number : w.account_number,
       w.account_name ?? '',
       w.status,
     ]);
