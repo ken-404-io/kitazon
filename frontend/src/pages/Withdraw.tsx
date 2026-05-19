@@ -387,15 +387,17 @@ export default function Withdraw() {
           className={styles.withdrawBtn}
           onClick={() => setView('form')}
           disabled={elig !== null && !elig.eligible}
-          style={elig !== null && !elig.eligible ? { opacity: 0.5, cursor: 'not-allowed' } : undefined}
+          style={elig !== null && !elig.eligible ? { opacity: 0.55, cursor: 'not-allowed', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 } : { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}
         >
-          {elig?.cooldown_active
-            ? cooldownLabel
-            : elig?.free_plan_cap_reached
-            ? 'Upgrade to Withdraw'
-            : (elig !== null && !elig.eligible)
-            ? 'Locked'
-            : 'Fast Cash →'}
+          {elig?.cooldown_active ? (
+            <><ClockIcon />Come back tomorrow · {cooldownLabel}</>
+          ) : elig?.free_plan_cap_reached ? (
+            <><LockIcon2 />Upgrade to Withdraw</>
+          ) : (elig !== null && !elig.eligible) ? (
+            <><ClockIcon />Come back tomorrow</>
+          ) : (
+            'Fast Cash →'
+          )}
         </button>
 
         <button
