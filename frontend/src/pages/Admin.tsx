@@ -499,6 +499,8 @@ export default function Admin() {
   const changePlan = async (userId: number, plan: PlanValue) => {
     await api.patch(`/admin/users/${userId}/plan`, { plan });
     setUsers(prev => prev.map(u => u.id === userId ? { ...u, plan } : u));
+    // Clear cached withdrawals so Pending Withdrawals tab re-fetches with updated priority grouping
+    setWithdrawals([]);
     showToast(`Plan updated to ${plan}`);
   };
 
@@ -1894,7 +1896,11 @@ export default function Admin() {
                             onClick={async () => {
                               if (!window.confirm(`Approve ${g.plan} plan for ${g.user_name}? This will activate their plan.`)) return;
                               await api.patch(`/admin/gcash-payments/${g.id}/approve`, {});
-                              showToast('Plan activated!');
+                              showToast('Plan activated! Their pending withdrawals will appear in Priority.');
+                              // Clear cached withdrawals + refresh stats so Pending Withdrawals tab
+                              // immediately re-fetches with the user's upgraded plan grouping.
+                              setWithdrawals([]);
+                              loadStats();
                               loadGcashPayments(gcashFilter);
                             }}
                             style={{ padding: '4px 10px', background: '#16a34a', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 12, fontWeight: 700 }}
