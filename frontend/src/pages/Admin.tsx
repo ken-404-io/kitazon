@@ -1861,10 +1861,17 @@ export default function Admin() {
                             const payload: { reason: string; user_ids?: number[] } = { reason };
                             if (userIds) payload.user_ids = userIds;
                             const res = await api.post<{ suspended: number }>('/admin/fraud/suspend-all', payload);
-                            showToast(`${res.data.suspended} account${res.data.suspended !== 1 ? 's' : ''} suspended. Email notifications sent.`);
+                            if (res.data.suspended === 0) {
+                              showToast('No active accounts found to suspend in this category.');
+                            } else {
+                              showToast(`${res.data.suspended} account${res.data.suspended !== 1 ? 's' : ''} suspended. Email notifications sent.`);
+                            }
                             await loadFraud();
-                          } catch { showToast('Failed to suspend accounts.'); }
-                          finally { setSuspendingAll(false); }
+                          } catch (err: unknown) {
+                            const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message ?? 'Failed to suspend accounts.';
+                            console.error('[Suspend All] error:', err);
+                            showToast(msg);
+                          } finally { setSuspendingAll(false); }
                         }}
                         style={{ padding: '8px 20px', borderRadius: 10, border: 'none', background: '#ef4444', color: '#fff', cursor: 'pointer', fontSize: '0.85rem', fontWeight: 700, opacity: suspendingAll ? 0.7 : 1 }}
                       >
