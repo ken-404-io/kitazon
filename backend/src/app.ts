@@ -19,6 +19,7 @@ import googleAuthRoutes from './routes/googleAuth';
 import subscriptionRoutes from './routes/subscriptions';
 import creditsRoutes from './routes/credits';
 import kycRoutes from './routes/kyc';
+import notificationsRoutes from './routes/notifications';
 import { getPublicSettings } from './controllers/settingsController';
 
 // ─── Startup guards ────────────────────────────────────────────────────────────
@@ -156,6 +157,7 @@ app.use('/api/auth', googleAuthRoutes);
 app.use('/api/subscriptions', subscriptionRoutes);
 app.use('/api/credits', creditsRoutes);
 app.use('/api/kyc', kycRoutes);
+app.use('/api/notifications', notificationsRoutes);
 
 // ─── security.txt (RFC 9116) ──────────────────────────────────────────────────
 app.get('/.well-known/security.txt', (_req, res) => {

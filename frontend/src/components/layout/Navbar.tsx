@@ -26,12 +26,22 @@ const SettingsIcon= () => <svg {...sz}><circle cx="12" cy="12" r="3"/><path d="M
 const CrownIcon   = () => <svg {...sz}><path d="M2 20h20"/><path d="M5 20V9l7-5 7 5v11"/><path d="M12 4v16"/><path d="M5 12h14"/></svg>;
 
 // ─── Component ────────────────────────────────────────────────────────────────
+interface AppNotification {
+  id: number;
+  type: string;
+  title: string;
+  message: string;
+  read_at: string | null;
+  created_at: string;
+}
+
 export default function Navbar() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const { theme, toggleTheme } = useTheme();
-  const [notifications, setNotifications] = useState<Withdrawal[]>([]);
+  const [withdrawals, setWithdrawals] = useState<Withdrawal[]>([]);
+  const [appNotifs, setAppNotifs] = useState<AppNotification[]>([]);
   const [notifOpen, setNotifOpen] = useState(false);
   const [seenIds, setSeenIds] = useState<number[]>(() => {
     try { return JSON.parse(localStorage.getItem('seenWithdrawals') ?? '[]'); } catch { return []; }
@@ -39,18 +49,28 @@ export default function Navbar() {
 
   useEffect(() => {
     if (!user) return;
-    const poll = () => api.get<Withdrawal[]>('/withdrawals').then((r) => setNotifications(r.data)).catch(() => {});
+    const poll = () => {
+      api.get<Withdrawal[]>('/withdrawals').then((r) => setWithdrawals(r.data)).catch(() => {});
+      api.get<AppNotification[]>('/notifications').then((r) => setAppNotifs(r.data)).catch(() => {});
+    };
     poll();
     const id = setInterval(poll, 30000);
     return () => clearInterval(id);
   }, [user]);
 
-  const unread = notifications.filter((n) => !seenIds.includes(n.id) && n.status !== 'pending').length;
+  const unreadWithdrawals = withdrawals.filter((n) => !seenIds.includes(n.id) && n.status !== 'pending').length;
+  const unreadBroadcasts = appNotifs.filter((n) => !n.read_at).length;
+  const unread = unreadWithdrawals + unreadBroadcasts;
 
   const markAllRead = () => {
-    const ids = notifications.map((n) => n.id);
+    const ids = withdrawals.map((n) => n.id);
     setSeenIds(ids);
     localStorage.setItem('seenWithdrawals', JSON.stringify(ids));
+    if (unreadBroadcasts > 0) {
+      api.post('/notifications/read-all').then(() => {
+        setAppNotifs(prev => prev.map(n => ({ ...n, read_at: n.read_at ?? new Date().toISOString() })));
+      }).catch(() => {});
+    }
   };
 
   const handleLogout = async () => {
@@ -107,16 +127,31 @@ export default function Navbar() {
 
               {notifOpen && (
                 <div className={styles.notifDropdown}>
-                  <div className={styles.notifHeader}>Withdrawal Updates</div>
-                  {notifications.filter((n) => n.status !== 'pending').length === 0 ? (
+                  {appNotifs.length > 0 && (
+                    <>
+                      <div className={styles.notifHeader}>Announcements</div>
+                      {appNotifs.slice(0, 5).map((n) => (
+                        <div key={`b-${n.id}`} className={styles.notifItem} style={{ borderLeft: `3px solid ${n.read_at ? 'var(--border)' : '#f97316'}`, paddingLeft: 10 }}>
+                          <div style={{ fontWeight: 700, fontSize: '0.82rem', color: 'var(--text)', marginBottom: 2 }}>{n.title}</div>
+                          <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', lineHeight: 1.4 }}>{n.message}</div>
+                          <div className={styles.notifDate}>{new Date(n.created_at).toLocaleString('en-PH')}</div>
+                        </div>
+                      ))}
+                    </>
+                  )}
+                  <div className={styles.notifHeader} style={{ marginTop: appNotifs.length > 0 ? 8 : 0 }}>Withdrawal Updates</div>
+                  {withdrawals.filter((n) => n.status !== 'pending').length === 0 ? (
                     <p className={styles.notifEmpty}>No updates yet.</p>
-                  ) : notifications.filter((n) => n.status !== 'pending').slice(0, 8).map((n) => (
+                  ) : withdrawals.filter((n) => n.status !== 'pending').slice(0, 8).map((n) => (
                     <div key={n.id} className={styles.notifItem}>
                       <span className={`${styles.notifStatus} ${styles[`status_${n.status}`]}`}>{n.status.toUpperCase()}</span>
                       {' — '}₱{Number(n.net_amount).toFixed(2)} via {n.channel.toUpperCase()}
                       <div className={styles.notifDate}>{new Date(n.created_at).toLocaleString('en-PH')}</div>
                     </div>
                   ))}
+                  {appNotifs.length === 0 && withdrawals.filter(n => n.status !== 'pending').length === 0 && (
+                    <p className={styles.notifEmpty}>No notifications yet.</p>
+                  )}
                 </div>
               )}
             </div>
