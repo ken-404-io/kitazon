@@ -93,30 +93,14 @@ export default function AccountSettings() {
   // Payment methods (GCash only)
   const [savedAcct, setSavedAcct]         = useState<string | null>(null);
   const [savedAcctLoading, setSavedAcctLoading] = useState(false);
-  const [savedAcctMsg, setSavedAcctMsg]   = useState('');
-  const [savedAcctErr, setSavedAcctErr]   = useState('');
-  const [removingAcct, setRemovingAcct]   = useState(false);
   const loadSavedAcct = async () => {
     setSavedAcctLoading(true);
-    setSavedAcctMsg(''); setSavedAcctErr('');
     try {
       const r = await api.get<{ account_number: string } | null>('/withdrawals/saved-account');
       setSavedAcct(r.data?.account_number ?? null);
     } catch {
       setSavedAcct(null);
     } finally { setSavedAcctLoading(false); }
-  };
-  const removeSavedAcct = async () => {
-    if (!window.confirm('Remove your saved GCash number? You\'ll be able to register a different GCash number on your next withdrawal.')) return;
-    setRemovingAcct(true);
-    setSavedAcctMsg(''); setSavedAcctErr('');
-    try {
-      await api.delete('/withdrawals/saved-account');
-      setSavedAcct(null);
-      setSavedAcctMsg('Payment method removed. You can register a new GCash number on your next withdrawal.');
-    } catch (err: unknown) {
-      setSavedAcctErr((err as { response?: { data?: { message?: string } } }).response?.data?.message ?? 'Failed to remove payment method.');
-    } finally { setRemovingAcct(false); }
   };
 
   const [sessionMsg, setSessionMsg]   = useState('');
@@ -513,21 +497,9 @@ export default function AccountSettings() {
                 </div>
                 <span style={{ fontSize: 11, fontWeight: 700, color: '#22c55e', background: 'rgba(34,197,94,0.1)', padding: '2px 8px', borderRadius: 20, whiteSpace: 'nowrap' }}>Saved</span>
               </div>
-              <button
-                type="button"
-                disabled={removingAcct}
-                onClick={removeSavedAcct}
-                style={{
-                  marginTop: 12, width: '100%',
-                  background: 'transparent', border: '1px solid var(--red)',
-                  color: 'var(--red)', borderRadius: 10, padding: '0.6rem 1rem',
-                  fontSize: 13, fontWeight: 600,
-                  cursor: removingAcct ? 'not-allowed' : 'pointer',
-                  opacity: removingAcct ? 0.6 : 1,
-                }}
-              >
-                {removingAcct ? 'Removing…' : 'Remove Payment Method'}
-              </button>
+              <div style={{ marginTop: 12, background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.25)', borderRadius: 10, padding: '0.75rem 1rem', fontSize: 13, color: 'var(--text-muted)', lineHeight: 1.5 }}>
+                To change or remove your payment method, please contact support. This is required to prevent duplicate accounts.
+              </div>
             </div>
           ) : (
             <div style={{ textAlign: 'center', padding: '1.5rem 0.5rem', color: 'var(--text-muted)' }}>
@@ -544,8 +516,6 @@ export default function AccountSettings() {
             </div>
           )}
 
-          {savedAcctMsg && <p style={{ marginTop: 12, fontSize: 12, color: '#22c55e' }}>{savedAcctMsg}</p>}
-          {savedAcctErr && <p style={{ marginTop: 12, fontSize: 12, color: 'var(--red)' }}>{savedAcctErr}</p>}
         </div>
       </SubView>
     </div>
