@@ -259,6 +259,9 @@ export default function Admin() {
   const [suspendReason, setSuspendReason] = useState('');
   const [suspendCategory, setSuspendCategory] = useState<'all' | 'devices' | 'ips' | 'referrals' | 'flagged'>('all');
 
+  // Mobile nav
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
   const SUSPEND_REASONS: Record<string, string> = {
     all:       'Multiple accounts or fraudulent activity detected on your device or network.',
     devices:   'Your account was suspended because multiple accounts were found registered from the same device. Each device may only have one Kitazon account.',
@@ -652,27 +655,56 @@ export default function Admin() {
     { id: 'settings',            label: 'Settings',            icon: <svg {...si}><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg> },
   ];
 
+  const MOBILE_PRIMARY_TABS: Tab[] = ['stats', 'pending-withdrawals', 'users', 'gcash-payments', 'fraud'];
+
+  function getTabBadge(tabId: Tab): number | null {
+    if (tabId === 'pending-withdrawals') return stats?.pending_withdrawals || null;
+    if (tabId === 'kyc')                return stats?.pending_kyc || null;
+    if (tabId === 'gcash-payments')     return stats?.pending_gcash || null;
+    if (tabId === 'online')             return onlineCount;
+    const t = TABS.find(x => x.id === tabId);
+    return (t?.badge != null && t.badge > 0) ? t.badge : null;
+  }
+
   return (
     <div style={{ display: 'flex', minHeight: '100vh', alignItems: 'flex-start' }}>
+      <style>{`
+        .admin-sidebar { display: flex; flex-direction: column; }
+        .admin-mobile-nav { display: none; }
+        .admin-drawer-overlay { display: none; }
+        @media (max-width: 767px) {
+          .admin-sidebar { display: none !important; }
+          .admin-content { padding: 1rem !important; padding-bottom: calc(72px + env(safe-area-inset-bottom)) !important; }
+          .admin-content h2 { font-size: 1.1rem !important; margin-bottom: 1rem !important; }
+          .admin-mobile-nav { display: flex !important; }
+          .admin-drawer-overlay { display: flex !important; }
+          .admin-stats-grid { grid-template-columns: repeat(2, 1fr) !important; gap: 0.6rem !important; }
+          .admin-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+          .admin-table-wrap table { min-width: 600px; }
+          .admin-card-row { flex-direction: column !important; gap: 0.75rem !important; }
+          .admin-settings-grid-5 { grid-template-columns: repeat(2, 1fr) !important; }
+          .admin-settings-grid-4 { grid-template-columns: repeat(2, 1fr) !important; }
+          .admin-settings-grid-3 { grid-template-columns: repeat(1, 1fr) !important; }
+        }
+        @media (min-width: 768px) and (max-width: 1023px) {
+          .admin-sidebar { width: 190px !important; }
+          .admin-content { padding: 1.25rem 1rem !important; }
+        }
+      `}</style>
+
       {toast && (
         <div style={{ position: 'fixed', top: 20, right: 20, background: '#16a34a', color: '#fff', padding: '10px 18px', borderRadius: 8, zIndex: 9999, fontWeight: 600 }}>
           {toast}
         </div>
       )}
 
-      {/* ── Sidebar ── */}
-      <div style={{ width: 230, flexShrink: 0, background: 'var(--dark-card)', borderRight: '1px solid var(--dark-border)', minHeight: '100vh', padding: '1.5rem 0.75rem', position: 'sticky', top: 0, height: '100vh', overflowY: 'auto' }}>
+      {/* ── Desktop Sidebar ── */}
+      <div className="admin-sidebar" style={{ width: 230, flexShrink: 0, background: 'var(--dark-card)', borderRight: '1px solid var(--dark-border)', minHeight: '100vh', padding: '1.5rem 0.75rem', position: 'sticky', top: 0, height: '100vh', overflowY: 'auto' }}>
         <div style={{ fontSize: '0.65rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--text-muted)', padding: '0 0.5rem', marginBottom: '1rem' }}>Admin Panel</div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
           {TABS.map(t => {
             const isActive = tab === t.id;
-            const badge =
-              t.id === 'pending-withdrawals' ? (stats?.pending_withdrawals || null) :
-              t.id === 'kyc'                 ? (stats?.pending_kyc || null) :
-              t.id === 'gcash-payments'      ? (stats?.pending_gcash || null) :
-              t.id === 'online'              ? onlineCount :
-              t.badge != null && t.badge > 0 ? t.badge :
-              null;
+            const badge = getTabBadge(t.id);
             return (
               <button
                 key={t.id}
@@ -699,15 +731,111 @@ export default function Admin() {
         </div>
       </div>
 
+      {/* ── Mobile Bottom Nav ── */}
+      <nav className="admin-mobile-nav" style={{
+        position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 300,
+        background: 'var(--dark-card)', borderTop: '1px solid var(--dark-border)',
+        height: 64, paddingBottom: 'env(safe-area-inset-bottom)',
+        alignItems: 'stretch',
+      }}>
+        {MOBILE_PRIMARY_TABS.map(tabId => {
+          const t = TABS.find(x => x.id === tabId)!;
+          const isActive = tab === tabId;
+          const badge = getTabBadge(tabId);
+          return (
+            <button key={tabId} onClick={() => setTab(tabId)} style={{
+              flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+              gap: 3, border: 'none', background: 'transparent', cursor: 'pointer',
+              color: isActive ? 'var(--gold)' : 'var(--text-muted)',
+              fontSize: '9px', fontWeight: isActive ? 700 : 500, padding: '6px 2px',
+              position: 'relative',
+            }}>
+              <span style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={isActive ? 2.5 : 2} strokeLinecap="round" strokeLinejoin="round">
+                  {(t.icon as React.ReactElement<React.SVGProps<SVGSVGElement>>).props.children}
+                </svg>
+                {badge !== null && badge > 0 && (
+                  <span style={{ position: 'absolute', top: -4, right: -6, background: '#ef4444', color: '#fff', borderRadius: 999, fontSize: 8, fontWeight: 800, minWidth: 14, height: 14, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 2px' }}>{badge}</span>
+                )}
+              </span>
+              <span style={{ fontSize: '9px', letterSpacing: '0.2px', maxWidth: 52, textAlign: 'center', lineHeight: 1.1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {tabId === 'pending-withdrawals' ? 'Pending' : t.label}
+              </span>
+            </button>
+          );
+        })}
+        {/* More button */}
+        <button onClick={() => setMobileMenuOpen(true)} style={{
+          flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+          gap: 3, border: 'none', background: 'transparent', cursor: 'pointer',
+          color: !MOBILE_PRIMARY_TABS.includes(tab) ? 'var(--gold)' : 'var(--text-muted)',
+          fontSize: '9px', fontWeight: !MOBILE_PRIMARY_TABS.includes(tab) ? 700 : 500, padding: '6px 2px',
+        }}>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="12" cy="5" r="1" fill="currentColor"/><circle cx="12" cy="12" r="1" fill="currentColor"/><circle cx="12" cy="19" r="1" fill="currentColor"/>
+          </svg>
+          <span style={{ fontSize: '9px' }}>More</span>
+        </button>
+      </nav>
+
+      {/* ── Mobile Full Menu Drawer ── */}
+      {mobileMenuOpen && (
+        <div className="admin-drawer-overlay" onClick={() => setMobileMenuOpen(false)} style={{
+          position: 'fixed', inset: 0, zIndex: 400, background: 'rgba(0,0,0,0.55)',
+          alignItems: 'flex-end',
+        }}>
+          <div onClick={e => e.stopPropagation()} style={{
+            background: 'var(--dark-card)', borderTopLeftRadius: 20, borderTopRightRadius: 20,
+            width: '100%', maxHeight: '85vh', overflowY: 'auto',
+            padding: '0 0 calc(16px + env(safe-area-inset-bottom))',
+            boxShadow: '0 -4px 32px rgba(0,0,0,0.4)',
+          }}>
+            {/* Handle + title */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 20px 10px', borderBottom: '1px solid var(--dark-border)', position: 'sticky', top: 0, background: 'var(--dark-card)', zIndex: 1 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--gold)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                <span style={{ fontWeight: 800, fontSize: '0.9rem', color: 'var(--text)' }}>Admin Panel</span>
+              </div>
+              <button onClick={() => setMobileMenuOpen(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: 4 }}>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+              </button>
+            </div>
+            <div style={{ padding: '8px 12px', display: 'flex', flexDirection: 'column', gap: 2 }}>
+              {TABS.map(t => {
+                const isActive = tab === t.id;
+                const badge = getTabBadge(t.id);
+                return (
+                  <button key={t.id} onClick={() => { setTab(t.id); setMobileMenuOpen(false); }} style={{
+                    display: 'flex', alignItems: 'center', gap: 12,
+                    padding: '0.75rem 0.9rem', borderRadius: 12, border: 'none', cursor: 'pointer',
+                    background: isActive ? 'rgba(245,158,11,0.12)' : 'transparent',
+                    color: isActive ? 'var(--gold)' : 'var(--text)',
+                    fontWeight: isActive ? 700 : 400, fontSize: '0.9rem',
+                    textAlign: 'left', width: '100%',
+                  }}>
+                    <span style={{ flexShrink: 0, opacity: isActive ? 1 : 0.6 }}>{t.icon}</span>
+                    <span style={{ flex: 1 }}>{t.label}</span>
+                    {badge !== null && badge > 0 && (
+                      <span style={{ background: '#ef4444', color: '#fff', fontSize: '0.7rem', fontWeight: 800, borderRadius: 999, padding: '2px 7px', minWidth: 20, textAlign: 'center' }}>{badge}</span>
+                    )}
+                    {isActive && <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--gold)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"/></svg>}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ── Main content ── */}
-      <div style={{ flex: 1, minWidth: 0, padding: '2rem 1.5rem' }}>
+      <div className="admin-content" style={{ flex: 1, minWidth: 0, padding: '2rem 1.5rem' }}>
         <h2 style={{ marginBottom: '1.5rem' }}>{TAB_LABELS[tab]}</h2>
 
       {/* ── Stats ── */}
       {tab === 'stats' && (
         <div>
           {!stats ? <p>Loading...</p> : (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '1rem' }}>
+            <div className="admin-stats-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '1rem' }}>
               {[
                 { label: 'Total Users', value: stats.users },
                 { label: 'Active Users', value: stats.active_users },
@@ -794,7 +922,7 @@ export default function Admin() {
             <button className="btn-primary" onClick={() => loadUsers(1, userSearch)}>Search</button>
           </div>
           {userLoading ? <p>Loading...</p> : (
-            <div style={{ overflowX: 'auto' }}>
+            <div className="admin-table-wrap" style={{ overflowX: 'auto' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
                 <thead>
                   <tr style={{ borderBottom: '2px solid #e5e7eb', background: '#f9fafb' }}>
@@ -1101,7 +1229,7 @@ export default function Admin() {
               : [];
 
             const renderTable = (rows: AdminWithdrawal[], headerBg?: string) => (
-            <div style={{ overflowX: 'auto' }}>
+            <div className="admin-table-wrap" style={{ overflowX: 'auto' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
                 <thead>
                   <tr style={{ borderBottom: '2px solid #e5e7eb', background: headerBg ?? '#f9fafb' }}>
@@ -1336,7 +1464,7 @@ export default function Admin() {
           </div>
 
           {taskLoading ? <p>Loading...</p> : (
-            <div style={{ overflowX: 'auto' }}>
+            <div className="admin-table-wrap" style={{ overflowX: 'auto' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
                 <thead>
                   <tr style={{ borderBottom: '2px solid #e5e7eb', background: '#f9fafb' }}>
@@ -1370,7 +1498,7 @@ export default function Admin() {
       {tab === 'logs' && (
         <div>
           {logLoading ? <p>Loading...</p> : (
-            <div style={{ overflowX: 'auto' }}>
+            <div className="admin-table-wrap" style={{ overflowX: 'auto' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
                 <thead>
                   <tr style={{ borderBottom: '2px solid #e5e7eb', background: '#f9fafb' }}>
@@ -1648,6 +1776,7 @@ export default function Admin() {
               <p style={{ fontSize: 13 }}>Users become visible once they make an API request.</p>
             </div>
           ) : (
+            <div className="admin-table-wrap" style={{ overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
               <thead>
                 <tr style={{ borderBottom: '2px solid var(--border)' }}>
@@ -1679,6 +1808,7 @@ export default function Admin() {
                 })}
               </tbody>
             </table>
+            </div>
           )}
         </div>
       )}
@@ -1915,7 +2045,7 @@ export default function Admin() {
                 {fraudData.flagged_withdrawals.length === 0 ? (
                   <p style={{ padding: '1.25rem', color: 'var(--text-muted)', fontSize: '0.85rem', margin: 0 }}>No flagged withdrawals.</p>
                 ) : (
-                  <div style={{ overflowX: 'auto' }}>
+                  <div className="admin-table-wrap" style={{ overflowX: 'auto' }}>
                     <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem' }}>
                       <thead><tr style={{ borderBottom: '1px solid var(--dark-border)' }}>
                         {['ID','User','Amount','Status','Flags','Date'].map(h => <th key={h} style={{ padding: '8px 12px', textAlign: 'left', color: 'var(--text-muted)', fontWeight: 600, whiteSpace: 'nowrap' }}>{h}</th>)}
@@ -2069,7 +2199,7 @@ export default function Admin() {
                 {fraudData.fraud_referrals.length === 0 ? (
                   <p style={{ padding: '1.25rem', color: 'var(--text-muted)', fontSize: '0.85rem', margin: 0 }}>No suspicious referrals found.</p>
                 ) : (
-                  <div style={{ overflowX: 'auto' }}>
+                  <div className="admin-table-wrap" style={{ overflowX: 'auto' }}>
                     <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem' }}>
                       <thead><tr style={{ borderBottom: '1px solid var(--dark-border)' }}>
                         {['Referrer','Referred','Signal','Date'].map(h => <th key={h} style={{ padding: '8px 12px', textAlign: 'left', color: 'var(--text-muted)', fontWeight: 600, whiteSpace: 'nowrap' }}>{h}</th>)}
@@ -2159,7 +2289,7 @@ export default function Admin() {
                   {/* Plan grid table */}
                   <div>
                     <p style={{ fontSize: '0.7rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--text-muted)', marginBottom: '0.6rem' }}>Max Withdrawal per Request (₱)</p>
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 10 }}>
+                    <div className="admin-settings-grid-5" style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 10 }}>
                       {([
                         { plan: 'free',    color: '#6b7280', label: 'Free' },
                         { plan: 'bronze',  color: '#cd7f32', label: 'Bronze' },
@@ -2180,7 +2310,7 @@ export default function Admin() {
                   </div>
                   <div>
                     <p style={{ fontSize: '0.7rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--text-muted)', marginBottom: '0.6rem' }}>Monthly Price (₱/mo) — paid plans only</p>
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10 }}>
+                    <div className="admin-settings-grid-4" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10 }}>
                       {([
                         { plan: 'bronze',  color: '#cd7f32', label: 'Bronze' },
                         { plan: 'silver',  color: '#9ca3af', label: 'Silver' },
@@ -2225,7 +2355,7 @@ export default function Admin() {
                           <p style={{ fontSize: '0.72rem', color: 'var(--text-muted)', margin: 0 }}>{desc}</p>
                         </div>
                       </div>
-                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 10 }}>
+                      <div className="admin-settings-grid-5" style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 10 }}>
                         {([
                           { plan: 'free',    color: '#6b7280', label: 'Free' },
                           { plan: 'bronze',  color: '#cd7f32', label: 'Bronze' },
