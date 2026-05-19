@@ -105,11 +105,43 @@ async function getWithdrawalEligibility(userId: number, user: DbUser) {
     ? await countQuizzesForNextGate(userId)
     : { count: 0, frozen: false };
 
+  // 24-hour cooldown: after any withdrawal request, user must wait 24h before submitting another
+  const lastWithdrawal = await db('withdrawals')
+    .where({ user_id: userId })
+    .orderBy('created_at', 'desc')
+    .select('created_at')
+    .first();
+  let cooldownActive = false;
+  let cooldownEndsAt: Date | null = null;
+  if (lastWithdrawal) {
+    const cooldownEnd = new Date(new Date(lastWithdrawal.created_at).getTime() + 24 * 60 * 60 * 1000);
+    if (cooldownEnd > new Date()) {
+      cooldownActive = true;
+      cooldownEndsAt = cooldownEnd;
+    }
+  }
+
+  // Free plan lifetime cap: once the user has withdrawn ₱25 total, they must upgrade
+  const FREE_PLAN_CAP = 25;
+  let freePlanCapReached = false;
+  let freePlanTotalWithdrawn = 0;
+  if (plan === 'free') {
+    const capRow = await db('withdrawals')
+      .where({ user_id: userId })
+      .whereIn('status', ['completed', 'pending', 'processing'])
+      .sum('amount as total')
+      .first();
+    freePlanTotalWithdrawn = parseFloat(String(capRow?.total ?? 0));
+    if (freePlanTotalWithdrawn >= FREE_PLAN_CAP) freePlanCapReached = true;
+  }
+
   const reasons: string[] = [];
-  if (!user.email_verified) reasons.push('email_not_verified');
+  if (!user.email_verified)                    reasons.push('email_not_verified');
+  if (cooldownActive)                           reasons.push('cooldown_active');
+  if (freePlanCapReached)                       reasons.push('free_plan_cap_reached');
   if (quizRequired > 0) {
-    if (quizGateFrozen) reasons.push('quiz_gate_frozen');
-    else if (quizzesCompleted < quizRequired) reasons.push('quiz_gate_not_met');
+    if (quizGateFrozen)                         reasons.push('quiz_gate_frozen');
+    else if (quizzesCompleted < quizRequired)   reasons.push('quiz_gate_not_met');
   }
 
   return {
@@ -123,6 +155,11 @@ async function getWithdrawalEligibility(userId: number, user: DbUser) {
     referrals_completed: 0,
     referrals_required: 0,
     referral_gate_frozen: false,
+    cooldown_active: cooldownActive,
+    cooldown_ends_at: cooldownEndsAt,
+    free_plan_cap_reached: freePlanCapReached,
+    free_plan_total_withdrawn: freePlanTotalWithdrawn,
+    free_plan_cap: FREE_PLAN_CAP,
     reasons,
   };
 }
@@ -237,6 +274,23 @@ export async function requestOtp(req: Request, res: Response, next: NextFunction
 
     const elig = await getWithdrawalEligibility(user.id, user);
     if (!elig.eligible) {
+      if (elig.reasons.includes('cooldown_active') && elig.cooldown_ends_at) {
+        res.status(429).json({
+          message: 'You can only submit one withdrawal every 24 hours.',
+          reason: 'cooldown_active',
+          cooldown_ends_at: elig.cooldown_ends_at,
+        });
+        return;
+      }
+      if (elig.reasons.includes('free_plan_cap_reached')) {
+        res.status(403).json({
+          message: `Free plan users can only withdraw up to ₱${elig.free_plan_cap} in total. Upgrade to a paid plan to continue withdrawing.`,
+          reason: 'free_plan_cap_reached',
+          free_plan_total_withdrawn: elig.free_plan_total_withdrawn,
+          free_plan_cap: elig.free_plan_cap,
+        });
+        return;
+      }
       if (elig.reasons.includes('quiz_gate_not_met')) {
         res.status(403).json({
           message: `Answer ${elig.quizzes_required} math quiz questions before requesting a withdrawal. You have completed ${elig.quizzes_completed}/${elig.quizzes_required}.`,
@@ -369,6 +423,23 @@ export async function create(req: Request, res: Response, next: NextFunction): P
 
     const elig = await getWithdrawalEligibility(user.id, user);
     if (!elig.eligible) {
+      if (elig.reasons.includes('cooldown_active') && elig.cooldown_ends_at) {
+        res.status(429).json({
+          message: 'You can only submit one withdrawal every 24 hours.',
+          reason: 'cooldown_active',
+          cooldown_ends_at: elig.cooldown_ends_at,
+        });
+        return;
+      }
+      if (elig.reasons.includes('free_plan_cap_reached')) {
+        res.status(403).json({
+          message: `Free plan users can only withdraw up to ₱${elig.free_plan_cap} in total. Upgrade to a paid plan to continue withdrawing.`,
+          reason: 'free_plan_cap_reached',
+          free_plan_total_withdrawn: elig.free_plan_total_withdrawn,
+          free_plan_cap: elig.free_plan_cap,
+        });
+        return;
+      }
       if (elig.reasons.includes('quiz_gate_not_met')) {
         res.status(403).json({
           message: `Answer ${elig.quizzes_required} math quiz questions before requesting a withdrawal. You have completed ${elig.quizzes_completed}/${elig.quizzes_required}.`,
