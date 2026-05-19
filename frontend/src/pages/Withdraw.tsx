@@ -100,7 +100,7 @@ export default function Withdraw() {
   const [otpLoad,     setOtpLoad]     = useState(false);
   const [acctTouched, setAcctTouched] = useState(false);
   const [acctNameTouched, setAcctNameTouched] = useState(false);
-  const [removingAcct, setRemovingAcct] = useState(false);
+
 
   const loadData = () => {
     api.get<UserStats>('/auth/me/stats').then(r => setStats(r.data)).catch(() => {});
@@ -624,41 +624,9 @@ export default function Withdraw() {
                     <span style={{ flex: 1, fontSize: '0.9rem', color: 'var(--text)' }}>{savedAcct}</span>
                     <span style={{ fontSize: '0.7rem', fontWeight: 700, color: '#22c55e', background: 'rgba(34,197,94,0.1)', padding: '2px 8px', borderRadius: 20 }}>Saved</span>
                   </div>
-                  <button
-                    type="button"
-                    disabled={removingAcct}
-                    onClick={async () => {
-                      if (!window.confirm('Remove this saved GCash number? You\'ll be able to register a different GCash number on your next withdrawal.')) return;
-                      setRemovingAcct(true);
-                      try {
-                        await api.delete('/withdrawals/saved-account');
-                        setSavedAcct(null);
-                        setSavedAcctName(null);
-                        setAccount('');
-                        setAccountName('');
-                        setAcctTouched(false);
-                        setAcctNameTouched(false);
-                        showToast('Payment method removed.', 'success');
-                      } catch (err: unknown) {
-                        showToast((err as { response?: { data?: { message?: string } } }).response?.data?.message ?? 'Failed to remove payment method.', 'error');
-                      } finally {
-                        setRemovingAcct(false);
-                      }
-                    }}
-                    style={{
-                      marginTop: 8,
-                      background: 'transparent',
-                      border: 'none',
-                      color: 'var(--red)',
-                      fontSize: '0.78rem',
-                      fontWeight: 600,
-                      cursor: removingAcct ? 'not-allowed' : 'pointer',
-                      opacity: removingAcct ? 0.6 : 1,
-                      padding: '4px 0',
-                    }}
-                  >
-                    {removingAcct ? 'Removing…' : 'Remove payment method'}
-                  </button>
+                  <div style={{ marginTop: 8, background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.25)', borderRadius: 10, padding: '0.65rem 0.9rem', fontSize: '0.78rem', color: 'var(--text-muted)', lineHeight: 1.5 }}>
+                    To change or remove your GCash account, please contact support. This is required to prevent duplicate accounts.
+                  </div>
                 </div>
               ) : (
                 <input
