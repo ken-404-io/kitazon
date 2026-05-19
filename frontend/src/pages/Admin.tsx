@@ -519,7 +519,7 @@ export default function Admin() {
 
   const toggleActive = async (userId: number) => {
     try {
-      await api.patch(`/admin/users/${userId}/toggle-active`);
+      await api.patch(`/admin/users/${userId}/toggle-active`, {});
       loadUsers(userPage, userSearch);
     } catch (err: unknown) {
       showToast((err as { response?: { data?: { message?: string } } }).response?.data?.message ?? 'Failed to toggle user status.');
@@ -528,7 +528,7 @@ export default function Admin() {
 
   const toggleFraudUser = async (userId: number) => {
     try {
-      await api.patch(`/admin/users/${userId}/toggle-active`);
+      await api.patch(`/admin/users/${userId}/toggle-active`, {});
       // Update fraudData in-place so the fraud tab reflects the change immediately
       setFraudData(prev => {
         if (!prev) return prev;
