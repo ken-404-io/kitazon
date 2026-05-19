@@ -84,6 +84,22 @@ export async function toggleUserActive(req: Request, res: Response, next: NextFu
   } catch (err) { next(err); }
 }
 
+export async function toggleUserAdmin(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const userId = Number(req.params.id);
+    if (userId === req.user!.id) { res.status(400).json({ message: 'Cannot change your own admin status.' }); return; }
+
+    const user = await db<DbUser>('users').where({ id: userId }).first();
+    if (!user) { res.status(404).json({ message: 'User not found.' }); return; }
+
+    const newState = !user.is_admin;
+    await db('users').where({ id: userId }).update({ is_admin: newState });
+    await logAudit(req.user!.id, newState ? 'admin_grant_admin' : 'admin_revoke_admin', req, { metadata: { target_user_id: userId } });
+
+    res.json({ message: `Admin access ${newState ? 'granted' : 'revoked'}.`, is_admin: newState });
+  } catch (err) { next(err); }
+}
+
 // ─── Withdrawal management ────────────────────────────────────────────────────
 export async function listWithdrawals(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
