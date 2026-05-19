@@ -230,6 +230,32 @@ export default function Admin() {
   const [referralInput, setReferralInput] = useState('');
   const [referralLoading, setReferralLoading] = useState(false);
 
+  // User activity log
+  interface UserAuditEntry { id: number; action: string; amount: number | null; ip_address: string | null; metadata: Record<string, unknown> | string | null; created_at: string; }
+  const [viewingLogUser, setViewingLogUser] = useState<number | null>(null);
+  const [userLogs, setUserLogs] = useState<UserAuditEntry[]>([]);
+  const [userLogPage, setUserLogPage] = useState(1);
+  const [userLogPages, setUserLogPages] = useState(1);
+  const [userLogLoading, setUserLogLoading] = useState(false);
+  const loadUserLogs = async (uid: number, page: number) => {
+    setUserLogLoading(true);
+    try {
+      const r = await api.get<{ logs: UserAuditEntry[]; pages: number }>(`/admin/users/${uid}/audit-logs?page=${page}`);
+      setUserLogs(r.data.logs);
+      setUserLogPages(r.data.pages);
+    } catch { setUserLogs([]); }
+    finally { setUserLogLoading(false); }
+  };
+  const ACTION_LABELS: Record<string, string> = {
+    register: 'Registered', login: 'Logged in', logout: 'Logged out',
+    google_login: 'Logged in via Google', password_change: 'Changed password',
+    profile_update: 'Updated profile', avatar_update: 'Updated avatar',
+    account_delete: 'Deleted account', revoke_other_sessions: 'Revoked other sessions',
+    withdrawal_create: 'Requested withdrawal', payment_method_cleared: 'Payment method cleared',
+    credits_convert: 'Converted credits', plan_upgrade: 'Plan upgraded',
+    auto_suspend_fake_referrals: 'Auto-suspended (fake referrals)',
+  };
+
   // GCash Payments
   const [gcashPayments, setGcashPayments] = useState<GcashPayment[]>([]);
   const [gcashFilter, setGcashFilter] = useState('pending');
@@ -934,7 +960,7 @@ export default function Admin() {
                   </tr>
                 </thead>
                 <tbody>
-                  {users.map(u => (
+                  {users.map(u => (<>
                     <tr key={u.id} style={{ borderBottom: '1px solid #f3f4f6' }}>
                       <td style={{ padding: '8px 10px' }}>{u.id}</td>
                       <td style={{ padding: '8px 10px' }}>{u.name}</td>
@@ -1009,6 +1035,16 @@ export default function Admin() {
                             }}
                           >
                             👥 Referrals
+                          </button>
+                          <button
+                            className="btn-outline"
+                            style={{ fontSize: 12, padding: '4px 10px', borderColor: '#a78bfa', color: '#a78bfa', background: viewingLogUser === u.id ? 'rgba(167,139,250,0.1)' : undefined }}
+                            onClick={() => {
+                              if (viewingLogUser === u.id) { setViewingLogUser(null); setUserLogs([]); }
+                              else { setViewingLogUser(u.id); setUserLogPage(1); loadUserLogs(u.id, 1); }
+                            }}
+                          >
+                            📋 Activity
                           </button>
                         </div>
                         {editingReferrals === u.id && (
@@ -1092,7 +1128,68 @@ export default function Admin() {
                         )}
                       </td>
                     </tr>
-                  ))}
+                    {viewingLogUser === u.id && (
+                      <tr>
+                        <td colSpan={10} style={{ padding: '0 0 12px 0', background: 'rgba(167,139,250,0.05)', borderBottom: '2px solid rgba(167,139,250,0.2)' }}>
+                          <div style={{ padding: '12px 16px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+                              <span style={{ fontWeight: 700, fontSize: 13, color: '#a78bfa' }}>Activity Log — {u.name}</span>
+                              <button className="btn-outline" style={{ fontSize: 11, padding: '2px 8px' }} onClick={() => { setViewingLogUser(null); setUserLogs([]); }}>Close</button>
+                            </div>
+                            {userLogLoading ? (
+                              <p style={{ fontSize: 12, color: 'var(--text-muted)' }}>Loading…</p>
+                            ) : userLogs.length === 0 ? (
+                              <p style={{ fontSize: 12, color: 'var(--text-muted)' }}>No activity recorded for this user.</p>
+                            ) : (
+                              <>
+                                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+                                  <thead>
+                                    <tr style={{ borderBottom: '1px solid rgba(167,139,250,0.2)' }}>
+                                      {['Time', 'Action', 'IP Address', 'Details'].map(h => (
+                                        <th key={h} style={{ padding: '5px 10px', textAlign: 'left', color: '#a78bfa', fontWeight: 600, whiteSpace: 'nowrap' }}>{h}</th>
+                                      ))}
+                                    </tr>
+                                  </thead>
+                                  <tbody>
+                                    {userLogs.map(log => {
+                                      const meta = typeof log.metadata === 'string' ? (() => { try { return JSON.parse(log.metadata as string); } catch { return {}; } })() : (log.metadata ?? {});
+                                      const details = Object.entries(meta as Record<string, unknown>)
+                                        .filter(([k]) => k !== 'target_user_id')
+                                        .map(([k, v]) => `${k}: ${v}`)
+                                        .join(' · ');
+                                      return (
+                                        <tr key={log.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+                                          <td style={{ padding: '6px 10px', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>
+                                            {new Date(log.created_at).toLocaleString()}
+                                          </td>
+                                          <td style={{ padding: '6px 10px', fontWeight: 600, color: '#e8e8e8' }}>
+                                            {ACTION_LABELS[log.action] ?? log.action}
+                                          </td>
+                                          <td style={{ padding: '6px 10px', color: 'var(--text-muted)', fontFamily: 'monospace' }}>
+                                            {log.ip_address ?? '—'}
+                                          </td>
+                                          <td style={{ padding: '6px 10px', color: 'var(--text-muted)', fontSize: 11 }}>
+                                            {log.amount != null ? `₱${Number(log.amount).toFixed(2)}` : ''}{details ? ` ${details}` : ''}
+                                          </td>
+                                        </tr>
+                                      );
+                                    })}
+                                  </tbody>
+                                </table>
+                                {userLogPages > 1 && (
+                                  <div style={{ display: 'flex', gap: 8, marginTop: 8, alignItems: 'center' }}>
+                                    <button className="btn-outline" style={{ fontSize: 11, padding: '3px 10px' }} disabled={userLogPage <= 1} onClick={() => { const p = userLogPage - 1; setUserLogPage(p); loadUserLogs(u.id, p); }}>Prev</button>
+                                    <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>Page {userLogPage} of {userLogPages}</span>
+                                    <button className="btn-outline" style={{ fontSize: 11, padding: '3px 10px' }} disabled={userLogPage >= userLogPages} onClick={() => { const p = userLogPage + 1; setUserLogPage(p); loadUserLogs(u.id, p); }}>Next</button>
+                                  </div>
+                                )}
+                              </>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                  </>))}
                 </tbody>
               </table>
             </div>

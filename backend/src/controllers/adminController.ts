@@ -739,6 +739,29 @@ export async function listAuditLogs(req: Request, res: Response, next: NextFunct
   } catch (err) { next(err); }
 }
 
+export async function getUserAuditLogs(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const userId = Number(req.params.id);
+    const page = Math.max(1, Number(req.query.page ?? 1));
+    const limit = 50;
+    const offset = (page - 1) * limit;
+
+    const [rows, [countRow]] = await Promise.all([
+      db('audit_logs as a')
+        .where('a.user_id', userId)
+        .select('a.id', 'a.action', 'a.amount', 'a.ip_address', 'a.metadata', 'a.created_at')
+        .orderBy('a.created_at', 'desc')
+        .limit(limit)
+        .offset(offset),
+      db('audit_logs')
+        .where('user_id', userId)
+        .count('id as total'),
+    ]);
+
+    res.json({ logs: rows, total: Number(countRow.total), page, pages: Math.ceil(Number(countRow.total) / limit) });
+  } catch (err) { next(err); }
+}
+
 // ─── Online users ─────────────────────────────────────────────────────────────
 export async function listOnlineUsers(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {

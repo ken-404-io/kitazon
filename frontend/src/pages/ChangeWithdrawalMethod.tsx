@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useToast } from '../context/ToastContext';
 import api from '../services/api';
 import styles from './Withdraw.module.css';
 
@@ -17,11 +16,9 @@ interface SavedAccount {
 
 export default function ChangeWithdrawalMethod() {
   const navigate = useNavigate();
-  const { showToast } = useToast();
 
   const [saved, setSaved] = useState<SavedAccount | null>(null);
   const [loading, setLoading] = useState(true);
-  const [removing, setRemoving] = useState(false);
 
   const loadSaved = async () => {
     setLoading(true);
@@ -36,21 +33,6 @@ export default function ChangeWithdrawalMethod() {
   };
 
   useEffect(() => { loadSaved(); }, []);
-
-  const removeSaved = async () => {
-    if (!window.confirm('Remove your saved GCash account? You\'ll be able to register a different GCash number on your next withdrawal.')) return;
-    setRemoving(true);
-    try {
-      await api.delete('/withdrawals/saved-account');
-      setSaved(null);
-      showToast('Withdrawal method removed. Register a new GCash account on your next withdrawal.', 'success');
-    } catch (err: unknown) {
-      const msg = (err as { response?: { data?: { message?: string } } }).response?.data?.message ?? 'Failed to remove withdrawal method.';
-      showToast(msg, 'error');
-    } finally {
-      setRemoving(false);
-    }
-  };
 
   return (
     <div className="page-container">
@@ -89,6 +71,9 @@ export default function ChangeWithdrawalMethod() {
                   </div>
                 </div>
               )}
+              <div style={{ marginTop: 12, background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.25)', borderRadius: 10, padding: '0.75rem 1rem', fontSize: '0.8rem', color: 'var(--text-muted)', lineHeight: 1.5 }}>
+                To change or remove your GCash account, please contact support. This is required to prevent duplicate accounts.
+              </div>
             </div>
           ) : (
             <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
@@ -109,30 +94,6 @@ export default function ChangeWithdrawalMethod() {
             <span>PayPal and email-based payouts are <strong>not accepted</strong>. Only GCash withdrawals are supported at this time.</span>
           </p>
         </div>
-
-        {saved && (
-          <button
-            type="button"
-            disabled={removing}
-            onClick={removeSaved}
-            style={{
-              display: 'block',
-              width: '100%',
-              marginTop: 10,
-              background: 'transparent',
-              border: '1.5px solid var(--red)',
-              color: 'var(--red)',
-              borderRadius: 10,
-              padding: '0.75rem 1rem',
-              fontSize: '0.88rem',
-              fontWeight: 700,
-              cursor: removing ? 'not-allowed' : 'pointer',
-              opacity: removing ? 0.6 : 1,
-            }}
-          >
-            {removing ? 'Removing…' : 'Remove & Register a Different GCash Account'}
-          </button>
-        )}
 
         <button
           type="button"
