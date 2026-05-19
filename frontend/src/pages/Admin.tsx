@@ -518,8 +518,40 @@ export default function Admin() {
   }, [tab, loadOnline]);
 
   const toggleActive = async (userId: number) => {
-    await api.patch(`/admin/users/${userId}/toggle-active`);
-    loadUsers(userPage, userSearch);
+    try {
+      await api.patch(`/admin/users/${userId}/toggle-active`, {});
+      loadUsers(userPage, userSearch);
+    } catch (err: unknown) {
+      showToast((err as { response?: { data?: { message?: string } } }).response?.data?.message ?? 'Failed to toggle user status.');
+    }
+  };
+
+  const toggleFraudUser = async (userId: number) => {
+    try {
+      await api.patch(`/admin/users/${userId}/toggle-active`, {});
+      // Update fraudData in-place so the fraud tab reflects the change immediately
+      setFraudData(prev => {
+        if (!prev) return prev;
+        const flip = (active: boolean) => !active;
+        return {
+          ...prev,
+          duplicate_devices: prev.duplicate_devices.map(d => ({
+            ...d,
+            user1_active: d.user1_id === userId ? flip(d.user1_active) : d.user1_active,
+            user2_active: d.user2_id === userId ? flip(d.user2_active) : d.user2_active,
+          })),
+          duplicate_ips: prev.duplicate_ips.map(g => ({
+            ...g,
+            users: g.users.map(u => u.id === userId ? { ...u, is_active: flip(u.is_active) } : u),
+          })),
+          fraud_referrals: prev.fraud_referrals,
+          flagged_withdrawals: prev.flagged_withdrawals.map(w => w.user_id === userId ? { ...w, is_active: !w.is_active } : w),
+        };
+      });
+      showToast('User status updated.');
+    } catch (err: unknown) {
+      showToast((err as { response?: { data?: { message?: string } } }).response?.data?.message ?? 'Failed to toggle user status.');
+    }
   };
 
   const changePlan = async (userId: number, plan: PlanValue) => {
@@ -2217,7 +2249,7 @@ export default function Admin() {
                             </div>
                             <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{u.email}</div>
                             <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: 2 }}>Joined {new Date(u.created_at).toLocaleDateString()}</div>
-                            <button onClick={() => toggleActive(u.id)} style={{ marginTop: 8, padding: '4px 10px', borderRadius: 8, border: '1px solid var(--dark-border)', background: 'transparent', color: u.active ? '#ef4444' : '#16a34a', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 600 }}>
+                            <button onClick={() => toggleFraudUser(u.id)} style={{ marginTop: 8, padding: '4px 10px', borderRadius: 8, border: '1px solid var(--dark-border)', background: 'transparent', color: u.active ? '#ef4444' : '#16a34a', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 600 }}>
                               {u.active ? 'Ban Account' : 'Unban Account'}
                             </button>
                           </div>
@@ -2267,7 +2299,7 @@ export default function Admin() {
                               </div>
                               <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>{u.email}</div>
                               <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', marginTop: 1 }}>{u.plan} · {new Date(u.created_at).toLocaleDateString()}</div>
-                              <button onClick={() => toggleActive(u.id)} style={{ marginTop: 6, padding: '3px 8px', borderRadius: 6, border: '1px solid var(--dark-border)', background: 'transparent', color: u.is_active ? '#ef4444' : '#16a34a', cursor: 'pointer', fontSize: '0.7rem', fontWeight: 600 }}>
+                              <button onClick={() => toggleFraudUser(u.id)} style={{ marginTop: 6, padding: '3px 8px', borderRadius: 6, border: '1px solid var(--dark-border)', background: 'transparent', color: u.is_active ? '#ef4444' : '#16a34a', cursor: 'pointer', fontSize: '0.7rem', fontWeight: 600 }}>
                                 {u.is_active ? 'Ban' : 'Unban'}
                               </button>
                             </div>
