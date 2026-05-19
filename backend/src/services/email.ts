@@ -354,14 +354,3 @@ export async function sendGcashPaymentRejectedEmail(to: string, name: string, pl
   `));
 }
 
-export async function sendAccountSuspendedEmail(to: string, name: string, reason: string): Promise<void> {
-  await send(to, 'Your Kitazon account has been suspended', layout('Account Suspended', `
-    ${h2('Account Suspended')}
-    ${p(`Hi ${name.split(' ')[0]}, your Kitazon account has been suspended due to a violation of our Terms of Service.`)}
-    ${table(row('Reason', `<span style="color:#fca5a5;">${escapeHtml(reason)}</span>`))}
-    ${p('Your account access has been disabled. Any pending withdrawals may be affected.')}
-    ${p('If you believe this is a mistake or would like to appeal, please contact our support team and provide your registered email address.')}
-    <div style="text-align:center;margin:24px 0;">${btn('mailto:support@kitazon.com', 'Contact Support')}</div>
-    ${p('Kitazon reserves the right to suspend accounts that violate our policies, including the use of multiple accounts, fake referrals, or fraudulent activity.')}
-  `));
-}
