@@ -47,7 +47,31 @@ interface Eligibility {
   referrals_completed?: number;
   referrals_required?: number;
   referral_gate_frozen?: boolean;
+  cooldown_active?: boolean;
+  cooldown_ends_at?: string | null;
+  free_plan_cap_reached?: boolean;
+  free_plan_total_withdrawn?: number;
+  free_plan_cap?: number;
   reasons: string[];
+}
+
+function useCooldownTimer(endsAt: string | null | undefined): string {
+  const [label, setLabel] = useState('');
+  useEffect(() => {
+    if (!endsAt) { setLabel(''); return; }
+    const tick = () => {
+      const diff = new Date(endsAt).getTime() - Date.now();
+      if (diff <= 0) { setLabel('Ready'); return; }
+      const h = Math.floor(diff / 3600000);
+      const m = Math.floor((diff % 3600000) / 60000);
+      const s = Math.floor((diff % 60000) / 1000);
+      setLabel(`${h}h ${String(m).padStart(2, '0')}m ${String(s).padStart(2, '0')}s`);
+    };
+    tick();
+    const id = setInterval(tick, 1000);
+    return () => clearInterval(id);
+  }, [endsAt]);
+  return label;
 }
 
 export default function Withdraw() {
@@ -98,6 +122,7 @@ export default function Withdraw() {
   const weekAmt     = Number(stats?.week    ?? 0);
   const totalAmt    = Number(stats?.total   ?? 0);
   const emailOk     = user?.email_verified ?? false;
+  const cooldownLabel = useCooldownTimer(elig?.cooldown_ends_at);
 
   // Free/Bronze plan: fixed ₱5. VIP plans: chosen preset (default to dailyLimit).
   const amount = (plan === 'free' || plan === 'bronze') ? 5 : (preset ?? planCfg.dailyLimit);
@@ -203,8 +228,42 @@ export default function Withdraw() {
           {(plan === 'free' || plan === 'bronze') && <Link to="/plans" className={styles.upgradeLink}>Upgrade →</Link>}
         </div>
 
+        {/* ── 24h cooldown banner ── */}
+        {elig?.cooldown_active && elig.cooldown_ends_at && (
+          <div style={{ background: 'rgba(245,158,11,0.08)', border: '1.5px solid rgba(245,158,11,0.35)', borderRadius: 14, padding: '1rem 1.1rem', marginBottom: '0.9rem', display: 'flex', alignItems: 'flex-start', gap: 12 }}>
+            <span style={{ fontSize: 22, lineHeight: 1, flexShrink: 0 }}>⏳</span>
+            <div style={{ flex: 1 }}>
+              <p style={{ margin: 0, fontWeight: 800, fontSize: '0.9rem', color: 'var(--gold)' }}>Withdrawal Cooldown</p>
+              <p style={{ margin: '2px 0 0', fontSize: '0.82rem', color: 'var(--text-muted)' }}>You can only withdraw once every 24 hours. Next withdrawal available in:</p>
+              <p style={{ margin: '6px 0 0', fontWeight: 800, fontSize: '1.15rem', fontVariantNumeric: 'tabular-nums', color: 'var(--gold)', letterSpacing: '0.03em' }}>{cooldownLabel}</p>
+            </div>
+          </div>
+        )}
+
+        {/* ── Free plan ₱25 cap banner ── */}
+        {elig?.free_plan_cap_reached && (
+          <div style={{ background: 'rgba(239,68,68,0.07)', border: '1.5px solid rgba(239,68,68,0.3)', borderRadius: 14, padding: '1rem 1.1rem', marginBottom: '0.9rem' }}>
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
+              <span style={{ fontSize: 22, lineHeight: 1, flexShrink: 0 }}>🔒</span>
+              <div style={{ flex: 1 }}>
+                <p style={{ margin: 0, fontWeight: 800, fontSize: '0.9rem', color: '#ef4444' }}>Free Plan Withdrawal Limit Reached</p>
+                <p style={{ margin: '3px 0 0', fontSize: '0.82rem', color: 'var(--text-muted)', lineHeight: 1.5 }}>
+                  Free plan users can only withdraw up to <strong style={{ color: 'var(--text)' }}>₱{elig.free_plan_cap ?? 25}</strong> in total.
+                  You have withdrawn <strong style={{ color: 'var(--text)' }}>₱{Number(elig.free_plan_total_withdrawn ?? 0).toFixed(2)}</strong>.
+                </p>
+                <p style={{ margin: '4px 0 0', fontSize: '0.82rem', color: 'var(--text-muted)' }}>
+                  Upgrade to a paid plan to continue withdrawing with no lifetime cap.
+                </p>
+              </div>
+            </div>
+            <Link to="/plans" style={{ display: 'block', marginTop: '0.75rem', textAlign: 'center', background: 'var(--gold)', color: '#000', fontWeight: 800, fontSize: '0.88rem', padding: '0.65rem', borderRadius: 10, textDecoration: 'none' }}>
+              Upgrade Plan →
+            </Link>
+          </div>
+        )}
+
         {/* ── Withdrawal requirements checklist ── */}
-        {elig && !elig.eligible && (
+        {elig && !elig.eligible && !elig.cooldown_active && !elig.free_plan_cap_reached && (
           <div className={styles.requirementsCard}>
             <p className={styles.reqTitle}>
               <LockIcon /> Complete these steps to unlock withdrawals
@@ -331,9 +390,15 @@ export default function Withdraw() {
           className={styles.withdrawBtn}
           onClick={() => setView('form')}
           disabled={elig !== null && !elig.eligible}
-          style={elig !== null && !elig.eligible ? { opacity: 0.4, cursor: 'not-allowed' } : undefined}
+          style={elig !== null && !elig.eligible ? { opacity: 0.5, cursor: 'not-allowed' } : undefined}
         >
-          {elig !== null && !elig.eligible ? '🔒 Locked' : 'Fast Cash →'}
+          {elig?.cooldown_active
+            ? `⏳ ${cooldownLabel}`
+            : elig?.free_plan_cap_reached
+            ? '🔒 Upgrade to Withdraw'
+            : (elig !== null && !elig.eligible)
+            ? '🔒 Locked'
+            : 'Fast Cash →'}
         </button>
 
         <button
@@ -474,6 +539,41 @@ export default function Withdraw() {
   );
 
   /* ══════════════════════════ FORM ════════════════════════════════════════════ */
+  // Redirect back to overview if cooldown or cap is blocking
+  if (elig && (elig.cooldown_active || elig.free_plan_cap_reached)) {
+    return (
+      <div className="page-container">
+        <div className={styles.page}>
+          <div className={styles.pageHeader}>
+            <button className={styles.iconBtn} onClick={() => setView('overview')}><BackIcon /></button>
+            <span className={styles.pageTitle}>Request Withdrawal</span>
+            <span style={{ width: 38 }} />
+          </div>
+          {elig.cooldown_active && elig.cooldown_ends_at && (
+            <div style={{ background: 'rgba(245,158,11,0.08)', border: '1.5px solid rgba(245,158,11,0.35)', borderRadius: 14, padding: '1.25rem', textAlign: 'center', marginTop: '1rem' }}>
+              <p style={{ fontSize: 36, margin: '0 0 0.5rem' }}>⏳</p>
+              <p style={{ fontWeight: 800, fontSize: '1rem', color: 'var(--gold)', margin: '0 0 4px' }}>Withdrawal Cooldown Active</p>
+              <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', margin: '0 0 10px' }}>You can only withdraw once every 24 hours.</p>
+              <p style={{ fontWeight: 800, fontSize: '1.4rem', fontVariantNumeric: 'tabular-nums', color: 'var(--gold)', margin: 0 }}>{cooldownLabel}</p>
+            </div>
+          )}
+          {elig.free_plan_cap_reached && (
+            <div style={{ background: 'rgba(239,68,68,0.07)', border: '1.5px solid rgba(239,68,68,0.3)', borderRadius: 14, padding: '1.25rem', textAlign: 'center', marginTop: '1rem' }}>
+              <p style={{ fontSize: 36, margin: '0 0 0.5rem' }}>🔒</p>
+              <p style={{ fontWeight: 800, fontSize: '1rem', color: '#ef4444', margin: '0 0 4px' }}>Free Plan Limit Reached</p>
+              <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', margin: '0 0 12px', lineHeight: 1.5 }}>
+                You've withdrawn ₱{Number(elig.free_plan_total_withdrawn ?? 0).toFixed(2)} of your ₱{elig.free_plan_cap ?? 25} free plan limit.<br/>Upgrade to keep withdrawing with no cap.
+              </p>
+              <Link to="/plans" style={{ display: 'inline-block', background: 'var(--gold)', color: '#000', fontWeight: 800, fontSize: '0.9rem', padding: '0.65rem 2rem', borderRadius: 10, textDecoration: 'none' }}>
+                Upgrade Plan →
+              </Link>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <KycGate feature="withdrawals">
     <div className="page-container">
