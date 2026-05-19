@@ -780,11 +780,15 @@ export default function Admin() {
       Number(w.fee).toFixed(2),
       Number(w.net_amount).toFixed(2),
       w.channel,
-      /^\d{10}$/.test(w.account_number) ? '0' + w.account_number : w.account_number,
+      `="`+(/^\d{10}$/.test(w.account_number) ? '0' + w.account_number : w.account_number)+`"`,
       w.account_name ?? '',
       w.status,
     ]);
-    const csv = [headers, ...rows].map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n');
+    const csv = [headers, ...rows].map(r => r.map(v => {
+      const s = String(v);
+      if (s.startsWith('="')) return s; // already an Excel text formula — don't re-quote
+      return `"${s.replace(/"/g, '""')}"`;
+    }).join(',')).join('\n');
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
