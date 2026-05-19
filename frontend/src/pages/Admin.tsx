@@ -4,12 +4,13 @@ import { useAuth } from '../context/AuthContext';
 import api from '../services/api';
 import { WithdrawalStatus, WithdrawalChannel } from '../types';
 
-type Tab = 'stats' | 'users' | 'withdrawals' | 'pending-withdrawals' | 'tasks' | 'logs' | 'revenue' | 'broadcast' | 'kyc' | 'online' | 'gcash-payments' | 'fraud' | 'settings';
+type Tab = 'stats' | 'users' | 'suspended' | 'withdrawals' | 'pending-withdrawals' | 'tasks' | 'logs' | 'revenue' | 'broadcast' | 'kyc' | 'online' | 'gcash-payments' | 'fraud' | 'settings';
 
 const TAB_LABELS: Record<Tab, string> = {
   stats: 'Stats',
   revenue: 'Revenue',
   users: 'Users',
+  suspended: 'Suspended Users',
   'pending-withdrawals': 'Pending Withdrawals',
   withdrawals: 'All Withdrawals',
   tasks: 'Tasks',
@@ -70,6 +71,7 @@ interface PlatformStats {
   users: number;
   active_users: number;
   verified_users: number;
+  suspended_users: number;
   pending_withdrawals: number;
   total_paid_out: number;
   total_earnings_distributed: number;
@@ -384,11 +386,13 @@ export default function Admin() {
     setStats(res.data);
   }, []);
 
-  const loadUsers = useCallback(async (page: number, search: string) => {
+  const loadUsers = useCallback(async (page: number, search: string, filter = '') => {
     setUserLoading(true);
     try {
+      const params = new URLSearchParams({ page: String(page), search });
+      if (filter) params.set('filter', filter);
       const res = await api.get<{ users: AdminUser[]; total: number; pages: number }>(
-        `/admin/users?page=${page}&search=${encodeURIComponent(search)}`
+        `/admin/users?${params.toString()}`
       );
       setUsers(res.data.users);
       setUserPages(res.data.pages);
@@ -498,6 +502,7 @@ export default function Admin() {
   useEffect(() => {
     if (tab === 'stats' && !stats) loadStats();
     if (tab === 'users') loadUsers(userPage, userSearch);
+    if (tab === 'suspended') loadUsers(userPage, userSearch, 'suspended');
     if (tab === 'withdrawals') loadWithdrawals(wPage, wFilter, wSearch);
     if (tab === 'pending-withdrawals') loadWithdrawals(wPage, 'pending', wSearch);
     if (tab === 'tasks') loadTasks();
@@ -519,8 +524,13 @@ export default function Admin() {
 
   const toggleActive = async (userId: number) => {
     try {
-      await api.patch(`/admin/users/${userId}/toggle-active`, {});
-      loadUsers(userPage, userSearch);
+      const res = await api.patch<{ is_active: boolean }>(`/admin/users/${userId}/toggle-active`, {});
+      const newActive = res.data.is_active;
+      // Update in-place so the button flips immediately
+      setUsers(prev => prev.map(u => u.id === userId ? { ...u, is_active: newActive } : u));
+      // Refresh stats badge and, if on suspended tab, reload that list
+      loadStats();
+      if (tab === 'suspended') loadUsers(userPage, userSearch, 'suspended');
     } catch (err: unknown) {
       showToast((err as { response?: { data?: { message?: string } } }).response?.data?.message ?? 'Failed to toggle user status.');
     }
@@ -703,6 +713,7 @@ export default function Admin() {
     { id: 'stats',               label: 'Stats',               icon: <svg {...si}><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg> },
     { id: 'revenue',             label: 'Revenue',             icon: <svg {...si}><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg> },
     { id: 'users',               label: 'Users',               icon: <svg {...si}><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg> },
+    { id: 'suspended',           label: 'Suspended',           icon: <svg {...si}><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>, badge: stats?.suspended_users ?? 0 },
     { id: 'pending-withdrawals', label: 'Pending Withdrawals', icon: <svg {...si}><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg> },
     { id: 'withdrawals',         label: 'All Withdrawals',     icon: <svg {...si}><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg> },
     { id: 'tasks',               label: 'Tasks',               icon: <svg {...si}><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg> },
@@ -722,6 +733,7 @@ export default function Admin() {
     if (tabId === 'kyc')                return stats?.pending_kyc || null;
     if (tabId === 'gcash-payments')     return stats?.pending_gcash || null;
     if (tabId === 'online')             return onlineCount;
+    if (tabId === 'suspended')          return stats?.suspended_users || null;
     const t = TABS.find(x => x.id === tabId);
     return (t?.badge != null && t.badge > 0) ? t.badge : null;
   }
@@ -1222,6 +1234,75 @@ export default function Admin() {
                       </tr>
                     )}
                   </>))}
+                </tbody>
+              </table>
+            </div>
+          )}
+          <div style={{ display: 'flex', gap: 8, marginTop: '1rem', alignItems: 'center' }}>
+            <button className="btn-outline" disabled={userPage <= 1} onClick={() => setUserPage(p => p - 1)}>Prev</button>
+            <span style={{ fontSize: 13 }}>Page {userPage} of {userPages}</span>
+            <button className="btn-outline" disabled={userPage >= userPages} onClick={() => setUserPage(p => p + 1)}>Next</button>
+          </div>
+        </div>
+      )}
+
+      {/* ── Suspended Users ── */}
+      {tab === 'suspended' && (
+        <div>
+          <div style={{ display: 'flex', gap: 8, marginBottom: '1rem' }}>
+            <input
+              style={{ flex: 1, padding: '8px 12px', borderRadius: 6, border: '1px solid #e5e7eb' }}
+              placeholder="Search by name or email..."
+              value={userSearch}
+              onChange={e => { setUserSearch(e.target.value); setUserPage(1); }}
+              onKeyDown={e => { if (e.key === 'Enter') loadUsers(1, userSearch, 'suspended'); }}
+            />
+            <button className="btn-primary" onClick={() => loadUsers(1, userSearch, 'suspended')}>Search</button>
+          </div>
+          {userLoading ? <p>Loading...</p> : users.length === 0 ? (
+            <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>
+              <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.4, marginBottom: 8 }}><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>
+              <p style={{ margin: 0 }}>No suspended users found.</p>
+            </div>
+          ) : (
+            <div className="admin-table-wrap" style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+                <thead>
+                  <tr style={{ borderBottom: '2px solid #e5e7eb', background: '#f9fafb' }}>
+                    {['ID', 'Name', 'Email', 'Balance', 'Plan', 'Verified', 'Joined', 'Action'].map(h => (
+                      <th key={h} style={{ padding: '8px 10px', textAlign: 'left', whiteSpace: 'nowrap' }}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {users.map(u => (
+                    <tr key={u.id} style={{ borderBottom: '1px solid #f3f4f6', opacity: u.is_active ? 1 : 0.75 }}>
+                      <td style={{ padding: '8px 10px' }}>{u.id}</td>
+                      <td style={{ padding: '8px 10px', fontWeight: 600 }}>{u.name}</td>
+                      <td style={{ padding: '8px 10px', color: 'var(--text-muted)' }}>{u.email}</td>
+                      <td style={{ padding: '8px 10px' }}>₱{fmt(u.balance)}</td>
+                      <td style={{ padding: '8px 10px' }}>
+                        <span style={{ padding: '2px 8px', borderRadius: 12, fontSize: 11, fontWeight: 700, background: PLAN_COLORS[(u.plan ?? 'free') as PlanValue] + '22', color: PLAN_COLORS[(u.plan ?? 'free') as PlanValue], border: `1px solid ${PLAN_COLORS[(u.plan ?? 'free') as PlanValue]}`, textTransform: 'uppercase' }}>
+                          {u.plan ?? 'free'}
+                        </span>
+                      </td>
+                      <td style={{ padding: '8px 10px', color: u.email_verified ? 'green' : '#d97706' }}>
+                        {u.email_verified ? 'Yes' : 'No'}
+                      </td>
+                      <td style={{ padding: '8px 10px', whiteSpace: 'nowrap' }}>
+                        {new Date(u.created_at).toLocaleDateString()}
+                      </td>
+                      <td style={{ padding: '8px 10px' }}>
+                        <button
+                          className="btn-outline"
+                          style={{ fontSize: 12, padding: '4px 12px', borderColor: '#16a34a', color: '#16a34a', fontWeight: 700 }}
+                          onClick={() => toggleActive(u.id)}
+                        >
+                          Enable Account
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
                 </tbody>
               </table>
             </div>
