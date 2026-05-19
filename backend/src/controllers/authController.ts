@@ -235,6 +235,34 @@ async function referrerExceedsDailyLimit(referrerId: number): Promise<boolean> {
   return Number(row.cnt) >= 3;
 }
 
+// Auto-suspend a referrer who has accumulated >= 100 unverified referred accounts.
+// Called non-blocking after every referral insert.
+export async function checkAndSuspendForFakeReferrals(referrerId: number): Promise<void> {
+  try {
+    const row = await db('referrals')
+      .join('users as referred', 'referrals.referred_id', 'referred.id')
+      .where('referrals.referrer_id', referrerId)
+      .where('referred.email_verified', false)
+      .count('referrals.id as cnt')
+      .first();
+    const unverifiedCount = Number((row as { cnt?: unknown })?.cnt ?? 0);
+    if (unverifiedCount >= 100) {
+      await db('users').where({ id: referrerId }).update({ is_active: false });
+      await db('audit_logs').insert({
+        user_id: referrerId,
+        action: 'auto_suspend_fake_referrals',
+        amount: null,
+        ip_address: null,
+        user_agent: null,
+        metadata: JSON.stringify({ unverified_referral_count: unverifiedCount }),
+      }).catch(() => {});
+      console.warn(`[AUTO-SUSPEND] Referrer ${referrerId} suspended: ${unverifiedCount} unverified referrals.`);
+    }
+  } catch (err) {
+    console.error('[checkAndSuspendForFakeReferrals] error:', err);
+  }
+}
+
 // ─── Account lockout (DB-backed — survives restarts) ─────────────────────────
 const MAX_ATTEMPTS = 5;
 const LOCKOUT_MS   = 15 * 60 * 1000;
@@ -438,6 +466,8 @@ export async function register(req: Request, res: Response, next: NextFunction):
               // Fallback if bonus_paid column doesn't exist yet
               await db('referrals').insert({ referrer_id: referrer.id, referred_id: user.id, commission_earned: 0 });
             }
+            // Non-blocking: suspend referrer if they've accumulated 100+ unverified accounts
+            checkAndSuspendForFakeReferrals(referrer.id).catch(() => {});
           }
         }
       }
@@ -628,7 +658,7 @@ export async function verifyEmail(req: Request, res: Response, next: NextFunctio
     // Grant referral signup bonus now that email is confirmed real
     try {
       const verifiedUser = await db<DbUser>('users').where({ id: otpRecord.user_id }).first();
-      if (verifiedUser) {
+      if (verifiedUser && verifiedUser.email_verified) {
         const referral = await db('referrals').where({ referred_id: verifiedUser.id }).first();
         if (referral) {
           // Check if bonus already paid (bonus_paid column may not exist — treat missing as unpaid)
