@@ -232,6 +232,32 @@ export default function Admin() {
   const [referralInput, setReferralInput] = useState('');
   const [referralLoading, setReferralLoading] = useState(false);
 
+  // Suspended users batch selection
+  const [selectedSuspended, setSelectedSuspended] = useState<Set<number>>(new Set());
+  const [batchEnableBusy, setBatchEnableBusy] = useState(false);
+  const toggleSuspendedSelect = (id: number) =>
+    setSelectedSuspended(prev => { const s = new Set(prev); s.has(id) ? s.delete(id) : s.add(id); return s; });
+  const allSuspendedSelected = users.length > 0 && users.every(u => selectedSuspended.has(u.id));
+  const toggleSelectAllSuspended = () =>
+    setSelectedSuspended(allSuspendedSelected ? new Set() : new Set(users.map(u => u.id)));
+  const batchEnable = async () => {
+    if (selectedSuspended.size === 0) return;
+    if (!window.confirm(`Enable ${selectedSuspended.size} account${selectedSuspended.size !== 1 ? 's' : ''}?`)) return;
+    setBatchEnableBusy(true);
+    let enabled = 0;
+    for (const uid of selectedSuspended) {
+      try {
+        await api.patch(`/admin/users/${uid}/toggle-active`, {});
+        enabled++;
+      } catch { /* skip individual failures */ }
+    }
+    setSelectedSuspended(new Set());
+    loadUsers(userPage, userSearch, 'suspended');
+    loadStats();
+    setBatchEnableBusy(false);
+    showToast(`${enabled} account${enabled !== 1 ? 's' : ''} enabled.`);
+  };
+
   // User activity log
   interface UserAuditEntry { id: number; action: string; amount: number | null; ip_address: string | null; metadata: Record<string, unknown> | string | null; created_at: string; }
   const [viewingLogUser, setViewingLogUser] = useState<number | null>(null);
@@ -1249,16 +1275,35 @@ export default function Admin() {
       {/* ── Suspended Users ── */}
       {tab === 'suspended' && (
         <div>
-          <div style={{ display: 'flex', gap: 8, marginBottom: '1rem' }}>
+          {/* Search + batch toolbar */}
+          <div style={{ display: 'flex', gap: 8, marginBottom: '0.75rem', flexWrap: 'wrap', alignItems: 'center' }}>
             <input
-              style={{ flex: 1, padding: '8px 12px', borderRadius: 6, border: '1px solid #e5e7eb' }}
+              style={{ flex: 1, minWidth: 180, padding: '8px 12px', borderRadius: 6, border: '1px solid #e5e7eb' }}
               placeholder="Search by name or email..."
               value={userSearch}
               onChange={e => { setUserSearch(e.target.value); setUserPage(1); }}
-              onKeyDown={e => { if (e.key === 'Enter') loadUsers(1, userSearch, 'suspended'); }}
+              onKeyDown={e => { if (e.key === 'Enter') { setSelectedSuspended(new Set()); loadUsers(1, userSearch, 'suspended'); } }}
             />
-            <button className="btn-primary" onClick={() => loadUsers(1, userSearch, 'suspended')}>Search</button>
+            <button className="btn-primary" onClick={() => { setSelectedSuspended(new Set()); loadUsers(1, userSearch, 'suspended'); }}>Search</button>
           </div>
+
+          {selectedSuspended.size > 0 && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, background: 'rgba(22,163,74,0.08)', border: '1px solid rgba(22,163,74,0.3)', borderRadius: 8, padding: '8px 14px', marginBottom: '0.75rem' }}>
+              <span style={{ fontSize: 13, fontWeight: 600, color: '#16a34a' }}>{selectedSuspended.size} selected</span>
+              <button
+                className="btn-primary"
+                style={{ fontSize: 12, padding: '4px 14px', background: '#16a34a', opacity: batchEnableBusy ? 0.6 : 1 }}
+                disabled={batchEnableBusy}
+                onClick={batchEnable}
+              >
+                {batchEnableBusy ? 'Enabling…' : `Enable ${selectedSuspended.size} Account${selectedSuspended.size !== 1 ? 's' : ''}`}
+              </button>
+              <button className="btn-outline" style={{ fontSize: 12, padding: '4px 10px' }} onClick={() => setSelectedSuspended(new Set())}>
+                Clear
+              </button>
+            </div>
+          )}
+
           {userLoading ? <p>Loading...</p> : users.length === 0 ? (
             <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>
               <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.4, marginBottom: 8 }}><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>
@@ -1269,40 +1314,49 @@ export default function Admin() {
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
                 <thead>
                   <tr style={{ borderBottom: '2px solid #e5e7eb', background: '#f9fafb' }}>
+                    <th style={{ padding: '8px 10px', width: 36 }}>
+                      <input type="checkbox" checked={allSuspendedSelected} onChange={toggleSelectAllSuspended} title="Select all on this page" />
+                    </th>
                     {['ID', 'Name', 'Email', 'Balance', 'Plan', 'Verified', 'Joined', 'Action'].map(h => (
                       <th key={h} style={{ padding: '8px 10px', textAlign: 'left', whiteSpace: 'nowrap' }}>{h}</th>
                     ))}
                   </tr>
                 </thead>
                 <tbody>
-                  {users.map(u => (
-                    <tr key={u.id} style={{ borderBottom: '1px solid #f3f4f6', opacity: u.is_active ? 1 : 0.75 }}>
-                      <td style={{ padding: '8px 10px' }}>{u.id}</td>
-                      <td style={{ padding: '8px 10px', fontWeight: 600 }}>{u.name}</td>
-                      <td style={{ padding: '8px 10px', color: 'var(--text-muted)' }}>{u.email}</td>
-                      <td style={{ padding: '8px 10px' }}>₱{fmt(u.balance)}</td>
-                      <td style={{ padding: '8px 10px' }}>
-                        <span style={{ padding: '2px 8px', borderRadius: 12, fontSize: 11, fontWeight: 700, background: PLAN_COLORS[(u.plan ?? 'free') as PlanValue] + '22', color: PLAN_COLORS[(u.plan ?? 'free') as PlanValue], border: `1px solid ${PLAN_COLORS[(u.plan ?? 'free') as PlanValue]}`, textTransform: 'uppercase' }}>
-                          {u.plan ?? 'free'}
-                        </span>
-                      </td>
-                      <td style={{ padding: '8px 10px', color: u.email_verified ? 'green' : '#d97706' }}>
-                        {u.email_verified ? 'Yes' : 'No'}
-                      </td>
-                      <td style={{ padding: '8px 10px', whiteSpace: 'nowrap' }}>
-                        {new Date(u.created_at).toLocaleDateString()}
-                      </td>
-                      <td style={{ padding: '8px 10px' }}>
-                        <button
-                          className="btn-outline"
-                          style={{ fontSize: 12, padding: '4px 12px', borderColor: '#16a34a', color: '#16a34a', fontWeight: 700 }}
-                          onClick={() => toggleActive(u.id)}
-                        >
-                          Enable Account
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
+                  {users.map(u => {
+                    const isSelected = selectedSuspended.has(u.id);
+                    return (
+                      <tr key={u.id} style={{ borderBottom: '1px solid #f3f4f6', background: isSelected ? 'rgba(22,163,74,0.05)' : undefined }}>
+                        <td style={{ padding: '8px 10px' }}>
+                          <input type="checkbox" checked={isSelected} onChange={() => toggleSuspendedSelect(u.id)} />
+                        </td>
+                        <td style={{ padding: '8px 10px' }}>{u.id}</td>
+                        <td style={{ padding: '8px 10px', fontWeight: 600 }}>{u.name}</td>
+                        <td style={{ padding: '8px 10px', color: 'var(--text-muted)' }}>{u.email}</td>
+                        <td style={{ padding: '8px 10px' }}>₱{fmt(u.balance)}</td>
+                        <td style={{ padding: '8px 10px' }}>
+                          <span style={{ padding: '2px 8px', borderRadius: 12, fontSize: 11, fontWeight: 700, background: PLAN_COLORS[(u.plan ?? 'free') as PlanValue] + '22', color: PLAN_COLORS[(u.plan ?? 'free') as PlanValue], border: `1px solid ${PLAN_COLORS[(u.plan ?? 'free') as PlanValue]}`, textTransform: 'uppercase' }}>
+                            {u.plan ?? 'free'}
+                          </span>
+                        </td>
+                        <td style={{ padding: '8px 10px', color: u.email_verified ? 'green' : '#d97706' }}>
+                          {u.email_verified ? 'Yes' : 'No'}
+                        </td>
+                        <td style={{ padding: '8px 10px', whiteSpace: 'nowrap' }}>
+                          {new Date(u.created_at).toLocaleDateString()}
+                        </td>
+                        <td style={{ padding: '8px 10px' }}>
+                          <button
+                            className="btn-outline"
+                            style={{ fontSize: 12, padding: '4px 12px', borderColor: '#16a34a', color: '#16a34a', fontWeight: 700 }}
+                            onClick={() => toggleActive(u.id)}
+                          >
+                            Enable
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
