@@ -12,11 +12,13 @@ import styles from './Withdraw.module.css';
 
 /* ─── icons ──────────────────────────────────────────────────────────────────── */
 const sz = { width: 20, height: 20, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 2, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const };
-const BackIcon  = () => <svg {...sz}><polyline points="15 18 9 12 15 6"/></svg>;
-const HistIcon  = () => <svg {...sz} width={16} height={16}><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>;
-const AlertIcon = () => <svg {...sz} width={16} height={16}><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>;
-const CheckIcon = () => <svg {...sz} width={14} height={14}><polyline points="20 6 9 17 4 12"/></svg>;
-const LockIcon  = () => <svg {...sz} width={16} height={16}><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>;
+const BackIcon   = () => <svg {...sz}><polyline points="15 18 9 12 15 6"/></svg>;
+const HistIcon   = () => <svg {...sz} width={16} height={16}><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>;
+const AlertIcon  = () => <svg {...sz} width={16} height={16}><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>;
+const CheckIcon  = () => <svg {...sz} width={14} height={14}><polyline points="20 6 9 17 4 12"/></svg>;
+const LockIcon   = () => <svg {...sz} width={16} height={16}><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>;
+const ClockIcon  = () => <svg {...sz} width={20} height={20}><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>;
+const LockIcon2  = () => <svg {...sz} width={20} height={20}><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>;
 
 /* ─── plan config ────────────────────────────────────────────────────────────── */
 const PLAN_CONFIG: Record<UserPlan, { name: string; color: string; dailyLimit: number; badge: string; presets: number[] | null }> = {
@@ -230,29 +232,24 @@ export default function Withdraw() {
 
         {/* ── 24h cooldown banner ── */}
         {elig?.cooldown_active && elig.cooldown_ends_at && (
-          <div style={{ background: 'rgba(245,158,11,0.08)', border: '1.5px solid rgba(245,158,11,0.35)', borderRadius: 14, padding: '1rem 1.1rem', marginBottom: '0.9rem', display: 'flex', alignItems: 'flex-start', gap: 12 }}>
-            <span style={{ fontSize: 22, lineHeight: 1, flexShrink: 0 }}>⏳</span>
+          <div style={{ background: 'var(--dark-card)', border: '1px solid var(--dark-border)', borderRadius: 14, padding: '1rem 1.1rem', marginBottom: '0.9rem', display: 'flex', alignItems: 'center', gap: 14, opacity: 0.8 }}>
+            <span style={{ flexShrink: 0, color: 'var(--text-muted)' }}><ClockIcon /></span>
             <div style={{ flex: 1 }}>
-              <p style={{ margin: 0, fontWeight: 800, fontSize: '0.9rem', color: 'var(--gold)' }}>Withdrawal Cooldown</p>
-              <p style={{ margin: '2px 0 0', fontSize: '0.82rem', color: 'var(--text-muted)' }}>You can only withdraw once every 24 hours. Next withdrawal available in:</p>
-              <p style={{ margin: '6px 0 0', fontWeight: 800, fontSize: '1.15rem', fontVariantNumeric: 'tabular-nums', color: 'var(--gold)', letterSpacing: '0.03em' }}>{cooldownLabel}</p>
+              <p style={{ margin: 0, fontWeight: 700, fontSize: '0.88rem', color: 'var(--text)' }}>Come back tomorrow</p>
+              <p style={{ margin: '2px 0 0', fontSize: '0.8rem', color: 'var(--text-muted)' }}>One withdrawal per day · available in <span style={{ fontVariantNumeric: 'tabular-nums', fontWeight: 700, color: 'var(--text)' }}>{cooldownLabel}</span></p>
             </div>
           </div>
         )}
 
         {/* ── Free plan ₱25 cap banner ── */}
         {elig?.free_plan_cap_reached && (
-          <div style={{ background: 'rgba(239,68,68,0.07)', border: '1.5px solid rgba(239,68,68,0.3)', borderRadius: 14, padding: '1rem 1.1rem', marginBottom: '0.9rem' }}>
-            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
-              <span style={{ fontSize: 22, lineHeight: 1, flexShrink: 0 }}>🔒</span>
+          <div style={{ background: 'var(--dark-card)', border: '1px solid var(--dark-border)', borderRadius: 14, padding: '1rem 1.1rem', marginBottom: '0.9rem' }}>
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 14 }}>
+              <span style={{ flexShrink: 0, color: 'var(--text-muted)', marginTop: 2 }}><LockIcon2 /></span>
               <div style={{ flex: 1 }}>
-                <p style={{ margin: 0, fontWeight: 800, fontSize: '0.9rem', color: '#ef4444' }}>Free Plan Withdrawal Limit Reached</p>
-                <p style={{ margin: '3px 0 0', fontSize: '0.82rem', color: 'var(--text-muted)', lineHeight: 1.5 }}>
-                  Free plan users can only withdraw up to <strong style={{ color: 'var(--text)' }}>₱{elig.free_plan_cap ?? 25}</strong> in total.
-                  You have withdrawn <strong style={{ color: 'var(--text)' }}>₱{Number(elig.free_plan_total_withdrawn ?? 0).toFixed(2)}</strong>.
-                </p>
-                <p style={{ margin: '4px 0 0', fontSize: '0.82rem', color: 'var(--text-muted)' }}>
-                  Upgrade to a paid plan to continue withdrawing with no lifetime cap.
+                <p style={{ margin: 0, fontWeight: 700, fontSize: '0.88rem', color: 'var(--text)' }}>Free plan limit reached</p>
+                <p style={{ margin: '3px 0 0', fontSize: '0.8rem', color: 'var(--text-muted)', lineHeight: 1.5 }}>
+                  You've used ₱{Number(elig.free_plan_total_withdrawn ?? 0).toFixed(2)} of your ₱{elig.free_plan_cap ?? 25} free plan allowance. Upgrade to a paid plan to keep withdrawing.
                 </p>
               </div>
             </div>
@@ -393,11 +390,11 @@ export default function Withdraw() {
           style={elig !== null && !elig.eligible ? { opacity: 0.5, cursor: 'not-allowed' } : undefined}
         >
           {elig?.cooldown_active
-            ? `⏳ ${cooldownLabel}`
+            ? cooldownLabel
             : elig?.free_plan_cap_reached
-            ? '🔒 Upgrade to Withdraw'
+            ? 'Upgrade to Withdraw'
             : (elig !== null && !elig.eligible)
-            ? '🔒 Locked'
+            ? 'Locked'
             : 'Fast Cash →'}
         </button>
 
@@ -550,19 +547,19 @@ export default function Withdraw() {
             <span style={{ width: 38 }} />
           </div>
           {elig.cooldown_active && elig.cooldown_ends_at && (
-            <div style={{ background: 'rgba(245,158,11,0.08)', border: '1.5px solid rgba(245,158,11,0.35)', borderRadius: 14, padding: '1.25rem', textAlign: 'center', marginTop: '1rem' }}>
-              <p style={{ fontSize: 36, margin: '0 0 0.5rem' }}>⏳</p>
-              <p style={{ fontWeight: 800, fontSize: '1rem', color: 'var(--gold)', margin: '0 0 4px' }}>Withdrawal Cooldown Active</p>
-              <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', margin: '0 0 10px' }}>You can only withdraw once every 24 hours.</p>
-              <p style={{ fontWeight: 800, fontSize: '1.4rem', fontVariantNumeric: 'tabular-nums', color: 'var(--gold)', margin: 0 }}>{cooldownLabel}</p>
+            <div style={{ background: 'var(--dark-card)', border: '1px solid var(--dark-border)', borderRadius: 14, padding: '1.5rem', textAlign: 'center', marginTop: '1rem', opacity: 0.85 }}>
+              <span style={{ display: 'inline-flex', color: 'var(--text-muted)', marginBottom: '0.75rem' }}><ClockIcon /></span>
+              <p style={{ fontWeight: 700, fontSize: '0.95rem', color: 'var(--text)', margin: '0 0 4px' }}>Come back tomorrow</p>
+              <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', margin: '0 0 10px' }}>One withdrawal per day. Next withdrawal available in:</p>
+              <p style={{ fontWeight: 700, fontSize: '1.3rem', fontVariantNumeric: 'tabular-nums', color: 'var(--text)', margin: 0 }}>{cooldownLabel}</p>
             </div>
           )}
           {elig.free_plan_cap_reached && (
-            <div style={{ background: 'rgba(239,68,68,0.07)', border: '1.5px solid rgba(239,68,68,0.3)', borderRadius: 14, padding: '1.25rem', textAlign: 'center', marginTop: '1rem' }}>
-              <p style={{ fontSize: 36, margin: '0 0 0.5rem' }}>🔒</p>
-              <p style={{ fontWeight: 800, fontSize: '1rem', color: '#ef4444', margin: '0 0 4px' }}>Free Plan Limit Reached</p>
-              <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', margin: '0 0 12px', lineHeight: 1.5 }}>
-                You've withdrawn ₱{Number(elig.free_plan_total_withdrawn ?? 0).toFixed(2)} of your ₱{elig.free_plan_cap ?? 25} free plan limit.<br/>Upgrade to keep withdrawing with no cap.
+            <div style={{ background: 'var(--dark-card)', border: '1px solid var(--dark-border)', borderRadius: 14, padding: '1.5rem', textAlign: 'center', marginTop: '1rem' }}>
+              <span style={{ display: 'inline-flex', color: 'var(--text-muted)', marginBottom: '0.75rem' }}><LockIcon2 /></span>
+              <p style={{ fontWeight: 700, fontSize: '0.95rem', color: 'var(--text)', margin: '0 0 6px' }}>Free plan limit reached</p>
+              <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', margin: '0 0 14px', lineHeight: 1.5 }}>
+                You've used ₱{Number(elig.free_plan_total_withdrawn ?? 0).toFixed(2)} of your ₱{elig.free_plan_cap ?? 25} free plan allowance. Upgrade to keep withdrawing.
               </p>
               <Link to="/plans" style={{ display: 'inline-block', background: 'var(--gold)', color: '#000', fontWeight: 800, fontSize: '0.9rem', padding: '0.65rem 2rem', borderRadius: 10, textDecoration: 'none' }}>
                 Upgrade Plan →
