@@ -18,6 +18,7 @@ export async function platformStats(req: Request, res: Response, next: NextFunct
     const [users] = await db('users').count('id as total');
     const [activeUsers] = await db('users').where({ is_active: true }).count('id as total');
     const [verifiedUsers] = await db('users').where({ email_verified: true }).count('id as total');
+    const [suspendedUsers] = await db('users').where({ is_active: false }).count('id as total');
     const [pendingWithdrawals] = await db('withdrawals').where({ status: 'pending' }).count('id as total');
     const [totalPaid] = await db('withdrawals').where({ status: 'completed' }).sum('net_amount as total');
     const [totalEarnings] = await db('earnings').sum('amount as total');
@@ -28,6 +29,7 @@ export async function platformStats(req: Request, res: Response, next: NextFunct
       users: Number(users.total),
       active_users: Number(activeUsers.total),
       verified_users: Number(verifiedUsers.total),
+      suspended_users: Number(suspendedUsers.total),
       pending_withdrawals: Number(pendingWithdrawals.total),
       total_paid_out: Number(totalPaid.total ?? 0),
       total_earnings_distributed: Number(totalEarnings.total ?? 0),
@@ -44,6 +46,13 @@ export async function listUsers(req: Request, res: Response, next: NextFunction)
     const limit = 50;
     const offset = (page - 1) * limit;
     const search = String(req.query.search ?? '').trim();
+    const filter = String(req.query.filter ?? '');
+
+    const applyFilters = (q: ReturnType<typeof db>) => {
+      if (filter === 'suspended') q.where('is_active', false);
+      if (search) q.where((b: ReturnType<typeof db>) => { b.whereILike('email', `%${search}%`).orWhereILike('name', `%${search}%`); });
+      return q;
+    };
 
     let query = db<DbUser>('users')
       .select('id', 'name', 'email', 'balance', 'is_active', 'is_admin', 'email_verified', 'created_at', 'last_login_at', 'plan', 'plan_expires_at', 'withdrawal_credits')
@@ -51,17 +60,11 @@ export async function listUsers(req: Request, res: Response, next: NextFunction)
       .limit(limit)
       .offset(offset);
 
-    if (search) {
-      query = query.where((b) => {
-        b.whereILike('email', `%${search}%`).orWhereILike('name', `%${search}%`);
-      });
-    }
+    applyFilters(query as unknown as ReturnType<typeof db>);
 
     const [rows, [count]] = await Promise.all([
       query,
-      db('users').count('id as total').modify((q) => {
-        if (search) q.where((b) => { b.whereILike('email', `%${search}%`).orWhereILike('name', `%${search}%`); });
-      }),
+      applyFilters(db('users').count('id as total')),
     ]);
 
     res.json({ users: rows, total: Number(count.total), page, pages: Math.ceil(Number(count.total) / limit) });
