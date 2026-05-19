@@ -2,7 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import db from '../../config/database';
 import { DbUser, DbWithdrawal, WithdrawalStatus, UserPlan } from '../types';
 import { logAudit } from '../services/audit';
-import { sendWithdrawalStatusEmail, sendBroadcastEmail, sendPlanUpgradeEmail, sendGcashPaymentRejectedEmail } from '../services/email';
+import { sendWithdrawalStatusEmail, sendBroadcastEmail, sendPlanUpgradeEmail, sendGcashPaymentRejectedEmail, sendAccountSuspendedEmail, sendAccountReactivatedEmail } from '../services/email';
 
 // Maximum withdrawals approvable in a single bulk approve call. Throttling at
 // 5s per email means a batch of 100 takes ~8 minutes, so keep the cap modest.
@@ -80,8 +80,21 @@ export async function toggleUserActive(req: Request, res: Response, next: NextFu
     if (!user) { res.status(404).json({ message: 'User not found.' }); return; }
 
     const newState = !user.is_active;
+    const reason = String(req.body?.reason ?? '').trim();
+
+    if (!newState && !reason) {
+      res.status(400).json({ message: 'A suspension reason is required.' });
+      return;
+    }
+
     await db('users').where({ id: userId }).update({ is_active: newState });
-    await logAudit(req.user!.id, newState ? 'admin_activate_user' : 'admin_deactivate_user', req, { metadata: { target_user_id: userId } });
+    await logAudit(req.user!.id, newState ? 'admin_activate_user' : 'admin_deactivate_user', req, { metadata: { target_user_id: userId, reason: reason || undefined } });
+
+    if (newState) {
+      sendAccountReactivatedEmail(user.email, user.name).catch(() => {});
+    } else {
+      sendAccountSuspendedEmail(user.email, user.name, reason).catch(() => {});
+    }
 
     res.json({ message: `User ${newState ? 'activated' : 'deactivated'}.`, is_active: newState });
   } catch (err) { next(err); }

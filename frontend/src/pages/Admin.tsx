@@ -242,12 +242,13 @@ export default function Admin() {
     setSelectedSuspended(allSuspendedSelected ? new Set() : new Set(users.map(u => u.id)));
   const batchEnable = async () => {
     if (selectedSuspended.size === 0) return;
-    if (!window.confirm(`Enable ${selectedSuspended.size} account${selectedSuspended.size !== 1 ? 's' : ''}?`)) return;
+    if (!window.confirm(`Enable ${selectedSuspended.size} account${selectedSuspended.size !== 1 ? 's' : ''}? Each user will receive a reactivation email.`)) return;
     setBatchEnableBusy(true);
     let enabled = 0;
     for (const uid of selectedSuspended) {
       try {
-        await api.patch(`/admin/users/${uid}/toggle-active`, {});
+        // reason is empty string — backend only requires it when disabling
+        await api.patch(`/admin/users/${uid}/toggle-active`, { reason: '' });
         enabled++;
       } catch { /* skip individual failures */ }
     }
@@ -255,7 +256,7 @@ export default function Admin() {
     loadUsers(userPage, userSearch, 'suspended');
     loadStats();
     setBatchEnableBusy(false);
-    showToast(`${enabled} account${enabled !== 1 ? 's' : ''} enabled.`);
+    showToast(`${enabled} account${enabled !== 1 ? 's' : ''} enabled. Reactivation emails sent.`);
   };
 
   // User activity log
@@ -548,13 +549,22 @@ export default function Admin() {
     return () => clearInterval(interval);
   }, [tab, loadOnline]);
 
-  const toggleActive = async (userId: number) => {
+  // Disable reason selector state (Users tab)
+  const [disablingUser, setDisablingUser] = useState<number | null>(null);
+  const [disableReason, setDisableReason] = useState('');
+  const DISABLE_REASONS = [
+    'Multiple accounts or fraudulent activity detected.',
+    'Violation of our Terms of Service.',
+    'Suspicious referral or withdrawal activity.',
+    'Account flagged for manual review.',
+    'Duplicate device or IP address registration.',
+  ];
+
+  const doToggleActive = async (userId: number, reason = '') => {
     try {
-      const res = await api.patch<{ is_active: boolean }>(`/admin/users/${userId}/toggle-active`, {});
+      const res = await api.patch<{ is_active: boolean }>(`/admin/users/${userId}/toggle-active`, { reason });
       const newActive = res.data.is_active;
-      // Update in-place so the button flips immediately
       setUsers(prev => prev.map(u => u.id === userId ? { ...u, is_active: newActive } : u));
-      // Refresh stats badge and, if on suspended tab, reload that list
       loadStats();
       if (tab === 'suspended') loadUsers(userPage, userSearch, 'suspended');
     } catch (err: unknown) {
@@ -562,31 +572,81 @@ export default function Admin() {
     }
   };
 
-  const toggleFraudUser = async (userId: number) => {
+  const toggleActive = async (userId: number, currentActive: boolean) => {
+    if (currentActive) {
+      // Disabling — show inline reason picker instead of acting immediately
+      setDisablingUser(userId);
+      setDisableReason('');
+    } else {
+      // Enabling — no reason needed, act immediately
+      await doToggleActive(userId, '');
+    }
+  };
+
+  const confirmDisable = async () => {
+    if (!disablingUser) return;
+    if (!disableReason.trim()) { showToast('Please select or enter a reason.'); return; }
+    const uid = disablingUser;
+    const reason = disableReason.trim();
+    setDisablingUser(null);
+    setDisableReason('');
     try {
-      await api.patch(`/admin/users/${userId}/toggle-active`, {});
-      // Update fraudData in-place so the fraud tab reflects the change immediately
+      await api.patch(`/admin/users/${uid}/toggle-active`, { reason });
+      setUsers(prev => prev.map(u => u.id === uid ? { ...u, is_active: false } : u));
       setFraudData(prev => {
         if (!prev) return prev;
-        const flip = (active: boolean) => !active;
         return {
           ...prev,
           duplicate_devices: prev.duplicate_devices.map(d => ({
             ...d,
-            user1_active: d.user1_id === userId ? flip(d.user1_active) : d.user1_active,
-            user2_active: d.user2_id === userId ? flip(d.user2_active) : d.user2_active,
+            user1_active: d.user1_id === uid ? false : d.user1_active,
+            user2_active: d.user2_id === uid ? false : d.user2_active,
           })),
           duplicate_ips: prev.duplicate_ips.map(g => ({
             ...g,
-            users: g.users.map(u => u.id === userId ? { ...u, is_active: flip(u.is_active) } : u),
+            users: g.users.map(u => u.id === uid ? { ...u, is_active: false } : u),
           })),
           fraud_referrals: prev.fraud_referrals,
-          flagged_withdrawals: prev.flagged_withdrawals.map(w => w.user_id === userId ? { ...w, is_active: !w.is_active } : w),
+          flagged_withdrawals: prev.flagged_withdrawals.map(w => w.user_id === uid ? { ...w, is_active: false } : w),
         };
       });
-      showToast('User status updated.');
+      loadStats();
+      showToast('Account disabled. Suspension email sent.');
     } catch (err: unknown) {
-      showToast((err as { response?: { data?: { message?: string } } }).response?.data?.message ?? 'Failed to toggle user status.');
+      showToast((err as { response?: { data?: { message?: string } } }).response?.data?.message ?? 'Failed to disable account.');
+    }
+  };
+
+  const toggleFraudUser = async (userId: number, currentActive: boolean) => {
+    if (currentActive) {
+      setDisablingUser(userId);
+      setDisableReason('');
+    } else {
+      try {
+        const res = await api.patch<{ is_active: boolean }>(`/admin/users/${userId}/toggle-active`, { reason: '' });
+        const newActive = res.data.is_active;
+        setFraudData(prev => {
+          if (!prev) return prev;
+          return {
+            ...prev,
+            duplicate_devices: prev.duplicate_devices.map(d => ({
+              ...d,
+              user1_active: d.user1_id === userId ? newActive : d.user1_active,
+              user2_active: d.user2_id === userId ? newActive : d.user2_active,
+            })),
+            duplicate_ips: prev.duplicate_ips.map(g => ({
+              ...g,
+              users: g.users.map(u => u.id === userId ? { ...u, is_active: newActive } : u),
+            })),
+            fraud_referrals: prev.fraud_referrals,
+            flagged_withdrawals: prev.flagged_withdrawals.map(w => w.user_id === userId ? { ...w, is_active: newActive } : w),
+          };
+        });
+        showToast('User reactivated. Email notification sent.');
+        loadStats();
+      } catch (err: unknown) {
+        showToast((err as { response?: { data?: { message?: string } } }).response?.data?.message ?? 'Failed to toggle user status.');
+      }
     }
   };
 
@@ -1081,7 +1141,7 @@ export default function Admin() {
                             <button
                               className="btn-outline"
                               style={{ fontSize: 12, padding: '4px 10px', borderColor: u.is_active ? '#dc2626' : 'green', color: u.is_active ? '#dc2626' : 'green' }}
-                              onClick={() => toggleActive(u.id)}
+                              onClick={() => toggleActive(u.id, u.is_active)}
                             >
                               {u.is_active ? 'Disable' : 'Enable'}
                             </button>
@@ -1191,6 +1251,32 @@ export default function Admin() {
                                 style={{ fontSize: 12, padding: '4px 10px' }}
                                 onClick={() => setAdjustingUser(null)}
                               >
+                                Cancel
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                        {disablingUser === u.id && (
+                          <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 6, minWidth: 220, background: 'rgba(220,38,38,0.05)', border: '1px solid rgba(220,38,38,0.2)', borderRadius: 8, padding: '10px 12px' }}>
+                            <p style={{ margin: 0, fontSize: 12, fontWeight: 700, color: '#dc2626' }}>Select suspension reason:</p>
+                            {DISABLE_REASONS.map(r => (
+                              <label key={r} style={{ display: 'flex', alignItems: 'flex-start', gap: 6, cursor: 'pointer', fontSize: 12 }}>
+                                <input type="radio" name={`disable-reason-${u.id}`} value={r} checked={disableReason === r} onChange={() => setDisableReason(r)} style={{ marginTop: 2, accentColor: '#dc2626' }} />
+                                <span style={{ color: 'var(--text)', lineHeight: 1.4 }}>{r}</span>
+                              </label>
+                            ))}
+                            <input
+                              type="text"
+                              placeholder="Or type a custom reason…"
+                              value={DISABLE_REASONS.includes(disableReason) ? '' : disableReason}
+                              onChange={e => setDisableReason(e.target.value)}
+                              style={{ padding: '5px 8px', borderRadius: 6, border: '1px solid rgba(220,38,38,0.3)', fontSize: 12, width: '100%', background: 'transparent', color: 'var(--text)' }}
+                            />
+                            <div style={{ display: 'flex', gap: 6 }}>
+                              <button className="btn-primary" style={{ fontSize: 12, padding: '4px 10px', flex: 1, background: '#dc2626' }} onClick={confirmDisable}>
+                                Confirm Disable
+                              </button>
+                              <button className="btn-outline" style={{ fontSize: 12, padding: '4px 10px' }} onClick={() => { setDisablingUser(null); setDisableReason(''); }}>
                                 Cancel
                               </button>
                             </div>
@@ -1349,7 +1435,7 @@ export default function Admin() {
                           <button
                             className="btn-outline"
                             style={{ fontSize: 12, padding: '4px 12px', borderColor: '#16a34a', color: '#16a34a', fontWeight: 700 }}
-                            onClick={() => toggleActive(u.id)}
+                            onClick={() => toggleActive(u.id, false)}
                           >
                             Enable
                           </button>
@@ -2384,7 +2470,7 @@ export default function Admin() {
                             </div>
                             <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{u.email}</div>
                             <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: 2 }}>Joined {new Date(u.created_at).toLocaleDateString()}</div>
-                            <button onClick={() => toggleFraudUser(u.id)} style={{ marginTop: 8, padding: '4px 10px', borderRadius: 8, border: '1px solid var(--dark-border)', background: 'transparent', color: u.active ? '#ef4444' : '#16a34a', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 600 }}>
+                            <button onClick={() => toggleFraudUser(u.id, u.active)} style={{ marginTop: 8, padding: '4px 10px', borderRadius: 8, border: '1px solid var(--dark-border)', background: 'transparent', color: u.active ? '#ef4444' : '#16a34a', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 600 }}>
                               {u.active ? 'Ban Account' : 'Unban Account'}
                             </button>
                           </div>
@@ -2434,7 +2520,7 @@ export default function Admin() {
                               </div>
                               <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>{u.email}</div>
                               <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', marginTop: 1 }}>{u.plan} · {new Date(u.created_at).toLocaleDateString()}</div>
-                              <button onClick={() => toggleFraudUser(u.id)} style={{ marginTop: 6, padding: '3px 8px', borderRadius: 6, border: '1px solid var(--dark-border)', background: 'transparent', color: u.is_active ? '#ef4444' : '#16a34a', cursor: 'pointer', fontSize: '0.7rem', fontWeight: 600 }}>
+                              <button onClick={() => toggleFraudUser(u.id, u.is_active)} style={{ marginTop: 6, padding: '3px 8px', borderRadius: 6, border: '1px solid var(--dark-border)', background: 'transparent', color: u.is_active ? '#ef4444' : '#16a34a', cursor: 'pointer', fontSize: '0.7rem', fontWeight: 600 }}>
                                 {u.is_active ? 'Ban' : 'Unban'}
                               </button>
                             </div>
