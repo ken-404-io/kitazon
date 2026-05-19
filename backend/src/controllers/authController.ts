@@ -5,7 +5,7 @@ import crypto from 'crypto';
 import dns from 'dns/promises';
 import db from '../../config/database';
 import { DbUser, DbRefreshToken, AuthPayload } from '../types';
-import { sendVerificationEmail, sendPasswordResetEmail, sendLoginAlertEmail, sendReferralEarnedEmail } from '../services/email';
+import { sendVerificationEmail, sendPasswordResetEmail, sendLoginAlertEmail, sendReferralEarnedEmail, sendAccountSuspendedEmail } from '../services/email';
 import { createOtp, verifyOtp } from '../services/otp';
 import { logAudit, logLoginEvent } from '../services/audit';
 import { verifyTotpLogin } from './totpController';
@@ -247,6 +247,7 @@ export async function checkAndSuspendForFakeReferrals(referrerId: number): Promi
       .first();
     const unverifiedCount = Number((row as { cnt?: unknown })?.cnt ?? 0);
     if (unverifiedCount >= 100) {
+      const referrer = await db<DbUser>('users').where({ id: referrerId }).first();
       await db('users').where({ id: referrerId }).update({ is_active: false });
       await db('audit_logs').insert({
         user_id: referrerId,
@@ -257,6 +258,13 @@ export async function checkAndSuspendForFakeReferrals(referrerId: number): Promi
         metadata: JSON.stringify({ unverified_referral_count: unverifiedCount }),
       }).catch(() => {});
       console.warn(`[AUTO-SUSPEND] Referrer ${referrerId} suspended: ${unverifiedCount} unverified referrals.`);
+      if (referrer?.email) {
+        sendAccountSuspendedEmail(
+          referrer.email,
+          referrer.name,
+          `Your account was automatically suspended because ${unverifiedCount} of your referred accounts have not verified their email address. This is a violation of our referral policy. If you believe this is a mistake, please contact support at support@kitazon.com.`
+        ).catch(() => {});
+      }
     }
   } catch (err) {
     console.error('[checkAndSuspendForFakeReferrals] error:', err);
