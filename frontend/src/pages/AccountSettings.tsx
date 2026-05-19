@@ -27,6 +27,8 @@ const TrashIcon    = () => <svg {...sz}><polyline points="3 6 5 6 21 6"/><path d
 const LogoutIcon   = () => <svg {...sz}><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>;
 const AlertSmIcon  = () => <svg {...sz} width={14} height={14}><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>;
 const CardIcon     = () => <svg {...sz}><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>;
+const TerminalIcon = () => <svg {...sz}><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>;
+const SearchIcon   = () => <svg {...sz} width={16} height={16}><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>;
 
 /* ─── types ───────────────────────────────────────────────────────────────── */
 interface TotpSetup { secret: string; qr: string; }
@@ -37,7 +39,7 @@ interface LoginEvent {
   user_agent: string | null;
   created_at: string;
 }
-type View = 'main' | 'edit-profile' | 'change-password' | '2fa' | 'login-history' | 'devices' | 'notifications' | 'help' | 'delete' | 'checkin' | 'payment-methods';
+type View = 'main' | 'edit-profile' | 'change-password' | '2fa' | 'login-history' | 'devices' | 'notifications' | 'help' | 'delete' | 'checkin' | 'payment-methods' | 'admin-console';
 
 /* ─── helpers ─────────────────────────────────────────────────────────────── */
 function initials(name?: string) {
@@ -134,6 +136,35 @@ export default function AccountSettings() {
   const [checkinMsg, setCheckinMsg]         = useState('');
   const [checkinStreak, setCheckinStreak]   = useState<number | null>(null);
   const [checkinDone, setCheckinDone]       = useState(false);
+
+  // Admin console state
+  interface AdminUserResult { id: number; name: string; email: string; is_admin: boolean; is_active: boolean; plan: string; }
+  const [acSearch, setAcSearch]           = useState('');
+  const [acResults, setAcResults]         = useState<AdminUserResult[]>([]);
+  const [acLoading, setAcLoading]         = useState(false);
+  const [acMsg, setAcMsg]                 = useState('');
+  const [acTogglingId, setAcTogglingId]   = useState<number | null>(null);
+  const searchAdminUsers = async () => {
+    if (!acSearch.trim()) return;
+    setAcLoading(true); setAcMsg(''); setAcResults([]);
+    try {
+      const r = await api.get<{ users: AdminUserResult[] }>('/admin/users', { params: { search: acSearch.trim(), page: 1 } });
+      setAcResults(r.data.users);
+      if (r.data.users.length === 0) setAcMsg('No users found.');
+    } catch { setAcMsg('Search failed. Please try again.'); }
+    finally { setAcLoading(false); }
+  };
+  const toggleAdmin = async (targetId: number, currentIsAdmin: boolean) => {
+    if (!window.confirm(`${currentIsAdmin ? 'Revoke' : 'Grant'} admin access for this user?`)) return;
+    setAcTogglingId(targetId);
+    try {
+      const r = await api.patch<{ message: string; is_admin: boolean }>(`/admin/users/${targetId}/toggle-admin`);
+      setAcResults(prev => prev.map(u => u.id === targetId ? { ...u, is_admin: r.data.is_admin } : u));
+      setAcMsg(r.data.message);
+    } catch (err: unknown) {
+      setAcMsg((err as { response?: { data?: { message?: string } } }).response?.data?.message ?? 'Failed to update admin status.');
+    } finally { setAcTogglingId(null); }
+  };
 
   useEffect(() => {
     api.get<{ balance: number }>('/auth/me/stats').then(r => setBalance(r.data.balance ?? 0)).catch(() => {});
@@ -579,6 +610,85 @@ export default function AccountSettings() {
     </div>
   );
 
+  /* ── Admin Console view ─────────────────────────────────────────────────── */
+  if (view === 'admin-console') return (
+    <div className="page-container">
+      <SubView title="Admin Console">
+        <div className={styles.formCard}>
+          <p style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: '1rem', lineHeight: 1.5 }}>
+            Search for a user by name or email to grant or revoke admin access.
+          </p>
+
+          {/* Search bar */}
+          <div style={{ display: 'flex', gap: 8, marginBottom: '1rem' }}>
+            <div style={{ flex: 1, position: 'relative' }}>
+              <span style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)', pointerEvents: 'none' }}>
+                <SearchIcon />
+              </span>
+              <input
+                type="text"
+                value={acSearch}
+                onChange={e => setAcSearch(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && searchAdminUsers()}
+                placeholder="Search by name or email…"
+                style={{ width: '100%', paddingLeft: 34, paddingRight: 10, boxSizing: 'border-box' }}
+                autoComplete="off"
+              />
+            </div>
+            <button className="btn-primary" onClick={searchAdminUsers} disabled={acLoading || !acSearch.trim()} style={{ whiteSpace: 'nowrap', padding: '0 1rem' }}>
+              {acLoading ? 'Searching…' : 'Search'}
+            </button>
+          </div>
+
+          {/* Results */}
+          {acMsg && <p style={{ fontSize: 13, color: acMsg.includes('Failed') ? 'var(--red)' : acMsg.includes('No users') ? 'var(--text-muted)' : '#22c55e', marginBottom: '0.75rem' }}>{acMsg}</p>}
+          {acResults.length > 0 && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {acResults.map(u => (
+                <div key={u.id} style={{ display: 'flex', alignItems: 'center', gap: 12, background: 'var(--surface)', border: '1px solid var(--dark-border)', borderRadius: 12, padding: '0.75rem 0.9rem' }}>
+                  {/* Avatar initials */}
+                  <div style={{ width: 38, height: 38, borderRadius: '50%', background: u.is_admin ? 'rgba(245,158,11,0.18)' : 'var(--primary-subtle)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: 14, color: u.is_admin ? 'var(--gold)' : 'var(--primary)', flexShrink: 0 }}>
+                    {u.name.trim().split(' ').map((w: string) => w[0]).slice(0, 2).join('').toUpperCase()}
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                      <p style={{ margin: 0, fontWeight: 700, fontSize: 14, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{u.name}</p>
+                      {u.is_admin && (
+                        <span style={{ fontSize: 10, fontWeight: 800, background: 'rgba(245,158,11,0.15)', color: 'var(--gold)', borderRadius: 20, padding: '1px 7px', whiteSpace: 'nowrap' }}>ADMIN</span>
+                      )}
+                      {!u.is_active && (
+                        <span style={{ fontSize: 10, fontWeight: 800, background: 'rgba(239,68,68,0.12)', color: '#ef4444', borderRadius: 20, padding: '1px 7px', whiteSpace: 'nowrap' }}>SUSPENDED</span>
+                      )}
+                    </div>
+                    <p style={{ margin: 0, fontSize: 12, color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{u.email}</p>
+                  </div>
+                  {/* Only show toggle if this is not the logged-in user */}
+                  {u.id !== user?.id ? (
+                    <button
+                      onClick={() => toggleAdmin(u.id, u.is_admin)}
+                      disabled={acTogglingId === u.id}
+                      style={{
+                        flexShrink: 0, padding: '6px 12px', borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: acTogglingId === u.id ? 'not-allowed' : 'pointer',
+                        border: u.is_admin ? '1px solid #ef4444' : '1px solid var(--gold)',
+                        background: 'transparent',
+                        color: u.is_admin ? '#ef4444' : 'var(--gold)',
+                        opacity: acTogglingId === u.id ? 0.6 : 1,
+                      }}
+                    >
+                      {acTogglingId === u.id ? '…' : u.is_admin ? 'Revoke Admin' : 'Make Admin'}
+                    </button>
+                  ) : (
+                    <span style={{ fontSize: 11, color: 'var(--text-muted)', flexShrink: 0 }}>You</span>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </SubView>
+    </div>
+  );
+
   /* ── Check-in view ──────────────────────────────────────────────────────── */
   if (view === 'checkin') {
     const handleCheckin = async () => {
@@ -837,6 +947,32 @@ export default function AccountSettings() {
             </div>
           ))}
         </div>
+
+        {/* Admin Console — visible to admins only */}
+        {user?.is_admin && (
+          <>
+            <p className={styles.sectionLabel}>Administration</p>
+            <div className={styles.settingsCard} style={{ marginBottom: 0, borderColor: 'rgba(245,158,11,0.3)', background: 'rgba(245,158,11,0.04)' }}>
+              <div className={styles.settingRow} onClick={() => { setAcSearch(''); setAcResults([]); setAcMsg(''); setView('admin-console'); }}>
+                <span className={styles.settingIcon} style={{ color: 'var(--gold)' }}><TerminalIcon /></span>
+                <div style={{ flex: 1 }}>
+                  <span className={styles.settingLabel} style={{ color: 'var(--gold)', fontWeight: 700 }}>Admin Console</span>
+                  <p style={{ margin: 0, fontSize: 11, color: 'var(--text-muted)' }}>Grant or revoke admin access for users</p>
+                </div>
+                <span className={styles.chevron}><ChevronRight /></span>
+              </div>
+              <div className={styles.settingRow} onClick={() => navigate('/admin')}>
+                <span className={styles.settingIcon} style={{ color: 'var(--gold)' }}>
+                  <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                  </svg>
+                </span>
+                <span className={styles.settingLabel} style={{ color: 'var(--gold)', fontWeight: 700 }}>Admin Panel</span>
+                <span className={styles.chevron}><ChevronRight /></span>
+              </div>
+            </div>
+          </>
+        )}
 
         {/* Logout */}
         <button
