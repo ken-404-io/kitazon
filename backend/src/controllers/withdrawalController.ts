@@ -105,6 +105,13 @@ async function getWithdrawalEligibility(userId: number, user: DbUser) {
     ? await countQuizzesForNextGate(userId)
     : { count: 0, frozen: false };
 
+  // Block if user already has a pending or processing withdrawal
+  const pendingWithdrawal = await db('withdrawals')
+    .where({ user_id: userId })
+    .whereIn('status', ['pending', 'processing'])
+    .first();
+  const hasPendingWithdrawal = !!pendingWithdrawal;
+
   // 24-hour cooldown: after any withdrawal request, user must wait 24h before submitting another
   const lastWithdrawal = await db('withdrawals')
     .where({ user_id: userId })
@@ -113,7 +120,7 @@ async function getWithdrawalEligibility(userId: number, user: DbUser) {
     .first();
   let cooldownActive = false;
   let cooldownEndsAt: Date | null = null;
-  if (lastWithdrawal) {
+  if (lastWithdrawal && !hasPendingWithdrawal) {
     const cooldownEnd = new Date(new Date(lastWithdrawal.created_at).getTime() + 24 * 60 * 60 * 1000);
     if (cooldownEnd > new Date()) {
       cooldownActive = true;
@@ -137,6 +144,7 @@ async function getWithdrawalEligibility(userId: number, user: DbUser) {
 
   const reasons: string[] = [];
   if (!user.email_verified)                    reasons.push('email_not_verified');
+  if (hasPendingWithdrawal)                    reasons.push('has_pending_withdrawal');
   if (cooldownActive)                           reasons.push('cooldown_active');
   if (freePlanCapReached)                       reasons.push('free_plan_cap_reached');
   if (quizRequired > 0) {
@@ -147,6 +155,7 @@ async function getWithdrawalEligibility(userId: number, user: DbUser) {
   return {
     eligible: reasons.length === 0,
     email_verified: user.email_verified,
+    has_pending_withdrawal: hasPendingWithdrawal,
     is_first_withdrawal: isFirstWithdrawal,
     withdrawal_credits: Number(user.withdrawal_credits ?? 0),
     quizzes_completed: quizzesCompleted,
