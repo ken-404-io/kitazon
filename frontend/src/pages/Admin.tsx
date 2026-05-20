@@ -355,6 +355,12 @@ export default function Admin() {
     gcash_qr_silver: 'https://res.cloudinary.com/dtm4n2uk3/image/upload/v1778935459/4432f02f-79d9-4bf7-bd8f-39f0b63487ad_qbjxzx.jpg',
     gcash_qr_gold: 'https://res.cloudinary.com/dtm4n2uk3/image/upload/v1778935610/1593c9bc-c490-4854-826d-72ad2a5a79a1_cwdk3l.jpg',
     gcash_qr_diamond: 'https://res.cloudinary.com/dtm4n2uk3/image/upload/v1778935570/69504c45-6f87-43b1-aebe-83d55a30e5be_p6tncl.jpg',
+    maya_number: '',
+    maya_name: 'Kitazon',
+    maya_qr_bronze:  '',
+    maya_qr_silver:  '',
+    maya_qr_gold:    '',
+    maya_qr_diamond: '',
     credit_php_per_credit: '25',
     withdrawal_min: '5',
     quiz_gate_free: '40',
@@ -2624,6 +2630,35 @@ export default function Admin() {
                     { key: 'gcash_qr_silver',  label: 'Silver Plan QR URL',  placeholder: 'https://...', full: true },
                     { key: 'gcash_qr_gold',    label: 'Gold Plan QR URL',    placeholder: 'https://...', full: true },
                     { key: 'gcash_qr_diamond', label: 'Diamond Plan QR URL', placeholder: 'https://...', full: true },
+                  ].map(({ key, label, placeholder, full }) => (
+                    <div key={key} style={{ gridColumn: full ? '1 / -1' : 'auto' }}>
+                      <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{label}</label>
+                      <input type="text" value={siteSettings[key] ?? ''} onChange={e => setSetting(key, e.target.value)} placeholder={placeholder}
+                        style={{ width: '100%', padding: '9px 12px', borderRadius: 10, border: '1.5px solid var(--dark-border)', background: 'var(--dark-bg)', color: 'var(--text)', fontSize: '0.85rem', outline: 'none', boxSizing: 'border-box' }} />
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* ── Maya ── */}
+              <div style={{ background: 'var(--dark-card)', border: '1px solid var(--dark-border)', borderRadius: 16, overflow: 'hidden' }}>
+                <div style={{ padding: '1rem 1.25rem', borderBottom: '1px solid var(--dark-border)', display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <div style={{ width: 32, height: 32, borderRadius: 8, background: 'rgba(108,60,223,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#8b5cf6' }}>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
+                  </div>
+                  <div>
+                    <p style={{ fontWeight: 700, fontSize: '0.9rem', margin: 0 }}>Maya Configuration</p>
+                    <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', margin: 0 }}>Maya payment account & QR codes shown to users</p>
+                  </div>
+                </div>
+                <div style={{ padding: '1.25rem', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                  {[
+                    { key: 'maya_number', label: 'Maya Number', placeholder: '09XXXXXXXXX', full: false },
+                    { key: 'maya_name',   label: 'Account Name', placeholder: 'Kitazon', full: false },
+                    { key: 'maya_qr_bronze',  label: 'Bronze Plan QR URL',  placeholder: 'https://...', full: true },
+                    { key: 'maya_qr_silver',  label: 'Silver Plan QR URL',  placeholder: 'https://...', full: true },
+                    { key: 'maya_qr_gold',    label: 'Gold Plan QR URL',    placeholder: 'https://...', full: true },
+                    { key: 'maya_qr_diamond', label: 'Diamond Plan QR URL', placeholder: 'https://...', full: true },
                   ].map(({ key, label, placeholder, full }) => (
                     <div key={key} style={{ gridColumn: full ? '1 / -1' : 'auto' }}>
                       <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{label}</label>

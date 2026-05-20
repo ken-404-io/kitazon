@@ -70,6 +70,14 @@ export default function Plans() {
     gold:    getSetting('gcash_qr_gold',   'https://res.cloudinary.com/dtm4n2uk3/image/upload/v1778935610/1593c9bc-c490-4854-826d-72ad2a5a79a1_cwdk3l.jpg'),
     diamond: getSetting('gcash_qr_diamond','https://res.cloudinary.com/dtm4n2uk3/image/upload/v1778935570/69504c45-6f87-43b1-aebe-83d55a30e5be_p6tncl.jpg'),
   };
+  const MAYA_NUMBER = getSetting('maya_number', '');
+  const MAYA_NAME   = getSetting('maya_name', 'Kitazon');
+  const MAYA_QR: Record<string, string> = {
+    bronze:  getSetting('maya_qr_bronze',  ''),
+    silver:  getSetting('maya_qr_silver',  ''),
+    gold:    getSetting('maya_qr_gold',    ''),
+    diamond: getSetting('maya_qr_diamond', ''),
+  };
 
   const PLANS = STATIC_PLANS.map(p => {
     const priceNum = p.plan === 'free' ? 0 : Number(getSetting(`plan_price_${p.plan}`, '0'));
@@ -87,6 +95,7 @@ export default function Plans() {
   }, []);
 
   const [modal, setModal] = useState<typeof PLANS[number] | null>(null);
+  const [payChannel, setPayChannel] = useState<'gcash' | 'maya'>('gcash');
   const [reference, setReference] = useState('');
   const [screenshot, setScreenshot] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -95,6 +104,7 @@ export default function Plans() {
 
   const openModal = (p: typeof PLANS[number]) => {
     setModal(p);
+    setPayChannel('gcash');
     setReference('');
     setScreenshot(null);
     setSubmitError('');
@@ -119,7 +129,7 @@ export default function Plans() {
     if (!modal) return;
     setSubmitError('');
     if (reference.trim().length < 5) {
-      setSubmitError('Please enter your GCash reference number.');
+      setSubmitError(`Please enter your ${payChannel === 'maya' ? 'Maya' : 'GCash'} reference number.`);
       return;
     }
     setSubmitting(true);
@@ -195,7 +205,7 @@ export default function Plans() {
                   onClick={() => openModal(p)}
                 >
                   <span className={styles.gcashIcon}>G</span>
-                  Pay via GCash · {p.price}
+                  Pay via GCash / Maya · {p.price}
                 </button>
               )}
             </div>
@@ -204,7 +214,7 @@ export default function Plans() {
       </div>
 
       <p className={styles.note}>
-        Payments are made via GCash. After sending, submit your reference number below and the admin will activate your plan within 24 hours.
+        Payments are accepted via GCash or Maya. After sending, submit your reference number and the admin will activate your plan within 24 hours.
       </p>
 
       {/* ── GCash Payment Modal ── */}
@@ -233,22 +243,56 @@ export default function Plans() {
                 </div>
 
                 <div className={styles.gcashInstruction}>
-                  <p className={styles.instructionTitle}>Send exactly <strong style={{ color: '#0073e6' }}>₱{modal.priceNum.toLocaleString()}</strong> to this GCash account:</p>
+                  {/* Channel picker */}
+                  <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+                    {(['gcash', 'maya'] as const).map(ch => (
+                      <button
+                        key={ch}
+                        type="button"
+                        onClick={() => setPayChannel(ch)}
+                        style={{
+                          flex: 1,
+                          padding: '0.55rem 0',
+                          borderRadius: 10,
+                          border: `2px solid ${payChannel === ch ? (ch === 'gcash' ? '#0073e6' : '#6c3cdf') : 'var(--border)'}`,
+                          background: payChannel === ch ? (ch === 'gcash' ? 'rgba(0,115,230,0.10)' : 'rgba(108,60,223,0.10)') : 'var(--surface)',
+                          color: payChannel === ch ? (ch === 'gcash' ? '#0073e6' : '#8b5cf6') : 'var(--text-muted)',
+                          fontWeight: 700,
+                          fontSize: '0.88rem',
+                          cursor: 'pointer',
+                          transition: 'all 0.15s',
+                          letterSpacing: '0.5px',
+                        }}
+                      >
+                        {ch === 'gcash' ? '🔵 GCash' : '🟣 Maya'}
+                      </button>
+                    ))}
+                  </div>
 
-                  {GCASH_QR[modal.plan] ? (
+                  <p className={styles.instructionTitle}>
+                    Send exactly <strong style={{ color: payChannel === 'gcash' ? '#0073e6' : '#8b5cf6' }}>₱{modal.priceNum.toLocaleString()}</strong> to this {payChannel === 'gcash' ? 'GCash' : 'Maya'} account:
+                  </p>
+
+                  {(payChannel === 'gcash' ? GCASH_QR : MAYA_QR)[modal.plan] ? (
                     <div className={styles.qrWrapper}>
-                      <img src={GCASH_QR[modal.plan]} alt={`${modal.name} GCash QR Code`} className={styles.qrImage} />
+                      <img
+                        src={(payChannel === 'gcash' ? GCASH_QR : MAYA_QR)[modal.plan]}
+                        alt={`${modal.name} ${payChannel === 'gcash' ? 'GCash' : 'Maya'} QR Code`}
+                        className={styles.qrImage}
+                      />
                     </div>
                   ) : (
                     <div className={styles.qrPlaceholder}>
-                      <span className={styles.gcashIconLarge}>G</span>
+                      <span className={styles.gcashIconLarge} style={{ color: payChannel === 'gcash' ? '#0073e6' : '#8b5cf6' }}>
+                        {payChannel === 'gcash' ? 'G' : 'M'}
+                      </span>
                       <p style={{ margin: '8px 0 0', fontSize: '0.78rem', color: 'var(--text-muted)' }}>QR code not configured</p>
                     </div>
                   )}
 
                   <div className={styles.gcashAccount}>
-                    <div className={styles.gcashNum}>{GCASH_NUMBER || '—'}</div>
-                    <div className={styles.gcashOwner}>{GCASH_NAME}</div>
+                    <div className={styles.gcashNum}>{(payChannel === 'gcash' ? GCASH_NUMBER : MAYA_NUMBER) || '—'}</div>
+                    <div className={styles.gcashOwner}>{payChannel === 'gcash' ? GCASH_NAME : MAYA_NAME}</div>
                   </div>
                 </div>
 
@@ -258,8 +302,10 @@ export default function Plans() {
                     <p className={styles.stepsTitle}>How to Pay</p>
                     {[
                       { n: 1, text: 'Screenshot or long-press the QR code above to save it.' },
-                      { n: 2, text: 'Open GCash → tap "Pay QR" → tap the upload icon → select the saved QR.' },
-                      { n: 3, text: 'Confirm and complete the payment in GCash.' },
+                      { n: 2, text: payChannel === 'gcash'
+                          ? 'Open GCash → tap "Pay QR" → tap the upload icon → select the saved QR.'
+                          : 'Open Maya → tap "Scan QR" → tap the gallery icon → select the saved QR.' },
+                      { n: 3, text: `Confirm and complete the payment in ${payChannel === 'gcash' ? 'GCash' : 'Maya'}.` },
                       { n: 4, text: 'Come back here, upload your receipt and enter the reference number below.' },
                     ].map(s => (
                       <div key={s.n} className={styles.stepRow}>
@@ -269,7 +315,7 @@ export default function Plans() {
                     ))}
                   </div>
 
-                  <label className={styles.refLabel}>GCash Reference Number</label>
+                  <label className={styles.refLabel}>{payChannel === 'gcash' ? 'GCash' : 'Maya'} Reference Number</label>
                   <input
                     className={styles.refInput}
                     type="text"
