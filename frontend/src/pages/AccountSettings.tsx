@@ -23,7 +23,6 @@ const MailIcon     = () => <svg {...sz}><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1
 const MoonIcon     = () => <svg {...sz}><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/></svg>;
 const SunIcon      = () => <svg {...sz}><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>;
 const HelpIcon     = () => <svg {...sz}><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 015.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>;
-const TrashIcon    = () => <svg {...sz}><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 011-1h4a1 1 0 011 1v2"/></svg>;
 const LogoutIcon   = () => <svg {...sz}><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>;
 const AlertSmIcon  = () => <svg {...sz} width={14} height={14}><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>;
 const CardIcon     = () => <svg {...sz}><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>;
@@ -39,7 +38,7 @@ interface LoginEvent {
   user_agent: string | null;
   created_at: string;
 }
-type View = 'main' | 'edit-profile' | 'change-password' | '2fa' | 'login-history' | 'devices' | 'notifications' | 'help' | 'delete' | 'checkin' | 'payment-methods' | 'admin-console';
+type View = 'main' | 'edit-profile' | 'change-password' | '2fa' | 'login-history' | 'devices' | 'notifications' | 'help' | 'checkin' | 'payment-methods' | 'admin-console';
 
 /* ─── helpers ─────────────────────────────────────────────────────────────── */
 function initials(name?: string) {
@@ -69,10 +68,6 @@ export default function AccountSettings() {
   const pwCurrentErr = pwTouched.current ? (!pwForm.current ? 'Current password is required.' : null) : null;
   const pwNextErr    = pwTouched.next    ? validatePasswordField(pwForm.next) : null;
 
-  const [deletePassword, setDeletePassword] = useState('');
-  const [deleteError, setDeleteError]       = useState('');
-  const [deleteLoading, setDeleteLoading]   = useState(false);
-  const [confirmDelete, setConfirmDelete]   = useState(false);
 
   const [history, setHistory]         = useState<LoginEvent[] | null>(null);
   const [historyLoading, setHistoryLoading] = useState(false);
@@ -172,17 +167,6 @@ export default function AccountSettings() {
     } finally { setPwLoading(false); }
   };
 
-  const deleteAccount = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setDeleteError('');
-    setDeleteLoading(true);
-    try {
-      await api.delete('/account', { data: { password: deletePassword } });
-      await logout();
-    } catch (err: unknown) {
-      setDeleteError((err as { response?: { data?: { message?: string } } }).response?.data?.message ?? 'Failed.');
-    } finally { setDeleteLoading(false); }
-  };
 
   const loadHistory = async () => {
     setHistoryLoading(true);
@@ -548,37 +532,6 @@ export default function AccountSettings() {
     </div>
   );
 
-  /* ── Delete Account view ─────────────────────────────────────────────────── */
-  if (view === 'delete') return (
-    <div className="page-container">
-      <SubView title="Delete Account">
-        <div className={styles.dangerCard}>
-          <p style={{ fontSize: 14, color: 'var(--text-muted)', marginBottom: '1.25rem' }}>
-            This permanently anonymizes your account. Your earnings history is preserved for audit purposes.
-          </p>
-          {!confirmDelete ? (
-            <button className="btn-outline" style={{ borderColor: 'var(--red)', color: 'var(--red)', width: '100%' }} onClick={() => setConfirmDelete(true)}>
-              Delete My Account
-            </button>
-          ) : (
-            <form onSubmit={deleteAccount}>
-              <div className="form-group">
-                <label>Enter your password to confirm</label>
-                <input type="password" value={deletePassword} onChange={e => setDeletePassword(e.target.value)} required maxLength={128} autoComplete="current-password" />
-              </div>
-              {deleteError && <p className="error-msg">{deleteError}</p>}
-              <div style={{ display: 'flex', gap: 8 }}>
-                <button type="button" className="btn-outline" style={{ flex: 1 }} onClick={() => setConfirmDelete(false)}>Cancel</button>
-                <button type="submit" className="btn-primary" style={{ flex: 1, background: 'var(--red)' }} disabled={deleteLoading}>
-                  {deleteLoading ? 'Deleting…' : 'Confirm Delete'}
-                </button>
-              </div>
-            </form>
-          )}
-        </div>
-      </SubView>
-    </div>
-  );
 
   /* ── Admin Console view ─────────────────────────────────────────────────── */
   if (view === 'admin-console') return (
@@ -891,11 +844,6 @@ export default function AccountSettings() {
           <div className={styles.settingRow} onClick={() => setView('help')}>
             <span className={styles.settingIcon}><HelpIcon /></span>
             <span className={styles.settingLabel}>Help Center</span>
-            <span className={styles.chevron}><ChevronRight /></span>
-          </div>
-          <div className={styles.settingRow} onClick={() => setView('delete')}>
-            <span className={`${styles.settingIcon} ${styles.settingIconRed}`}><TrashIcon /></span>
-            <span className={`${styles.settingLabel} ${styles.settingLabelRed}`}>Delete Account</span>
             <span className={styles.chevron}><ChevronRight /></span>
           </div>
         </div>
