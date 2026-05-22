@@ -568,6 +568,8 @@ export default function Admin() {
 
   const [rejectingGcash, setRejectingGcash] = useState<number | null>(null);
   const [gcashRejectReason, setGcashRejectReason] = useState('');
+  const [revokingGcash, setRevokingGcash] = useState<number | null>(null);
+  const [gcashRevokeReason, setGcashRevokeReason] = useState('');
   const GCASH_REJECT_REASONS = [
     'The reference number you provided is incorrect or does not match our records.',
     'The receipt or screenshot you uploaded is unclear, invalid, or does not show the transaction.',
@@ -2198,7 +2200,7 @@ export default function Admin() {
           )}
 
           <div style={{ display: 'flex', gap: 8, marginBottom: '1rem', alignItems: 'center' }}>
-            {(['pending', 'approved', 'rejected'] as const).map(s => (
+            {(['pending', 'approved', 'rejected', 'revoked'] as const).map(s => (
               <button key={s} onClick={() => setGcashFilter(s)} style={{
                 padding: '6px 14px', borderRadius: 6, cursor: 'pointer', fontWeight: gcashFilter === s ? 700 : 400,
                 background: gcashFilter === s ? 'var(--gold)' : 'transparent',
@@ -2224,7 +2226,7 @@ export default function Admin() {
               </thead>
               <tbody>
                 {gcashPayments.map(g => (<>
-                  <tr key={g.id} style={{ borderBottom: rejectingGcash === g.id ? 'none' : '1px solid var(--border)' }}>
+                  <tr key={g.id} style={{ borderBottom: (rejectingGcash === g.id || revokingGcash === g.id) ? 'none' : '1px solid var(--border)' }}>
                     <td style={{ padding: '8px 10px', whiteSpace: 'nowrap' }}>
                       <div>{new Date(g.created_at).toLocaleDateString('en-PH', { timeZone: 'Asia/Manila' })}</div>
                       <div style={{ fontSize: 11, color: '#9ca3af' }}>{new Date(g.created_at).toLocaleTimeString('en-PH', { timeZone: 'Asia/Manila', hour: '2-digit', minute: '2-digit' })}</div>
@@ -2253,8 +2255,8 @@ export default function Admin() {
                     <td style={{ padding: '8px 10px' }}>
                       <span style={{
                         fontSize: 11, fontWeight: 700, padding: '3px 8px', borderRadius: 20, textTransform: 'capitalize',
-                        background: g.status === 'approved' ? 'rgba(34,197,94,0.15)' : g.status === 'rejected' ? 'rgba(239,68,68,0.15)' : 'rgba(234,179,8,0.15)',
-                        color: g.status === 'approved' ? '#22c55e' : g.status === 'rejected' ? '#ef4444' : '#eab308',
+                        background: g.status === 'approved' ? 'rgba(34,197,94,0.15)' : g.status === 'rejected' ? 'rgba(239,68,68,0.15)' : g.status === 'revoked' ? 'rgba(168,85,247,0.15)' : 'rgba(234,179,8,0.15)',
+                        color: g.status === 'approved' ? '#22c55e' : g.status === 'rejected' ? '#ef4444' : g.status === 'revoked' ? '#a855f7' : '#eab308',
                       }}>{g.status}</span>
                       {g.admin_note && <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 2 }}>{g.admin_note}</div>}
                     </td>
@@ -2278,8 +2280,49 @@ export default function Admin() {
                           >Reject</button>
                         </div>
                       )}
+                      {g.status === 'approved' && (
+                        <button
+                          onClick={() => { setRevokingGcash(g.id); setGcashRevokeReason(''); }}
+                          style={{ padding: '4px 10px', background: 'transparent', color: '#a855f7', border: '1px solid #a855f7', borderRadius: 6, cursor: 'pointer', fontSize: 12 }}
+                        >Revoke</button>
+                      )}
                     </td>
                   </tr>
+                  {revokingGcash === g.id && (
+                    <tr>
+                      <td colSpan={8} style={{ padding: '0 10px 12px', background: 'rgba(168,85,247,0.04)', borderBottom: '1px solid rgba(168,85,247,0.15)' }}>
+                        <div style={{ padding: '12px 14px', borderRadius: 10, border: '1px solid rgba(168,85,247,0.25)', background: 'rgba(168,85,247,0.06)' }}>
+                          <p style={{ margin: '0 0 6px', fontWeight: 700, fontSize: 12, color: '#c084fc', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Revoke Subscription</p>
+                          <p style={{ margin: '0 0 10px', fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.5 }}>
+                            This will remove the user's <strong style={{ color: 'var(--text)' }}>{g.plan}</strong> plan and revert them to the free plan. The user will be notified by email.
+                          </p>
+                          <input
+                            type="text"
+                            placeholder="Reason for revoking (e.g. accidental approval, duplicate payment…)"
+                            value={gcashRevokeReason}
+                            onChange={e => setGcashRevokeReason(e.target.value)}
+                            style={{ width: '100%', padding: '6px 10px', borderRadius: 8, border: '1px solid rgba(168,85,247,0.3)', background: 'var(--surface)', color: 'var(--text)', fontSize: 13, boxSizing: 'border-box' }}
+                          />
+                          <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
+                            <button
+                              onClick={async () => {
+                                if (!window.confirm(`Revoke ${g.plan} plan for ${g.user_name}? This cannot be undone and will move them back to free.`)) return;
+                                await api.patch(`/admin/gcash-payments/${g.id}/revoke`, { reason: gcashRevokeReason.trim() || undefined });
+                                setRevokingGcash(null);
+                                showToast('Subscription revoked. User moved back to free plan.');
+                                loadGcashPayments(gcashFilter);
+                              }}
+                              style={{ padding: '5px 16px', background: '#7c3aed', color: '#fff', border: 'none', borderRadius: 7, cursor: 'pointer', fontSize: 12, fontWeight: 700 }}
+                            >Confirm Revoke</button>
+                            <button
+                              onClick={() => setRevokingGcash(null)}
+                              style={{ padding: '5px 14px', background: 'transparent', border: '1px solid var(--border)', color: 'var(--text-muted)', borderRadius: 7, cursor: 'pointer', fontSize: 12 }}
+                            >Cancel</button>
+                          </div>
+                        </div>
+                      </td>
+                    </tr>
+                  )}
                   {rejectingGcash === g.id && (
                     <tr>
                       <td colSpan={8} style={{ padding: '0 10px 12px', background: 'rgba(239,68,68,0.04)', borderBottom: '1px solid rgba(239,68,68,0.15)' }}>

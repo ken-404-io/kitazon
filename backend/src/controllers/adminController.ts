@@ -922,6 +922,48 @@ export async function rejectGcashPayment(req: Request, res: Response, next: Next
   } catch (err) { next(err); }
 }
 
+export async function revokeGcashPayment(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const id = parseInt(req.params.id, 10);
+    const { reason } = req.body as { reason?: string };
+
+    const payment = await db('gcash_payments').where({ id }).first();
+    if (!payment) { res.status(404).json({ message: 'Payment not found.' }); return; }
+    if (payment.status !== 'approved') {
+      res.status(409).json({ message: 'Only approved payments can be revoked.' }); return;
+    }
+
+    await db.transaction(async (trx) => {
+      await trx('gcash_payments').where({ id }).update({
+        status: 'revoked',
+        admin_note: reason?.trim() ?? 'Subscription revoked by admin.',
+        reviewed_by: req.user!.id,
+        updated_at: new Date(),
+      });
+      // Revert user back to free plan and clear expiry
+      await trx('users').where({ id: payment.user_id }).update({
+        plan: 'free',
+        plan_expires_at: null,
+      });
+    });
+
+    await logAudit(req.user!.id, 'gcash_payment_revoked', req, {
+      metadata: { payment_id: id, user_id: payment.user_id, plan: payment.plan, reason: reason?.trim() },
+    });
+
+    const user = await db<DbUser>('users').where({ id: payment.user_id }).select('email', 'name').first();
+    if (user) {
+      sendAccountSuspendedEmail(
+        user.email,
+        user.name,
+        reason?.trim() ?? `Your ${payment.plan} plan subscription has been revoked by our team. If you believe this is a mistake, please contact support.`
+      ).catch(() => {});
+    }
+
+    res.json({ message: 'Subscription revoked. User has been moved back to the free plan.' });
+  } catch (err) { next(err); }
+}
+
 // ─── Adjust referral count ────────────────────────────────────────────────────
 export async function setReferralCount(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {

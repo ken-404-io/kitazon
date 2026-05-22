@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import authMiddleware from '../middleware/auth';
 import adminAuth from '../middleware/adminAuth';
-import { platformStats, listUsers, toggleUserActive, batchEnableUsers, toggleUserAdmin, listWithdrawals, updateWithdrawalStatus, listAuditLogs, getUserAuditLogs, listTasks, createTask, updateTask, updateUserPlan, adjustBalance, broadcastEmail, revenueStats, bulkImportTasks, grantLeaderboardRewards, listOnlineUsers, bulkApproveWithdrawals, listGcashPayments, approveGcashPayment, rejectGcashPayment, setReferralCount, fraudReport, suspendAllFraud } from '../controllers/adminController';
+import { platformStats, listUsers, toggleUserActive, batchEnableUsers, toggleUserAdmin, listWithdrawals, updateWithdrawalStatus, listAuditLogs, getUserAuditLogs, listTasks, createTask, updateTask, updateUserPlan, adjustBalance, broadcastEmail, revenueStats, bulkImportTasks, grantLeaderboardRewards, listOnlineUsers, bulkApproveWithdrawals, listGcashPayments, approveGcashPayment, rejectGcashPayment, revokeGcashPayment, setReferralCount, fraudReport, suspendAllFraud } from '../controllers/adminController';
 import { getPublicSettings, adminUpdateSettings } from '../controllers/settingsController';
 
 const router = Router();
@@ -32,6 +32,7 @@ router.post('/leaderboard-rewards', grantLeaderboardRewards);
 router.get('/gcash-payments', listGcashPayments);
 router.patch('/gcash-payments/:id/approve', approveGcashPayment);
 router.patch('/gcash-payments/:id/reject', rejectGcashPayment);
+router.patch('/gcash-payments/:id/revoke', revokeGcashPayment);
 router.get('/fraud', fraudReport);
 router.post('/fraud/suspend-all', suspendAllFraud);
 router.get('/settings', getPublicSettings);
