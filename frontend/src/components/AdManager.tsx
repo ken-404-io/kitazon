@@ -36,6 +36,9 @@ export default function AdManager() {
     // Monetag Zone 11042162 (vignette)
     addScript({ src: 'https://dd133.com/vignette.min.js', 'data-zone': '11042162', async: '' });
 
+    // Monetag Zone 11042455
+    addScript({ src: 'https://ueuee.com/tag.min.js', 'data-zone': '11042455', async: '' });
+
     // Adsterra Social Bar
     addScript({ src: 'https://pl29417357.profitablecpmratenetwork.com/f8/8b/4a/f88b4accd723fbbe625cbc01ce5fcea6.js' });
 
