@@ -7,7 +7,18 @@ export default function AdManager() {
   const isPaidPlan = user?.plan && user.plan !== 'free';
 
   useEffect(() => {
-    if (!user || user.is_admin || isPaidPlan) return;
+    if (!user || user.is_admin || isPaidPlan) {
+      // Remove any lingering ad scripts/iframes left from a previous free-plan session
+      document
+        .querySelectorAll<HTMLElement>(
+          'script[data-zone], script[src*="ueuee.com"], script[src*="quge5.com"], ' +
+          'script[src*="profitablecpmratenetwork.com"], ' +
+          'iframe[src*="ueuee.com"], iframe[src*="profitablecpmratenetwork.com"], ' +
+          '[id*="container-6eabcdaeb07c57f4f19da67d49052315"]'
+        )
+        .forEach(el => el.remove());
+      return;
+    }
 
     const scripts: HTMLScriptElement[] = [];
 
@@ -19,11 +30,8 @@ export default function AdManager() {
       scripts.push(s);
     };
 
-    // Monetag Zone 11012417
-    addScript(
-      {},
-      `(function(s){s.dataset.zone='11012417',s.src='https://ueuee.com/tag.min.js'})([document.documentElement,document.body].filter(Boolean).pop().appendChild(document.createElement('script')))`
-    );
+    // Monetag Zone 11012417 — direct tracked script (not inline injector so cleanup works)
+    addScript({ src: 'https://ueuee.com/tag.min.js', 'data-zone': '11012417', async: '' });
 
     // Adsterra Social Bar
     addScript({ src: 'https://pl29417357.profitablecpmratenetwork.com/f8/8b/4a/f88b4accd723fbbe625cbc01ce5fcea6.js' });
@@ -31,8 +39,18 @@ export default function AdManager() {
     // Adsterra Native Banner
     addScript({ src: 'https://pl29417356.profitablecpmratenetwork.com/6eabcdaeb07c57f4f19da67d49052315/invoke.js', async: '', 'data-cfasync': 'false' });
 
-    return () => { scripts.forEach(s => s.remove()); };
-  }, [user]);
+    return () => {
+      scripts.forEach(s => s.remove());
+      // Also sweep any iframes/elements injected by the ad SDKs themselves
+      document
+        .querySelectorAll<HTMLElement>(
+          'script[data-zone], script[src*="ueuee.com"], ' +
+          'iframe[src*="ueuee.com"], iframe[src*="profitablecpmratenetwork.com"], ' +
+          '[id*="container-6eabcdaeb07c57f4f19da67d49052315"]'
+        )
+        .forEach(el => el.remove());
+    };
+  }, [user, isPaidPlan]);
 
   return null;
 }
