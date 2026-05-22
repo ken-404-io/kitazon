@@ -566,6 +566,15 @@ export default function Admin() {
     'Duplicate device or IP address registration.',
   ];
 
+  const [rejectingGcash, setRejectingGcash] = useState<number | null>(null);
+  const [gcashRejectReason, setGcashRejectReason] = useState('');
+  const GCASH_REJECT_REASONS = [
+    'The reference number you provided is incorrect or does not match our records.',
+    'The receipt or screenshot you uploaded is unclear, invalid, or does not show the transaction.',
+    'The payment amount does not match the required plan price.',
+    'The GCash transaction has already been used for another account.',
+  ];
+
   const doToggleActive = async (userId: number, reason = '') => {
     try {
       const res = await api.patch<{ is_active: boolean }>(`/admin/users/${userId}/toggle-active`, { reason });
@@ -2214,8 +2223,8 @@ export default function Admin() {
                 </tr>
               </thead>
               <tbody>
-                {gcashPayments.map(g => (
-                  <tr key={g.id} style={{ borderBottom: '1px solid var(--border)' }}>
+                {gcashPayments.map(g => (<>
+                  <tr key={g.id} style={{ borderBottom: rejectingGcash === g.id ? 'none' : '1px solid var(--border)' }}>
                     <td style={{ padding: '8px 10px', whiteSpace: 'nowrap' }}>
                       <div>{new Date(g.created_at).toLocaleDateString('en-PH', { timeZone: 'Asia/Manila' })}</div>
                       <div style={{ fontSize: 11, color: '#9ca3af' }}>{new Date(g.created_at).toLocaleTimeString('en-PH', { timeZone: 'Asia/Manila', hour: '2-digit', minute: '2-digit' })}</div>
@@ -2257,8 +2266,6 @@ export default function Admin() {
                               if (!window.confirm(`Approve ${g.plan} plan for ${g.user_name}? This will activate their plan.`)) return;
                               await api.patch(`/admin/gcash-payments/${g.id}/approve`, {});
                               showToast('Plan activated! Their pending withdrawals will appear in Priority.');
-                              // Clear cached withdrawals + refresh stats so Pending Withdrawals tab
-                              // immediately re-fetches with the user's upgraded plan grouping.
                               setWithdrawals([]);
                               loadStats();
                               loadGcashPayments(gcashFilter);
@@ -2266,20 +2273,53 @@ export default function Admin() {
                             style={{ padding: '4px 10px', background: '#16a34a', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 12, fontWeight: 700 }}
                           >Approve</button>
                           <button
-                            onClick={async () => {
-                              const note = window.prompt('Rejection reason (optional):') ?? '';
-                              if (note === null) return;
-                              await api.patch(`/admin/gcash-payments/${g.id}/reject`, { note });
-                              showToast('Payment rejected.');
-                              loadGcashPayments(gcashFilter);
-                            }}
+                            onClick={() => { setRejectingGcash(g.id); setGcashRejectReason(''); }}
                             style={{ padding: '4px 10px', background: 'transparent', color: '#ef4444', border: '1px solid #ef4444', borderRadius: 6, cursor: 'pointer', fontSize: 12 }}
                           >Reject</button>
                         </div>
                       )}
                     </td>
                   </tr>
-                ))}
+                  {rejectingGcash === g.id && (
+                    <tr>
+                      <td colSpan={8} style={{ padding: '0 10px 12px', background: 'rgba(239,68,68,0.04)', borderBottom: '1px solid rgba(239,68,68,0.15)' }}>
+                        <div style={{ padding: '12px 14px', borderRadius: 10, border: '1px solid rgba(239,68,68,0.25)', background: 'rgba(239,68,68,0.06)' }}>
+                          <p style={{ margin: '0 0 8px', fontWeight: 700, fontSize: 12, color: '#fca5a5', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Select rejection reason</p>
+                          {GCASH_REJECT_REASONS.map(r => (
+                            <label key={r} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, marginBottom: 6, cursor: 'pointer', fontSize: 13 }}>
+                              <input type="radio" name={`gcash-reject-${g.id}`} value={r} checked={gcashRejectReason === r} onChange={() => setGcashRejectReason(r)} style={{ marginTop: 2, accentColor: '#dc2626' }} />
+                              <span style={{ color: 'var(--text-muted)', lineHeight: 1.4 }}>{r}</span>
+                            </label>
+                          ))}
+                          <input
+                            type="text"
+                            placeholder="Or type a custom reason…"
+                            value={GCASH_REJECT_REASONS.includes(gcashRejectReason) ? '' : gcashRejectReason}
+                            onChange={e => setGcashRejectReason(e.target.value)}
+                            style={{ width: '100%', marginTop: 6, padding: '6px 10px', borderRadius: 8, border: '1px solid rgba(239,68,68,0.3)', background: 'var(--surface)', color: 'var(--text)', fontSize: 13, boxSizing: 'border-box' }}
+                          />
+                          <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
+                            <button
+                              onClick={async () => {
+                                const note = gcashRejectReason.trim();
+                                if (!note) { showToast('Please select or enter a reason.'); return; }
+                                await api.patch(`/admin/gcash-payments/${g.id}/reject`, { note });
+                                setRejectingGcash(null);
+                                showToast('Payment rejected.');
+                                loadGcashPayments(gcashFilter);
+                              }}
+                              style={{ padding: '5px 16px', background: '#dc2626', color: '#fff', border: 'none', borderRadius: 7, cursor: 'pointer', fontSize: 12, fontWeight: 700 }}
+                            >Confirm Reject</button>
+                            <button
+                              onClick={() => setRejectingGcash(null)}
+                              style={{ padding: '5px 14px', background: 'transparent', border: '1px solid var(--border)', color: 'var(--text-muted)', borderRadius: 7, cursor: 'pointer', fontSize: 12 }}
+                            >Cancel</button>
+                          </div>
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                </>))}
               </tbody>
             </table>
           )}
