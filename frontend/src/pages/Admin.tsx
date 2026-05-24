@@ -1599,7 +1599,7 @@ export default function Admin() {
             <span style={{ fontSize: 13, fontWeight: 600 }}>
               {selectedRows.length > 0
                 ? `${selectedRows.length} selected · ₱${selectedTotal.toFixed(2)} total`
-                : 'Select pending/processing withdrawals to approve in bulk (max 100). User emails are throttled at 5s each.'}
+                : 'Select pending/processing withdrawals to approve in bulk (max 150). User emails are throttled at 5s each.'}
             </span>
             <span style={{ flex: 1 }} />
             <button
