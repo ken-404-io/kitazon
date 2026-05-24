@@ -5,8 +5,8 @@ import { logAudit } from '../services/audit';
 import { sendWithdrawalStatusEmail, sendBroadcastEmail, sendPlanUpgradeEmail, sendGcashPaymentRejectedEmail, sendAccountSuspendedEmail, sendAccountReactivatedEmail } from '../services/email';
 
 // Maximum withdrawals approvable in a single bulk approve call. Throttling at
-// 5s per email means a batch of 100 takes ~8 minutes, so keep the cap modest.
-const BULK_APPROVE_MAX = 100;
+// 5s per email means a batch of 150 takes ~12.5 minutes, so keep the cap modest.
+const BULK_APPROVE_MAX = 150;
 const BULK_APPROVE_EMAIL_GAP_MS = 5000;
 const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
