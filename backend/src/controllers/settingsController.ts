@@ -1,5 +1,12 @@
 import { Request, Response, NextFunction } from 'express';
+import { v2 as cloudinary } from 'cloudinary';
 import db from '../../config/database';
+
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key:    process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
+});
 
 interface SettingRow { key: string; value: string; }
 
@@ -48,5 +55,20 @@ export async function adminUpdateSettings(req: Request, res: Response, next: Nex
     }
     invalidateCache();
     res.json({ message: 'Settings updated.' });
+  } catch (err) { next(err); }
+}
+
+export async function adminUploadImage(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const { image_data } = req.body as { image_data?: string };
+    if (!image_data || typeof image_data !== 'string' || !image_data.startsWith('data:image/')) {
+      res.status(400).json({ message: 'A valid image data URL is required.' });
+      return;
+    }
+    const result = await cloudinary.uploader.upload(image_data, {
+      folder: 'promo',
+      resource_type: 'image',
+    });
+    res.json({ url: result.secure_url });
   } catch (err) { next(err); }
 }

@@ -42,6 +42,7 @@ import CheckIn from './pages/CheckIn';
 import KYC from './pages/KYC';
 import MathQuiz from './pages/MathQuiz';
 import AdManager from './components/AdManager';
+import PromoPopup from './components/PromoPopup';
 
 function MaintenanceGuard({ children }: { children: ReactNode }) {
   const { user } = useAuth();
@@ -85,6 +86,7 @@ export default function App() {
         <PWAInstallPrompt />
         <Navbar />
         <AnnouncementBanner />
+        <PromoPopup />
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/payout-proof" element={<PayoutProof />} />

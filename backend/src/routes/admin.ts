@@ -2,7 +2,7 @@ import { Router } from 'express';
 import authMiddleware from '../middleware/auth';
 import adminAuth from '../middleware/adminAuth';
 import { platformStats, listUsers, toggleUserActive, batchEnableUsers, toggleUserAdmin, listWithdrawals, updateWithdrawalStatus, listAuditLogs, getUserAuditLogs, listTasks, createTask, updateTask, updateUserPlan, adjustBalance, broadcastEmail, revenueStats, bulkImportTasks, grantLeaderboardRewards, listOnlineUsers, bulkApproveWithdrawals, listGcashPayments, approveGcashPayment, rejectGcashPayment, revokeGcashPayment, setReferralCount, fraudReport, suspendAllFraud } from '../controllers/adminController';
-import { getPublicSettings, adminUpdateSettings } from '../controllers/settingsController';
+import { getPublicSettings, adminUpdateSettings, adminUploadImage } from '../controllers/settingsController';
 
 const router = Router();
 
@@ -37,5 +37,6 @@ router.get('/fraud', fraudReport);
 router.post('/fraud/suspend-all', suspendAllFraud);
 router.get('/settings', getPublicSettings);
 router.put('/settings', adminUpdateSettings);
+router.post('/upload-image', adminUploadImage);
 
 export default router;
