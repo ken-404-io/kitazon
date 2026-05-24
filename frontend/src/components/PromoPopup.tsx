@@ -1,14 +1,13 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useSettings } from '../context/SettingsContext';
 import styles from './PromoPopup.module.css';
 
-const SESSION_KEY = 'promo_popup_dismissed';
 const SHOW_DELAY = 900;
 const HIDE_DURATION = 350;
 
-// Routes where the upsell popup should never interrupt the user.
-const HIDDEN_PREFIXES = ['/login', '/register', '/forgot-password', '/reset-password', '/admin', '/auth', '/verify-email', '/plans'];
+// The upsell popup only appears on the homepage and the dashboard.
+const ALLOWED_ROUTES = ['/', '/dashboard'];
 
 export default function PromoPopup() {
   const { getSetting, loadingSettings } = useSettings();
@@ -19,25 +18,26 @@ export default function PromoPopup() {
   const image    = getSetting('promo_popup_image', '');
   const redirect = getSetting('promo_popup_redirect', '/plans') || '/plans';
 
-  const signature = `${image}|${redirect}`;
-  const onHiddenRoute = HIDDEN_PREFIXES.some((p) => location.pathname.startsWith(p));
+  const onAllowedRoute = ALLOWED_ROUTES.includes(location.pathname);
 
   const [mounted, setMounted] = useState(false);
   const [visible, setVisible] = useState(false);
+  // Show once per full page load: resets on reload, so the popup reappears every reload.
+  const shownThisLoad = useRef(false);
 
-  const eligible = !loadingSettings && enabled && !onHiddenRoute;
+  const eligible = !loadingSettings && enabled && onAllowedRoute;
 
   useEffect(() => {
-    if (!eligible) return;
-    if (sessionStorage.getItem(SESSION_KEY) === signature) return;
+    if (!eligible || shownThisLoad.current) return;
 
     const showTimer = setTimeout(() => {
+      shownThisLoad.current = true;
       setMounted(true);
       requestAnimationFrame(() => requestAnimationFrame(() => setVisible(true)));
     }, SHOW_DELAY);
 
     return () => clearTimeout(showTimer);
-  }, [eligible, signature]);
+  }, [eligible]);
 
   // Lock background scroll while the popup is on screen.
   useEffect(() => {
@@ -48,13 +48,11 @@ export default function PromoPopup() {
   }, [mounted]);
 
   const dismiss = () => {
-    sessionStorage.setItem(SESSION_KEY, signature);
     setVisible(false);
     setTimeout(() => setMounted(false), HIDE_DURATION);
   };
 
   const goToRedirect = () => {
-    sessionStorage.setItem(SESSION_KEY, signature);
     setVisible(false);
     setTimeout(() => setMounted(false), HIDE_DURATION);
     navigate(redirect);
