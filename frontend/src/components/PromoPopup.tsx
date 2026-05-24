@@ -8,7 +8,7 @@ const SHOW_DELAY = 900;
 const HIDE_DURATION = 350;
 
 // Routes where the upsell popup should never interrupt the user.
-const HIDDEN_PREFIXES = ['/login', '/register', '/forgot-password', '/reset-password', '/admin', '/auth', '/verify-email'];
+const HIDDEN_PREFIXES = ['/login', '/register', '/forgot-password', '/reset-password', '/admin', '/auth', '/verify-email', '/plans'];
 
 export default function PromoPopup() {
   const { getSetting, loadingSettings } = useSettings();
