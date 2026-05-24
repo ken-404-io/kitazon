@@ -178,6 +178,7 @@ export default function Admin() {
   const [withdrawals, setWithdrawals] = useState<AdminWithdrawal[]>([]);
   const [wPage, setWPage] = useState(1);
   const [wPages, setWPages] = useState(1);
+  const [wPerPage, setWPerPage] = useState(50);
   const [wFilter, setWFilter] = useState('');
   const [wSearch, setWSearch] = useState('');
   const [wLoading, setWLoading] = useState(false);
@@ -432,10 +433,10 @@ export default function Admin() {
     } finally { setUserLoading(false); }
   }, []);
 
-  const loadWithdrawals = useCallback(async (page: number, status: string, search = '') => {
+  const loadWithdrawals = useCallback(async (page: number, status: string, search = '', perPage = 50) => {
     setWLoading(true);
     try {
-      const params = new URLSearchParams({ page: String(page) });
+      const params = new URLSearchParams({ page: String(page), per_page: String(perPage) });
       if (status) params.set('status', status);
       if (search.trim()) params.set('search', search.trim());
       const res = await api.get<{ withdrawals: AdminWithdrawal[]; pages: number }>(
@@ -536,8 +537,8 @@ export default function Admin() {
     if (tab === 'stats' && !stats) loadStats();
     if (tab === 'users') loadUsers(userPage, userSearch);
     if (tab === 'suspended') loadUsers(userPage, userSearch, 'suspended');
-    if (tab === 'withdrawals') loadWithdrawals(wPage, wFilter, wSearch);
-    if (tab === 'pending-withdrawals') loadWithdrawals(wPage, 'pending', wSearch);
+    if (tab === 'withdrawals') loadWithdrawals(wPage, wFilter, wSearch, wPerPage);
+    if (tab === 'pending-withdrawals') loadWithdrawals(wPage, 'pending', wSearch, wPerPage);
     if (tab === 'tasks') loadTasks();
     if (tab === 'logs') loadLogs(logPage);
     if (tab === 'revenue' && !revenueStats) loadRevenue();
@@ -546,7 +547,7 @@ export default function Admin() {
     if (tab === 'online') loadOnline();
     if (tab === 'fraud' && !fraudData) loadFraud();
     if (tab === 'settings') loadSiteSettings();
-  }, [tab, userPage, wPage, wFilter, wSearch, logPage, kycFilter, gcashFilter, stats, revenueStats, fraudData, loadStats, loadUsers, loadWithdrawals, loadTasks, loadLogs, loadRevenue, loadKyc, loadGcashPayments, loadOnline, loadFraud, loadSiteSettings]);
+  }, [tab, userPage, wPage, wPerPage, wFilter, wSearch, logPage, kycFilter, gcashFilter, stats, revenueStats, fraudData, loadStats, loadUsers, loadWithdrawals, loadTasks, loadLogs, loadRevenue, loadKyc, loadGcashPayments, loadOnline, loadFraud, loadSiteSettings]);
 
   // Auto-refresh online tab every 1 minute
   useEffect(() => {
@@ -721,7 +722,7 @@ export default function Admin() {
       if (trimmed) message = trimmed.slice(0, 1000);
     }
     await api.patch(`/admin/withdrawals/${id}/status`, message ? { status, message } : { status });
-    loadWithdrawals(wPage, tab === 'pending-withdrawals' ? 'pending' : wFilter, wSearch);
+    loadWithdrawals(wPage, tab === 'pending-withdrawals' ? 'pending' : wFilter, wSearch, wPerPage);
   };
 
   // Pending and processing rows are eligible for bulk approve.
@@ -776,7 +777,7 @@ export default function Admin() {
       setTimeout(() => setToast(''), 6000);
       setSelectedW(new Set());
       setApproveMessage('');
-      loadWithdrawals(wPage, tab === 'pending-withdrawals' ? 'pending' : wFilter, wSearch);
+      loadWithdrawals(wPage, tab === 'pending-withdrawals' ? 'pending' : wFilter, wSearch, wPerPage);
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { message?: string } } }).response?.data?.message ?? 'Bulk approve failed.';
       setToast(msg);
@@ -1493,10 +1494,20 @@ export default function Admin() {
                 <option value="completed">Completed</option>
                 <option value="failed">Failed</option>
               </select>
+              <label style={{ fontSize: 13, marginLeft: 'auto' }}>Rows:</label>
+              <select
+                value={wPerPage}
+                onChange={e => { setWPerPage(Number(e.target.value)); setWPage(1); setSelectedW(new Set()); }}
+                style={{ padding: '6px 10px', borderRadius: 6, border: '1px solid #e5e7eb' }}
+              >
+                <option value={50}>50</option>
+                <option value={100}>100</option>
+                <option value={120}>120</option>
+              </select>
               <button
                 onClick={exportWithdrawalsCSV}
                 disabled={withdrawals.length === 0}
-                style={{ marginLeft: 'auto', padding: '6px 14px', borderRadius: 6, border: '1px solid #22c55e', background: 'rgba(34,197,94,0.1)', color: '#22c55e', fontSize: 12, fontWeight: 700, cursor: withdrawals.length === 0 ? 'default' : 'pointer', opacity: withdrawals.length === 0 ? 0.4 : 1 }}
+                style={{ padding: '6px 14px', borderRadius: 6, border: '1px solid #22c55e', background: 'rgba(34,197,94,0.1)', color: '#22c55e', fontSize: 12, fontWeight: 700, cursor: withdrawals.length === 0 ? 'default' : 'pointer', opacity: withdrawals.length === 0 ? 0.4 : 1 }}
               >
                 ⬇ Export CSV
               </button>
@@ -1516,6 +1527,16 @@ export default function Admin() {
                     </span>
                   )}
                 </div>
+                <label style={{ fontSize: 13, whiteSpace: 'nowrap' }}>Rows:</label>
+                <select
+                  value={wPerPage}
+                  onChange={e => { setWPerPage(Number(e.target.value)); setWPage(1); setSelectedW(new Set()); }}
+                  style={{ padding: '6px 10px', borderRadius: 6, border: '1px solid var(--dark-border)', background: 'var(--dark-bg)', color: 'var(--text)' }}
+                >
+                  <option value={50}>50</option>
+                  <option value={100}>100</option>
+                  <option value={120}>120</option>
+                </select>
                 <button
                   onClick={exportWithdrawalsCSV}
                   disabled={withdrawals.length === 0}

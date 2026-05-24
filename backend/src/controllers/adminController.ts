@@ -155,7 +155,9 @@ export async function toggleUserAdmin(req: Request, res: Response, next: NextFun
 export async function listWithdrawals(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     const page = Math.max(1, Number(req.query.page ?? 1));
-    const limit = 50;
+    const ALLOWED_PER_PAGE = [50, 100, 120];
+    const requestedPerPage = Number(req.query.per_page ?? 50);
+    const limit = ALLOWED_PER_PAGE.includes(requestedPerPage) ? requestedPerPage : 50;
     const offset = (page - 1) * limit;
     const status = req.query.status as string | undefined;
     const search = (req.query.search as string | undefined)?.trim() ?? '';

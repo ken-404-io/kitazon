@@ -39,6 +39,9 @@ export default function AdManager() {
     // Monetag Zone 11042455
     addScript({ src: 'https://ueuee.com/tag.min.js', 'data-zone': '11042455', async: '' });
 
+    // Monetag Zone 240267
+    addScript({ src: 'https://quge5.com/88/tag.min.js', 'data-zone': '240267', async: '', 'data-cfasync': 'false' });
+
     // Adsterra Social Bar
     addScript({ src: 'https://pl29417357.profitablecpmratenetwork.com/f8/8b/4a/f88b4accd723fbbe625cbc01ce5fcea6.js' });
 
@@ -50,8 +53,8 @@ export default function AdManager() {
       // Also sweep any iframes/elements injected by the ad SDKs themselves
       document
         .querySelectorAll<HTMLElement>(
-          'script[data-zone], script[src*="ueuee.com"], script[src*="dd133.com"], ' +
-          'iframe[src*="ueuee.com"], iframe[src*="dd133.com"], iframe[src*="profitablecpmratenetwork.com"], ' +
+          'script[data-zone], script[src*="ueuee.com"], script[src*="dd133.com"], script[src*="quge5.com"], ' +
+          'iframe[src*="ueuee.com"], iframe[src*="dd133.com"], iframe[src*="quge5.com"], iframe[src*="profitablecpmratenetwork.com"], ' +
           '[id*="container-6eabcdaeb07c57f4f19da67d49052315"]'
         )
         .forEach(el => el.remove());
