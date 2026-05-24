@@ -1,13 +1,17 @@
 import { useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
 export default function AdManager() {
   const { user } = useAuth();
+  const location = useLocation();
 
   const isPaidPlan = user?.plan && user.plan !== 'free';
+  // Suppress ads on the Plans page so free users can avail a plan without distraction.
+  const onPlansPage = location.pathname === '/plans';
 
   useEffect(() => {
-    if (!user || user.is_admin || isPaidPlan) {
+    if (!user || user.is_admin || isPaidPlan || onPlansPage) {
       // Remove any lingering ad scripts/iframes left from a previous free-plan session
       document
         .querySelectorAll<HTMLElement>(
@@ -59,7 +63,7 @@ export default function AdManager() {
         )
         .forEach(el => el.remove());
     };
-  }, [user, isPaidPlan]);
+  }, [user, isPaidPlan, onPlansPage]);
 
   return null;
 }
