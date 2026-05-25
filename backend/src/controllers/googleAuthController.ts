@@ -168,6 +168,7 @@ function safeUser(u: DbUser) {
     totp_enabled:   u.totp_enabled ?? false,
     last_login_at:  u.last_login_at ?? null,
     plan:           u.plan ?? 'free',
+    welcome_bonus_claimed: !!u.welcome_bonus_claimed_at,
   };
 }
 

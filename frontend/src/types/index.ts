@@ -13,6 +13,7 @@ export interface User {
   plan?: UserPlan;
   plan_expires_at?: string | null;
   avatar_url?: string | null;
+  welcome_bonus_claimed?: boolean;
 }
 
 export interface Task {

@@ -76,65 +76,68 @@
 }
 
 /* ── Stay Connected promo banner ───────────────────────────────────────── */
-.promoBanner {
+.claimBanner {
   display: flex;
   align-items: center;
   gap: 1rem;
-  background: rgba(249,115,22,0.06);
-  border: 1px solid rgba(249,115,22,0.35);
+  background: linear-gradient(135deg, rgba(34,197,94,0.14), rgba(249,115,22,0.12));
+  border: 1px solid rgba(34,197,94,0.4);
   border-radius: 16px;
   padding: 1rem 1.1rem;
   margin-bottom: 1.25rem;
-  text-decoration: none;
   color: var(--text);
-  transition: background 0.15s;
+  box-shadow: 0 4px 20px rgba(34,197,94,0.12);
 }
-.promoBanner:hover { background: rgba(249,115,22,0.1); text-decoration: none; }
 
-.promoIcon {
+.claimIcon {
   width: 52px;
   height: 52px;
   border-radius: 14px;
-  border: 1.5px solid rgba(249,115,22,0.4);
-  color: #f97316;
+  border: 1.5px solid rgba(34,197,94,0.45);
+  color: #22c55e;
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
 }
 
-.promoText {
+.claimText {
   display: flex;
   flex-direction: column;
   flex: 1;
   min-width: 0;
   gap: 2px;
 }
-.promoText strong {
-  font-size: 0.92rem;
-  font-weight: 700;
+.claimText strong {
+  font-size: 0.95rem;
+  font-weight: 800;
   color: var(--text);
 }
-.promoText span {
+.claimText span {
   font-size: 0.75rem;
   color: var(--text-muted);
   line-height: 1.35;
 }
 
-.promoBtn {
+.claimBtn {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  border: 1.5px solid #f97316;
-  color: #f97316;
-  background: transparent;
-  font-size: 0.78rem;
-  font-weight: 700;
-  padding: 0.5rem 0.9rem;
+  border: none;
+  color: #fff;
+  background: linear-gradient(135deg, #22c55e, #16a34a);
+  font-size: 0.82rem;
+  font-weight: 800;
+  padding: 0.6rem 1.1rem;
   border-radius: 10px;
   white-space: nowrap;
   flex-shrink: 0;
+  cursor: pointer;
+  transition: filter 0.15s, transform 0.1s;
 }
+.claimBtn:hover:not(:disabled) { filter: brightness(1.08); }
+.claimBtn:active:not(:disabled) { transform: scale(0.97); }
+.claimBtn:disabled { opacity: 0.6; cursor: not-allowed; }
 
 /* ── Connect & Follow card ─────────────────────────────────────────────── */
 .connectCard {
@@ -462,8 +465,8 @@
 /* ── Responsive ─────────────────────────────────────────────────────────── */
 @media (max-width: 600px) {
   .greetingRow { grid-template-columns: 1fr; }
-  .promoText strong { font-size: 0.85rem; }
-  .promoText span { font-size: 0.72rem; }
+  .claimText strong { font-size: 0.88rem; }
+  .claimText span { font-size: 0.72rem; }
 }
 
 @media (max-width: 480px) {
@@ -471,9 +474,9 @@
   .navLabel    { font-size: 0.6rem; }
   .subCards    { grid-template-columns: 1fr; }
   .balanceCard { padding: 1.2rem; }
-  .promoBanner { gap: 0.75rem; padding: 0.85rem; }
-  .promoIcon   { width: 44px; height: 44px; }
-  .promoBtn    { padding: 0.4rem 0.7rem; font-size: 0.72rem; }
+  .claimBanner { gap: 0.75rem; padding: 0.85rem; }
+  .claimIcon   { width: 44px; height: 44px; }
+  .claimBtn    { padding: 0.5rem 0.8rem; font-size: 0.76rem; }
   .connectBtn  { padding: 0.4rem 0.7rem; font-size: 0.72rem; }
 }
 

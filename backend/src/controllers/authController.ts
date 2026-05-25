@@ -58,6 +58,7 @@ const safeUser = (u: DbUser) => ({
   last_login_at: u.last_login_at ?? null,
   plan: u.plan ?? 'free',
   avatar_url: u.avatar_url ?? null,
+  welcome_bonus_claimed: !!u.welcome_bonus_claimed_at,
 });
 
 // ─── Token blacklist (access tokens; in-memory, clears hourly) ───────────────

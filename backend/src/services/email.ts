@@ -271,6 +271,20 @@ export async function sendReferralEarnedEmail(to: string, name: string, referred
   `));
 }
 
+export async function sendWelcomeBonusEmail(to: string, name: string, amount: number): Promise<void> {
+  const dashboardLink = `${BASE}/dashboard`;
+  await send(to, `Congratulations! You claimed your ₱${amount.toFixed(2)} bonus 🎉`, layout('Welcome Bonus Claimed', `
+    ${h2(`Congratulations, ${name.split(' ')[0]}! 🎉`)}
+    ${p(`You've successfully claimed your one-time welcome bonus of <strong style="color:#22c55e;">₱${amount.toFixed(2)}</strong>. It has been credited straight to your Kitazon balance.`)}
+    ${table(
+      row('Bonus', `<span style="color:#22c55e;font-weight:800;">+₱${amount.toFixed(2)}</span>`) +
+      row('Status', `<span style="color:#22c55e;font-weight:800;">Credited</span>`)
+    )}
+    ${p('Thank you for being part of Kitazon. Start earning more by completing tasks, spinning the daily wheel, and inviting friends!')}
+    <div style="text-align:center;margin:24px 0;">${btn(dashboardLink, 'View My Balance')}</div>
+  `));
+}
+
 export async function sendGcashPaymentReceivedEmail(to: string, name: string, plan: string, amount: string, reference: string): Promise<void> {
   const planLabel = plan.charAt(0).toUpperCase() + plan.slice(1);
   await send(to, 'We received your GCash payment proof 📥', layout('Payment Proof Received', `
