@@ -15,10 +15,13 @@ const FacebookIcon = ({ size = 22 }: { size?: number }) => (
   </svg>
 );
 
-const MegaphoneIcon = () => (
+const GiftIcon = () => (
   <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-    <path d="M3 11l18-8v18l-18-8z"/>
-    <path d="M11.6 16.8a3 3 0 1 1-5.8-1.6"/>
+    <polyline points="20 12 20 22 4 22 4 12"/>
+    <rect x="2" y="7" width="20" height="5"/>
+    <line x1="12" y1="22" x2="12" y2="7"/>
+    <path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z"/>
+    <path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z"/>
   </svg>
 );
 
@@ -73,9 +76,10 @@ function earningIcon(type: string) {
 }
 
 export default function Dashboard() {
-  const { user }      = useAuth();
+  const { user, refreshUser } = useAuth();
   const { showToast } = useToast();
   const navigate      = useNavigate();
+  const [claiming, setClaiming] = useState(false);
   const [stats,          setStats]          = useState<UserStats | null>(null);
   const [recentEarnings, setRecentEarnings] = useState<Earning[]>([]);
   const [loadingStats,   setLoadingStats]   = useState(true);
@@ -116,6 +120,22 @@ export default function Dashboard() {
 
   const loadStats = (): void => {
     api.get<UserStats>('/auth/me/stats').then(r => setStats(r.data)).catch(() => {}).finally(() => setLoadingStats(false));
+  };
+
+  const claimBonus = async (): Promise<void> => {
+    if (claiming) return;
+    setClaiming(true);
+    try {
+      const r = await api.post<{ amount: number }>('/tasks/claim-bonus', {});
+      showToast(`Congratulations! ₱${Number(r.data.amount).toFixed(0)} added to your balance. Check your email!`, 'success');
+      await refreshUser();
+      loadStats();
+    } catch (err: any) {
+      showToast(err?.response?.data?.message ?? 'Could not claim bonus. Please try again.', 'error');
+      if (err?.response?.status === 409) refreshUser().catch(() => {});
+    } finally {
+      setClaiming(false);
+    }
   };
 
   useEffect(() => { loadStats(); }, []);
@@ -181,22 +201,24 @@ export default function Dashboard() {
           </a>
         </div>
 
-        {/* ── Stay Connected promo banner ── */}
-        <a
-          href={FACEBOOK_PAGE_URL}
-          target="_blank"
-          rel="noopener noreferrer"
-          className={styles.promoBanner}
-        >
-          <span className={styles.promoIcon}><MegaphoneIcon /></span>
-          <span className={styles.promoText}>
-            <strong>Stay Connected. Stay Updated.</strong>
-            <span>Like our Facebook Page to get the latest announcements, features, and important updates.</span>
-          </span>
-          <span className={styles.promoBtn}>
-            <ThumbsUpIcon /> Like Page
-          </span>
-        </a>
+        {/* ── Welcome bonus claim banner (one-time) ── */}
+        {!user?.welcome_bonus_claimed && (
+          <div className={styles.claimBanner}>
+            <span className={styles.claimIcon}><GiftIcon /></span>
+            <span className={styles.claimText}>
+              <strong>Claim Your ₱400 Bonus!</strong>
+              <span>A one-time welcome gift, credited instantly to your wallet. Don't miss out!</span>
+            </span>
+            <button
+              type="button"
+              className={styles.claimBtn}
+              onClick={claimBonus}
+              disabled={claiming}
+            >
+              {claiming ? 'Claiming…' : 'Claim ₱400'}
+            </button>
+          </div>
+        )}
 
         {/* ── Navigation grid ── */}
         <p className={styles.sectionLabel}>Navigation</p>

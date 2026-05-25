@@ -1,8 +1,11 @@
 import { Request, Response, NextFunction } from 'express';
 import db from '../../config/database';
-import { DbTask, DbEarning } from '../types';
+import { DbTask, DbEarning, DbUser } from '../types';
+import { sendWelcomeBonusEmail } from '../services/email';
 
 const SPIN_PRIZES = [5, 5, 10, 10, 15, 20, 25, 50, 75, 100];
+
+const WELCOME_BONUS = 400;
 
 const VALID_CATEGORIES = ['survey', 'app_install', 'video', 'microjob', 'game'] as const;
 
@@ -274,5 +277,47 @@ export async function quizCorrect(req: Request, res: Response, next: NextFunctio
     });
 
     res.json({ amount: QUIZ_REWARD, capped: false });
+  } catch (err) { next(err); }
+}
+
+export async function claimWelcomeBonus(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    let alreadyClaimed = false;
+    let userRow: DbUser | undefined;
+
+    await db.transaction(async (trx) => {
+      // Lock the user row to prevent concurrent double-claims
+      userRow = await trx<DbUser>('users').where({ id: req.user!.id }).forUpdate().first();
+      if (!userRow) return;
+
+      if (userRow.welcome_bonus_claimed_at) {
+        alreadyClaimed = true;
+        return;
+      }
+
+      await trx('earnings').insert({
+        user_id: req.user!.id,
+        task_id: null,
+        amount: WELCOME_BONUS,
+        type: 'welcome_bonus',
+        description: 'Welcome bonus',
+      });
+      await trx('users').where({ id: req.user!.id }).increment('balance', WELCOME_BONUS);
+      await trx('users').where({ id: req.user!.id }).update({ welcome_bonus_claimed_at: new Date() });
+    });
+
+    if (!userRow) {
+      res.status(404).json({ message: 'User not found.' });
+      return;
+    }
+
+    if (alreadyClaimed) {
+      res.status(409).json({ message: 'You have already claimed your welcome bonus.' });
+      return;
+    }
+
+    sendWelcomeBonusEmail(userRow.email, userRow.name, WELCOME_BONUS).catch(() => {});
+
+    res.json({ message: `Congratulations! ₱${WELCOME_BONUS} has been added to your balance.`, amount: WELCOME_BONUS });
   } catch (err) { next(err); }
 }

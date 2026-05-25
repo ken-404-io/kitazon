@@ -39,6 +39,7 @@ export interface DbUser {
   kyc_submitted_at: Date | null;
   kyc_reviewed_at: Date | null;
   kyc_rejection_reason: string | null;
+  welcome_bonus_claimed_at: Date | null;
   created_at: Date;
   updated_at: Date;
 }
