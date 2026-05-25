@@ -21,7 +21,7 @@ import creditsRoutes from './routes/credits';
 import kycRoutes from './routes/kyc';
 import notificationsRoutes from './routes/notifications';
 import { getPublicSettings } from './controllers/settingsController';
-import { runMigrations } from './runMigrations';
+import { ensureSchema } from './ensureSchema';
 
 // ─── Startup guards ────────────────────────────────────────────────────────────
 if (!process.env.JWT_SECRET || process.env.JWT_SECRET.length < 32) {
@@ -174,10 +174,10 @@ app.use(errorHandler);
 
 const PORT = Number(process.env.PORT ?? 5000);
 
-// Apply pending DB migrations on boot, then start the server regardless of the
-// migration outcome so a migration error never causes downtime.
-runMigrations()
-  .catch((err) => console.error('[migrate] Migration step failed (starting server anyway):', err))
+// Ensure required DB schema on boot, then start the server regardless of the
+// outcome so a schema error never causes downtime.
+ensureSchema()
+  .catch((err) => console.error('[schema] schema ensure failed (starting server anyway):', err))
   .finally(() => {
     app.listen(PORT, () => console.log(`Kitazon API running on port ${PORT}`));
   });
