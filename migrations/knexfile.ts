@@ -18,13 +18,14 @@ const config: { [key: string]: Knex.Config } = {
   development: {
     client: 'pg',
     connection,
-    migrations: { directory: './migrations' },
-    seeds: { directory: './seeds' },
+    // Migration files live with the backend service so they ship and run on deploy.
+    migrations: { directory: path.resolve(__dirname, '../backend/migrations') },
+    seeds: { directory: path.resolve(__dirname, './seeds') },
   },
   production: {
     client: 'pg',
     connection,
-    migrations: { directory: './migrations' },
+    migrations: { directory: path.resolve(__dirname, '../backend/migrations') },
   },
 };
 
