@@ -3,6 +3,8 @@ builder = "NIXPACKS"
 buildCommand = "npm install --include=dev && npm run build"
 
 [deploy]
-startCommand = "node dist/src/app.js"
+# Apply any pending DB migrations before booting. Uses ";" (not "&&") so a
+# migration error never blocks the API from starting.
+startCommand = "npm run migrate; node dist/src/app.js"
 restartPolicyType = "ON_FAILURE"
 restartPolicyMaxRetries = 3
