@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import authMiddleware from '../middleware/auth';
 import adminAuth from '../middleware/adminAuth';
-import { platformStats, listUsers, toggleUserActive, batchEnableUsers, toggleUserAdmin, listWithdrawals, updateWithdrawalStatus, listAuditLogs, getUserAuditLogs, listTasks, createTask, updateTask, updateUserPlan, adjustBalance, broadcastEmail, revenueStats, bulkImportTasks, grantLeaderboardRewards, listOnlineUsers, bulkApproveWithdrawals, listGcashPayments, approveGcashPayment, rejectGcashPayment, revokeGcashPayment, setReferralCount, fraudReport, suspendAllFraud } from '../controllers/adminController';
+import { platformStats, listUsers, toggleUserActive, batchEnableUsers, toggleUserAdmin, listWithdrawals, updateWithdrawalStatus, listAuditLogs, getUserAuditLogs, listTasks, createTask, updateTask, updateUserPlan, adjustBalance, broadcastEmail, revenueStats, bulkImportTasks, grantLeaderboardRewards, listOnlineUsers, bulkApproveWithdrawals, bulkFailWithdrawals, listGcashPayments, approveGcashPayment, rejectGcashPayment, revokeGcashPayment, setReferralCount, fraudReport, suspendAllFraud } from '../controllers/adminController';
 import { getPublicSettings, adminUpdateSettings, adminUploadImage } from '../controllers/settingsController';
 
 const router = Router();
@@ -21,6 +21,7 @@ router.post('/users/:id/balance', adjustBalance);
 router.get('/withdrawals', listWithdrawals);
 router.patch('/withdrawals/:id/status', updateWithdrawalStatus);
 router.post('/withdrawals/bulk-approve', bulkApproveWithdrawals);
+router.post('/withdrawals/bulk-failed', bulkFailWithdrawals);
 router.get('/audit-logs', listAuditLogs);
 router.get('/tasks', listTasks);
 router.post('/tasks', createTask);

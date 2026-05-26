@@ -184,6 +184,7 @@ export default function Admin() {
   const [wLoading, setWLoading] = useState(false);
   const [selectedW, setSelectedW] = useState<Set<number>>(new Set());
   const [batchBusy, setBatchBusy] = useState(false);
+  const [batchAction, setBatchAction] = useState<'approve' | 'fail' | null>(null);
 
   // Tasks
   const [tasks, setTasks] = useState<AdminTask[]>([]);
@@ -787,6 +788,7 @@ export default function Admin() {
       `Each user will be notified by email. Sending is throttled to one email every 5 seconds.${messagePreview}`
     )) return;
     setBatchBusy(true);
+    setBatchAction('approve');
     try {
       const res = await api.post<{ message: string; approved_count: number; approved_ids: number[]; skipped_ids?: number[] }>(
         '/admin/withdrawals/bulk-approve',
@@ -810,6 +812,43 @@ export default function Admin() {
       setTimeout(() => setToast(''), 5000);
     } finally {
       setBatchBusy(false);
+      setBatchAction(null);
+    }
+  };
+
+  const triggerBulkFailed = async () => {
+    if (selectedRows.length === 0) return;
+    const messagePreview = approveMessage.trim() ? `\n\nUser will see this message in their email:\n"${approveMessage.trim()}"` : '';
+    if (!window.confirm(
+      `Mark ${selectedRows.length} withdrawal${selectedRows.length === 1 ? '' : 's'} (₱${selectedTotal.toFixed(2)} total) as FAILED?\n\n` +
+      `Each user's balance will be refunded and they will be notified by email. Sending is throttled to one email every 5 seconds.${messagePreview}`
+    )) return;
+    setBatchBusy(true);
+    setBatchAction('fail');
+    try {
+      const res = await api.post<{ message: string; failed_count: number; failed_ids: number[]; skipped_ids?: number[] }>(
+        '/admin/withdrawals/bulk-failed',
+        {
+          withdrawal_ids: selectedRows.map(w => w.id),
+          message: approveMessage.trim() || undefined,
+        },
+      );
+      const skippedNote = res.data.skipped_ids && res.data.skipped_ids.length > 0 ? ` · ${res.data.skipped_ids.length} skipped` : '';
+      const emailNote = res.data.failed_count > 0
+        ? ` · emails sending over ~${Math.max(0, res.data.failed_count - 1) * 5}s`
+        : '';
+      setToast(`Marked ${res.data.failed_count} as failed${skippedNote}.${emailNote}`);
+      setTimeout(() => setToast(''), 6000);
+      setSelectedW(new Set());
+      setApproveMessage('');
+      loadWithdrawals(wPage, tab === 'pending-withdrawals' ? 'pending' : wFilter, wSearch, wPerPage);
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { message?: string } } }).response?.data?.message ?? 'Bulk fail failed.';
+      setToast(msg);
+      setTimeout(() => setToast(''), 5000);
+    } finally {
+      setBatchBusy(false);
+      setBatchAction(null);
     }
   };
 
@@ -1599,7 +1638,7 @@ export default function Admin() {
             <span style={{ fontSize: 13, fontWeight: 600 }}>
               {selectedRows.length > 0
                 ? `${selectedRows.length} selected · ₱${selectedTotal.toFixed(2)} total`
-                : 'Select pending/processing withdrawals to approve in bulk (max 150). User emails are throttled at 5s each.'}
+                : 'Select pending/processing withdrawals to approve or mark failed in bulk (max 150). User emails are throttled at 5s each.'}
             </span>
             <span style={{ flex: 1 }} />
             <button
@@ -1618,14 +1657,22 @@ export default function Admin() {
               onClick={triggerBulkApprove}
               style={{ fontSize: 12, padding: '6px 14px', whiteSpace: 'nowrap', background: '#16a34a', borderColor: '#16a34a' }}
             >
-              {batchBusy ? 'Approving…' : `✓ Approve Selected (${selectedRows.length})`}
+              {batchAction === 'approve' ? 'Approving…' : `✓ Approve Selected (${selectedRows.length})`}
+            </button>
+            <button
+              className="btn-primary"
+              disabled={selectedRows.length === 0 || batchBusy}
+              onClick={triggerBulkFailed}
+              style={{ fontSize: 12, padding: '6px 14px', whiteSpace: 'nowrap', background: '#dc2626', borderColor: '#dc2626' }}
+            >
+              {batchAction === 'fail' ? 'Marking failed…' : `✗ Mark Failed Selected (${selectedRows.length})`}
             </button>
           </div>
 
-          {/* Optional message to include in the approval email */}
+          {/* Optional message to include in the approval/failed notification email */}
           <div style={{ marginBottom: '1rem' }}>
             <label style={{ fontSize: 12, fontWeight: 600, color: '#6b7280', display: 'block', marginBottom: 4 }}>
-              Optional message to include in the approval email ({approveMessage.length}/1000)
+              Optional message to include in the approval/failed notification email ({approveMessage.length}/1000)
             </label>
             <textarea
               value={approveMessage}
