@@ -393,6 +393,115 @@ export async function bulkApproveWithdrawals(req: Request, res: Response, next: 
   } catch (err) { next(err); }
 }
 
+// ─── Bulk fail withdrawals ────────────────────────────────────────────────────
+// Body: { withdrawal_ids: number[], message?: string }
+// Marks every listed pending/processing withdrawal as failed in a single
+// transaction and refunds each owner's balance, then notifies each user by
+// email with a 5-second gap between sends so Resend's rate limiter doesn't
+// reject the run.
+export async function bulkFailWithdrawals(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const { withdrawal_ids: rawIds, message } = req.body as { withdrawal_ids?: unknown; message?: unknown };
+    const adminMessage =
+      typeof message === 'string' && message.trim()
+        ? message.trim().slice(0, 1000)
+        : null;
+
+    if (!Array.isArray(rawIds) || rawIds.length === 0) {
+      res.status(400).json({ message: 'No withdrawals selected.' });
+      return;
+    }
+    const ids = rawIds
+      .map((v) => Number(v))
+      .filter((n) => Number.isInteger(n) && n > 0);
+    if (ids.length === 0) {
+      res.status(400).json({ message: 'No valid withdrawal ids provided.' });
+      return;
+    }
+    if (ids.length > BULK_APPROVE_MAX) {
+      res.status(400).json({ message: `Cannot fail more than ${BULK_APPROVE_MAX} withdrawals at once.` });
+      return;
+    }
+
+    // Atomically flip status from pending/processing → failed for the listed
+    // ids and refund each owner's balance within the same transaction. Rows
+    // already completed/failed are skipped, so a balance is never refunded twice.
+    const failedRows = await db.transaction(async (trx) => {
+      const claimed = await trx('withdrawals')
+        .whereIn('id', ids)
+        .whereIn('status', ['pending', 'processing'])
+        .update({ status: 'failed' })
+        .returning(['id', 'user_id', 'amount', 'net_amount', 'channel']);
+
+      const rows = (claimed ?? []) as Array<{
+        id: number;
+        user_id: number;
+        amount: number | string;
+        net_amount: number | string;
+        channel: string;
+      }>;
+
+      for (const row of rows) {
+        await trx('users').where({ id: row.user_id }).increment('balance', Number(row.amount));
+      }
+      return rows;
+    });
+
+    const failedIds = failedRows.map((r) => r.id);
+    const skipped = ids.filter((id) => !failedIds.includes(id));
+
+    if (failedRows.length === 0) {
+      res.status(409).json({
+        message: 'None of the selected withdrawals are pending or processing.',
+        skipped_ids: skipped,
+      });
+      return;
+    }
+
+    await logAudit(req.user!.id, 'admin_bulk_fail_withdrawals', req, {
+      amount: failedRows.reduce((s, r) => s + Number(r.amount), 0),
+      metadata: { withdrawal_ids: failedIds, skipped_ids: skipped, has_message: !!adminMessage },
+    });
+
+    // Respond immediately — emails are sent in the background with a 5s gap
+    // between each user to stay under the Resend per-second limit.
+    res.json({
+      message: `Marked ${failedRows.length} withdrawal${failedRows.length === 1 ? '' : 's'} as failed.`,
+      failed_count: failedRows.length,
+      failed_ids: failedIds,
+      skipped_ids: skipped,
+    });
+
+    void (async () => {
+      const owners = await db<DbUser>('users')
+        .whereIn('id', failedRows.map((r) => r.user_id))
+        .select('id', 'email', 'name');
+      const ownerById = new Map(owners.map((u) => [u.id, u]));
+
+      for (let i = 0; i < failedRows.length; i++) {
+        const row = failedRows[i];
+        const owner = ownerById.get(row.user_id);
+        if (owner) {
+          try {
+            await sendWithdrawalStatusEmail(
+              owner.email,
+              owner.name,
+              'failed',
+              Number(row.amount),
+              row.channel,
+              Number(row.net_amount),
+              adminMessage,
+            );
+          } catch (emailErr) {
+            console.error('[Bulk Fail] email send failed', { withdrawal_id: row.id, error: (emailErr as Error).message });
+          }
+        }
+        if (i < failedRows.length - 1) await sleep(BULK_APPROVE_EMAIL_GAP_MS);
+      }
+    })();
+  } catch (err) { next(err); }
+}
+
 // ─── Task management ──────────────────────────────────────────────────────────
 const VALID_TASK_CATEGORIES = ['survey', 'app_install', 'video', 'microjob', 'game'] as const;
 type TaskCategory = typeof VALID_TASK_CATEGORIES[number];
