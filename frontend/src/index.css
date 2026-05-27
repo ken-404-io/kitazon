@@ -54,21 +54,6 @@
   --blue-subtle:  var(--primary-subtle);
   --purple:       var(--primary-dark);
   --purple-subtle:var(--deep-subtle);
-
-  /* KitaGrow — distinct investment green theme (used only on /kitagrow) */
-  --kg-green:        #16a34a;
-  --kg-green-light:  #22c55e;
-  --kg-green-dark:   #15803d;
-  --kg-emerald:      #10b981;
-  --kg-mint:         #34d399;
-  --kg-text:         #062e1a;
-  --kg-card:         #ffffff;
-  --kg-card-soft:    #f0fdf4;
-  --kg-border:       rgba(22,163,74,0.18);
-  --kg-muted:        #5b7a67;
-  --kg-page-bg:      linear-gradient(160deg, #ecfdf5 0%, #d1fae5 38%, #f0fdf4 100%);
-  --kg-hero-bg:      linear-gradient(135deg, #16a34a 0%, #15803d 55%, #047857 100%);
-  --kg-shadow:       0 10px 30px rgba(16,122,64,0.18);
 }
 
 [data-theme="light"] {
