@@ -18,6 +18,7 @@ import totpRoutes from './routes/totp';
 import googleAuthRoutes from './routes/googleAuth';
 import subscriptionRoutes from './routes/subscriptions';
 import creditsRoutes from './routes/credits';
+import investmentRoutes from './routes/investments';
 import kycRoutes from './routes/kyc';
 import notificationsRoutes from './routes/notifications';
 import { getPublicSettings } from './controllers/settingsController';
@@ -124,6 +125,7 @@ app.use((req: Request, res: Response, next: NextFunction): void => {
 app.use(cookieParser());
 app.use('/api/kyc/submit', express.json({ limit: '20mb' }));
 app.use('/api/subscriptions/gcash-submit', express.json({ limit: '8mb' }));
+app.use('/api/investments', express.json({ limit: '8mb' }));
 app.use('/api/admin/upload-image', express.json({ limit: '8mb' }));
 app.use(express.json({ limit: '10kb' }));
 app.use(express.urlencoded({ extended: false, limit: '10kb' }));
@@ -158,6 +160,7 @@ app.use('/api/totp', totpRoutes);
 app.use('/api/auth', googleAuthRoutes);
 app.use('/api/subscriptions', subscriptionRoutes);
 app.use('/api/credits', creditsRoutes);
+app.use('/api/investments', investmentRoutes);
 app.use('/api/kyc', kycRoutes);
 app.use('/api/notifications', notificationsRoutes);
 
