@@ -2532,13 +2532,13 @@ export default function Admin() {
           )}
 
           {/* Investments */}
-          <h2 style={{ margin: '0 0 0.75rem', fontSize: '1.05rem', fontWeight: 700, color: '#16a34a' }}>Investments</h2>
+          <h2 style={{ margin: '0 0 0.75rem', fontSize: '1.05rem', fontWeight: 700, color: 'var(--gold)' }}>Investments</h2>
           <div style={{ display: 'flex', gap: 8, marginBottom: '1rem', alignItems: 'center', flexWrap: 'wrap' }}>
             {(['pending', 'active', 'matured', 'rejected'] as const).map(s => (
               <button key={s} onClick={() => setInvestFilter(s)} style={{
                 padding: '6px 14px', borderRadius: 6, cursor: 'pointer', fontWeight: investFilter === s ? 700 : 400,
-                background: investFilter === s ? '#16a34a' : 'transparent', color: investFilter === s ? '#fff' : 'inherit',
-                border: '1px solid #16a34a', textTransform: 'capitalize',
+                background: investFilter === s ? 'var(--gold)' : 'transparent', color: investFilter === s ? '#000' : 'inherit',
+                border: '1px solid var(--gold)', textTransform: 'capitalize',
               }}>{s}</button>
             ))}
             <button onClick={() => loadKitaGrow(investFilter, kgFilter)} style={{ marginLeft: 'auto', padding: '6px 14px', borderRadius: 6, border: '1px solid var(--border)', background: 'transparent', cursor: 'pointer' }}>
@@ -2567,7 +2567,7 @@ export default function Admin() {
                     </td>
                     <td style={{ padding: '8px 10px', fontWeight: 700 }}>{inv.term_days}d</td>
                     <td style={{ padding: '8px 10px', fontWeight: 700 }}>₱{inv.amount}</td>
-                    <td style={{ padding: '8px 10px', fontWeight: 700, color: '#16a34a' }}>₱{inv.payout_amount}</td>
+                    <td style={{ padding: '8px 10px', fontWeight: 700, color: 'var(--gold)' }}>₱{inv.payout_amount}</td>
                     <td style={{ padding: '8px 10px', fontFamily: 'monospace', fontSize: 12 }}>{inv.reference}</td>
                     <td style={{ padding: '8px 10px' }}>
                       {inv.screenshot_url
@@ -2613,13 +2613,13 @@ export default function Admin() {
           )}
 
           {/* Wallet withdrawals */}
-          <h2 style={{ margin: '0 0 0.75rem', fontSize: '1.05rem', fontWeight: 700, color: '#16a34a' }}>Wallet Withdrawals</h2>
+          <h2 style={{ margin: '0 0 0.75rem', fontSize: '1.05rem', fontWeight: 700, color: 'var(--gold)' }}>Wallet Withdrawals</h2>
           <div style={{ display: 'flex', gap: 8, marginBottom: '1rem', alignItems: 'center', flexWrap: 'wrap' }}>
             {(['pending', 'completed', 'rejected'] as const).map(s => (
               <button key={s} onClick={() => setKgFilter(s)} style={{
                 padding: '6px 14px', borderRadius: 6, cursor: 'pointer', fontWeight: kgFilter === s ? 700 : 400,
-                background: kgFilter === s ? '#16a34a' : 'transparent', color: kgFilter === s ? '#fff' : 'inherit',
-                border: '1px solid #16a34a', textTransform: 'capitalize',
+                background: kgFilter === s ? 'var(--gold)' : 'transparent', color: kgFilter === s ? '#000' : 'inherit',
+                border: '1px solid var(--gold)', textTransform: 'capitalize',
               }}>{s}</button>
             ))}
           </div>
@@ -2643,7 +2643,7 @@ export default function Admin() {
                       <div style={{ fontWeight: 600 }}>{w.user_name}</div>
                       <div style={{ fontSize: 11, color: '#9ca3af' }}>{w.user_email}</div>
                     </td>
-                    <td style={{ padding: '8px 10px', fontWeight: 700, color: '#16a34a' }}>₱{w.amount}</td>
+                    <td style={{ padding: '8px 10px', fontWeight: 700, color: 'var(--gold)' }}>₱{w.amount}</td>
                     <td style={{ padding: '8px 10px', fontFamily: 'monospace', fontSize: 12 }}>{w.account_number}</td>
                     <td style={{ padding: '8px 10px' }}>{w.account_name}</td>
                     <td style={{ padding: '8px 10px' }}>
@@ -3072,7 +3072,7 @@ export default function Admin() {
               {/* ── KitaGrow ── */}
               <div style={{ background: 'var(--dark-card)', border: '1px solid var(--dark-border)', borderRadius: 16, overflow: 'hidden' }}>
                 <div style={{ padding: '1rem 1.25rem', borderBottom: '1px solid var(--dark-border)', display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <div style={{ width: 32, height: 32, borderRadius: 8, background: 'rgba(22,163,74,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#16a34a' }}>
+                  <div style={{ width: 32, height: 32, borderRadius: 8, background: 'rgba(245,158,11,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#f59e0b' }}>
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
                   </div>
                   <div>
@@ -3082,7 +3082,7 @@ export default function Admin() {
                   <label style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
                     <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>Enabled</span>
                     <input type="checkbox" checked={siteSettings['kitagrow_enabled'] !== 'false'} onChange={e => setSetting('kitagrow_enabled', e.target.checked ? 'true' : 'false')} style={{ display: 'none' }} />
-                    <div style={{ width: 44, height: 24, borderRadius: 12, transition: 'background 0.2s', background: siteSettings['kitagrow_enabled'] !== 'false' ? '#16a34a' : 'var(--dark-border)', position: 'relative' }}>
+                    <div style={{ width: 44, height: 24, borderRadius: 12, transition: 'background 0.2s', background: siteSettings['kitagrow_enabled'] !== 'false' ? 'var(--gold)' : 'var(--dark-border)', position: 'relative' }}>
                       <div style={{ position: 'absolute', top: 3, left: siteSettings['kitagrow_enabled'] !== 'false' ? 23 : 3, width: 18, height: 18, borderRadius: '50%', background: '#fff', transition: 'left 0.2s' }} />
                     </div>
                   </label>

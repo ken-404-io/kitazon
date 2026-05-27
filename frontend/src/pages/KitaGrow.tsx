@@ -315,7 +315,7 @@ function InvestModal({ term, config, onClose, onDone }: {
               <div className={styles.label} style={{ marginBottom: 8 }}>Pay {peso(amt || config.min, 0)} via GCash</div>
               {config.gcash_qr
                 ? <img className={styles.qrImg} src={config.gcash_qr} alt="GCash QR" />
-                : <div style={{ fontSize: '0.8rem', color: 'var(--kg-muted)' }}>Scan / send to the GCash number below</div>}
+                : <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Scan / send to the GCash number below</div>}
               <div className={styles.qrAcct}>{config.gcash_number || '—'}</div>
               <div className={styles.qrName}>{config.gcash_name}</div>
             </div>
