@@ -365,7 +365,7 @@ export default function Admin() {
     maya_qr_diamond: '',
     credit_php_per_credit: '25',
     withdrawal_min: '5',
-    quiz_gate_free: '40',
+    quiz_gate_free: '45',
     quiz_gate_bronze: '40',
     quiz_gate_silver: '20',
     quiz_gate_gold: '0',

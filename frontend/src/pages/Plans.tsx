@@ -25,7 +25,7 @@ const STATIC_PLANS: {
     name:     'Free',
     badge:    <FreeIcon />,
     color:    'var(--text-muted)',
-    features: ['40 correct answers to withdraw', '₱25 lifetime withdrawal limit', 'GCash withdrawals', 'Task earnings', 'Referral bonuses'],
+    features: ['45 correct answers to withdraw', '₱5 lifetime withdrawal limit', 'GCash withdrawals', 'Task earnings', 'Referral bonuses'],
   },
   {
     plan:     'bronze',

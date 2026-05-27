@@ -242,7 +242,7 @@ export default function Withdraw() {
           </div>
         )}
 
-        {/* ── Free plan ₱25 cap banner ── */}
+        {/* ── Free plan ₱5 cap banner ── */}
         {elig?.free_plan_cap_reached && (
           <div style={{ background: 'var(--dark-card)', border: '1px solid var(--dark-border)', borderRadius: 14, padding: '1rem 1.1rem', marginBottom: '0.9rem' }}>
             <div style={{ display: 'flex', alignItems: 'flex-start', gap: 14 }}>
@@ -250,7 +250,7 @@ export default function Withdraw() {
               <div style={{ flex: 1 }}>
                 <p style={{ margin: 0, fontWeight: 700, fontSize: '0.88rem', color: 'var(--text)' }}>Free plan limit reached</p>
                 <p style={{ margin: '3px 0 0', fontSize: '0.8rem', color: 'var(--text-muted)', lineHeight: 1.5 }}>
-                  You've used ₱{Number(elig.free_plan_total_withdrawn ?? 0).toFixed(2)} of your ₱{elig.free_plan_cap ?? 25} free plan allowance. Upgrade to a paid plan to keep withdrawing.
+                  You've used ₱{Number(elig.free_plan_total_withdrawn ?? 0).toFixed(2)} of your ₱{elig.free_plan_cap ?? 5} free plan allowance. Upgrade to a paid plan to keep withdrawing.
                 </p>
               </div>
             </div>
@@ -573,7 +573,7 @@ export default function Withdraw() {
               <span style={{ display: 'inline-flex', color: 'var(--text-muted)', marginBottom: '0.75rem' }}><LockIcon2 /></span>
               <p style={{ fontWeight: 700, fontSize: '0.95rem', color: 'var(--text)', margin: '0 0 6px' }}>Free plan limit reached</p>
               <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', margin: '0 0 14px', lineHeight: 1.5 }}>
-                You've used ₱{Number(elig.free_plan_total_withdrawn ?? 0).toFixed(2)} of your ₱{elig.free_plan_cap ?? 25} free plan allowance. Upgrade to keep withdrawing.
+                You've used ₱{Number(elig.free_plan_total_withdrawn ?? 0).toFixed(2)} of your ₱{elig.free_plan_cap ?? 5} free plan allowance. Upgrade to keep withdrawing.
               </p>
               <Link to="/plans" style={{ display: 'inline-block', background: 'var(--gold)', color: '#000', fontWeight: 800, fontSize: '0.9rem', padding: '0.65rem 2rem', borderRadius: 10, textDecoration: 'none' }}>
                 Upgrade Plan →

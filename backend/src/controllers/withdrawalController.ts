@@ -14,7 +14,7 @@ const ACCOUNT_PATTERN = /^(09\d{9}|\+639\d{9})$/;
 
 // Default fallbacks (used if settings table not yet migrated)
 const QUIZ_GATE_DEFAULTS: Record<string, number> = {
-  free: 40, bronze: 40, silver: 20, gold: 0, diamond: 0,
+  free: 45, bronze: 40, silver: 20, gold: 0, diamond: 0,
 };
 
 // Count referrals made since the last COMPLETED withdrawal.
@@ -128,8 +128,8 @@ async function getWithdrawalEligibility(userId: number, user: DbUser) {
     }
   }
 
-  // Free plan lifetime cap: once the user has withdrawn ₱25 total, they must upgrade
-  const FREE_PLAN_CAP = 25;
+  // Free plan lifetime cap: once the user has withdrawn ₱5 total, they must upgrade
+  const FREE_PLAN_CAP = 5;
   let freePlanCapReached = false;
   let freePlanTotalWithdrawn = 0;
   if (plan === 'free') {
