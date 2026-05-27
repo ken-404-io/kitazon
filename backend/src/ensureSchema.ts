@@ -45,8 +45,51 @@ async function ensureWelcomeBonusSchema(): Promise<void> {
   });
 }
 
+async function ensureKitaGrowSchema(): Promise<void> {
+  await db.raw('ALTER TABLE users ADD COLUMN IF NOT EXISTS kitagrow_balance numeric(12,2) NOT NULL DEFAULT 0');
+
+  await db.raw(`
+    CREATE TABLE IF NOT EXISTS investments (
+      id serial PRIMARY KEY,
+      user_id integer NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      term_days integer NOT NULL,
+      amount numeric(12,2) NOT NULL,
+      payout_amount numeric(12,2) NOT NULL,
+      reference varchar(100) NOT NULL,
+      screenshot_url text NULL,
+      status varchar(20) NOT NULL DEFAULT 'pending',
+      admin_note text NULL,
+      reviewed_by integer NULL REFERENCES users(id) ON DELETE SET NULL,
+      activated_at timestamptz NULL,
+      matures_at timestamptz NULL,
+      paid_out_at timestamptz NULL,
+      created_at timestamptz NOT NULL DEFAULT now(),
+      updated_at timestamptz NOT NULL DEFAULT now()
+    )
+  `);
+  await db.raw('CREATE INDEX IF NOT EXISTS investments_user_status ON investments (user_id, status)');
+  await db.raw('CREATE INDEX IF NOT EXISTS investments_status_mature ON investments (status, matures_at)');
+
+  await db.raw(`
+    CREATE TABLE IF NOT EXISTS kitagrow_withdrawals (
+      id serial PRIMARY KEY,
+      user_id integer NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      amount numeric(12,2) NOT NULL,
+      channel varchar(20) NOT NULL DEFAULT 'gcash',
+      account_number varchar(30) NOT NULL,
+      account_name varchar(100) NOT NULL,
+      status varchar(20) NOT NULL DEFAULT 'pending',
+      admin_note text NULL,
+      reviewed_by integer NULL REFERENCES users(id) ON DELETE SET NULL,
+      created_at timestamptz NOT NULL DEFAULT now(),
+      updated_at timestamptz NOT NULL DEFAULT now()
+    )
+  `);
+  await db.raw('CREATE INDEX IF NOT EXISTS kitagrow_withdrawals_user_status ON kitagrow_withdrawals (user_id, status)');
+}
+
 export async function ensureSchema(): Promise<void> {
-  for (const step of [ensureNotificationsTable, ensureWelcomeBonusSchema]) {
+  for (const step of [ensureNotificationsTable, ensureWelcomeBonusSchema, ensureKitaGrowSchema]) {
     try {
       await step();
     } catch (err) {

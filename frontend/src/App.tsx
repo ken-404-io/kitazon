@@ -41,6 +41,7 @@ import Credits from './pages/Credits';
 import CheckIn from './pages/CheckIn';
 import KYC from './pages/KYC';
 import MathQuiz from './pages/MathQuiz';
+import KitaGrow from './pages/KitaGrow';
 import AdManager from './components/AdManager';
 import PromoPopup from './components/PromoPopup';
 
@@ -116,6 +117,7 @@ export default function App() {
           <Route path="/checkin" element={<PrivateRoute><CheckIn /></PrivateRoute>} />
           <Route path="/kyc" element={<PrivateRoute><KYC /></PrivateRoute>} />
           <Route path="/quiz" element={<PrivateRoute><MathQuiz /></PrivateRoute>} />
+          <Route path="/kitagrow" element={<PrivateRoute><KitaGrow /></PrivateRoute>} />
           <Route path="/ref/:code" element={<ReferralLanding />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

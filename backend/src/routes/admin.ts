@@ -3,6 +3,7 @@ import authMiddleware from '../middleware/auth';
 import adminAuth from '../middleware/adminAuth';
 import { platformStats, listUsers, toggleUserActive, batchEnableUsers, toggleUserAdmin, listWithdrawals, updateWithdrawalStatus, listAuditLogs, getUserAuditLogs, listTasks, createTask, updateTask, updateUserPlan, adjustBalance, broadcastEmail, revenueStats, bulkImportTasks, grantLeaderboardRewards, listOnlineUsers, bulkApproveWithdrawals, bulkFailWithdrawals, listGcashPayments, approveGcashPayment, rejectGcashPayment, revokeGcashPayment, setReferralCount, fraudReport, suspendAllFraud } from '../controllers/adminController';
 import { getPublicSettings, adminUpdateSettings, adminUploadImage } from '../controllers/settingsController';
+import { adminListInvestments, adminApproveInvestment, adminRejectInvestment, adminListKgWithdrawals, adminCompleteKgWithdrawal, adminRejectKgWithdrawal } from '../controllers/investmentController';
 
 const router = Router();
 
@@ -34,6 +35,12 @@ router.get('/gcash-payments', listGcashPayments);
 router.patch('/gcash-payments/:id/approve', approveGcashPayment);
 router.patch('/gcash-payments/:id/reject', rejectGcashPayment);
 router.patch('/gcash-payments/:id/revoke', revokeGcashPayment);
+router.get('/investments', adminListInvestments);
+router.patch('/investments/:id/approve', adminApproveInvestment);
+router.patch('/investments/:id/reject', adminRejectInvestment);
+router.get('/kitagrow-withdrawals', adminListKgWithdrawals);
+router.patch('/kitagrow-withdrawals/:id/complete', adminCompleteKgWithdrawal);
+router.patch('/kitagrow-withdrawals/:id/reject', adminRejectKgWithdrawal);
 router.get('/fraud', fraudReport);
 router.post('/fraud/suspend-all', suspendAllFraud);
 router.get('/settings', getPublicSettings);

@@ -4,7 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import api from '../services/api';
 import { WithdrawalStatus, WithdrawalChannel } from '../types';
 
-type Tab = 'stats' | 'users' | 'suspended' | 'withdrawals' | 'pending-withdrawals' | 'tasks' | 'logs' | 'revenue' | 'broadcast' | 'kyc' | 'online' | 'gcash-payments' | 'fraud' | 'settings';
+type Tab = 'stats' | 'users' | 'suspended' | 'withdrawals' | 'pending-withdrawals' | 'tasks' | 'logs' | 'revenue' | 'broadcast' | 'kyc' | 'online' | 'gcash-payments' | 'kitagrow' | 'fraud' | 'settings';
 
 const TAB_LABELS: Record<Tab, string> = {
   stats: 'Stats',
@@ -17,6 +17,7 @@ const TAB_LABELS: Record<Tab, string> = {
   kyc: 'KYC',
   fraud: 'Fraud Detection',
   'gcash-payments': 'GCash Payments',
+  kitagrow: 'KitaGrow',
   online: 'Online',
   logs: 'Audit Logs',
   broadcast: 'Broadcast',
@@ -62,6 +63,37 @@ interface GcashPayment {
   amount: string;
   reference: string;
   screenshot_url: string | null;
+  status: string;
+  admin_note: string | null;
+  created_at: string;
+}
+
+interface AdminInvestment {
+  id: number;
+  user_id: number;
+  user_name: string;
+  user_email: string;
+  term_days: number;
+  amount: string;
+  payout_amount: string;
+  reference: string;
+  screenshot_url: string | null;
+  status: string;
+  admin_note: string | null;
+  activated_at: string | null;
+  matures_at: string | null;
+  created_at: string;
+}
+
+interface AdminKgWithdrawal {
+  id: number;
+  user_id: number;
+  user_name: string;
+  user_email: string;
+  amount: string;
+  channel: string;
+  account_number: string;
+  account_name: string;
   status: string;
   admin_note: string | null;
   created_at: string;
@@ -293,6 +325,13 @@ export default function Admin() {
   const [gcashLoading, setGcashLoading] = useState(false);
   const [gcashPreview, setGcashPreview] = useState<string | null>(null);
 
+  // KitaGrow
+  const [investments, setInvestments] = useState<AdminInvestment[]>([]);
+  const [investFilter, setInvestFilter] = useState('pending');
+  const [kgWithdrawals, setKgWithdrawals] = useState<AdminKgWithdrawal[]>([]);
+  const [kgFilter, setKgFilter] = useState('pending');
+  const [kgLoading, setKgLoading] = useState(false);
+
   // Online users
   const [onlineUsers, setOnlineUsers] = useState<OnlineUser[]>([]);
   const [onlineCount, setOnlineCount] = useState<number | null>(null);
@@ -390,6 +429,12 @@ export default function Admin() {
     promo_popup_enabled: 'true',
     promo_popup_image: '',
     promo_popup_redirect: '/plans',
+    kitagrow_enabled: 'true',
+    kitagrow_min: '500',
+    kitagrow_max: '50000',
+    kitagrow_gcash_number: '',
+    kitagrow_gcash_name: 'Kitazon',
+    kitagrow_gcash_qr: '',
   };
   const [siteSettings, setSiteSettings] = useState<Record<string, string>>(SETTINGS_DEFAULTS);
   const [settingsLoading, setSettingsLoading] = useState(false);
@@ -492,6 +537,18 @@ export default function Admin() {
     } finally { setGcashLoading(false); }
   }, []);
 
+  const loadKitaGrow = useCallback(async (invStatus: string, wStatus: string) => {
+    setKgLoading(true);
+    try {
+      const [inv, w] = await Promise.all([
+        api.get<AdminInvestment[]>(`/admin/investments?status=${invStatus}`),
+        api.get<AdminKgWithdrawal[]>(`/admin/kitagrow-withdrawals?status=${wStatus}`),
+      ]);
+      setInvestments(inv.data);
+      setKgWithdrawals(w.data);
+    } finally { setKgLoading(false); }
+  }, []);
+
   const loadOnline = useCallback(async () => {
     setOnlineLoading(true);
     try {
@@ -571,10 +628,11 @@ export default function Admin() {
     if (tab === 'revenue' && !revenueStats) loadRevenue();
     if (tab === 'kyc') loadKyc(kycFilter);
     if (tab === 'gcash-payments') loadGcashPayments(gcashFilter);
+    if (tab === 'kitagrow') loadKitaGrow(investFilter, kgFilter);
     if (tab === 'online') loadOnline();
     if (tab === 'fraud' && !fraudData) loadFraud();
     if (tab === 'settings') loadSiteSettings();
-  }, [tab, userPage, wPage, wPerPage, wFilter, wSearch, logPage, kycFilter, gcashFilter, stats, revenueStats, fraudData, loadStats, loadUsers, loadWithdrawals, loadTasks, loadLogs, loadRevenue, loadKyc, loadGcashPayments, loadOnline, loadFraud, loadSiteSettings]);
+  }, [tab, userPage, wPage, wPerPage, wFilter, wSearch, logPage, kycFilter, gcashFilter, investFilter, kgFilter, stats, revenueStats, fraudData, loadStats, loadUsers, loadWithdrawals, loadTasks, loadLogs, loadRevenue, loadKyc, loadGcashPayments, loadKitaGrow, loadOnline, loadFraud, loadSiteSettings]);
 
   // Auto-refresh online tab every 1 minute
   useEffect(() => {
@@ -892,6 +950,7 @@ export default function Admin() {
     { id: 'tasks',               label: 'Tasks',               icon: <svg {...si}><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg> },
     { id: 'kyc',                 label: 'KYC',                 icon: <svg {...si}><rect x="3" y="4" width="18" height="16" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><path d="M9 12h6M9 16h4"/></svg> },
     { id: 'gcash-payments',      label: 'GCash Payments',      icon: <svg {...si}><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg> },
+    { id: 'kitagrow',            label: 'KitaGrow',            icon: <svg {...si}><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg> },
     { id: 'online',              label: 'Online',              icon: <svg {...si}><circle cx="12" cy="12" r="3"/><path d="M2 12C2 6.48 6.48 2 12 2s10 4.48 10 10-4.48 10-10 10"/></svg> },
     { id: 'logs',                label: 'Audit Logs',          icon: <svg {...si}><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg> },
     { id: 'broadcast',           label: 'Broadcast',           icon: <svg {...si}><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12 19.79 19.79 0 0 1 1.63 3.38 2 2 0 0 1 3.6 1.18h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 8.96a16 16 0 0 0 6.13 6.13l.96-.96a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg> },
@@ -2462,6 +2521,170 @@ export default function Admin() {
           )}
         </div>
       )}
+
+      {/* ── KitaGrow ── */}
+      {tab === 'kitagrow' && (
+        <div>
+          {gcashPreview && (
+            <div onClick={() => setGcashPreview(null)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'zoom-out' }}>
+              <img src={gcashPreview} alt="Receipt" style={{ maxWidth: '90vw', maxHeight: '90vh', borderRadius: 12, objectFit: 'contain' }} />
+            </div>
+          )}
+
+          {/* Investments */}
+          <h2 style={{ margin: '0 0 0.75rem', fontSize: '1.05rem', fontWeight: 700, color: '#16a34a' }}>Investments</h2>
+          <div style={{ display: 'flex', gap: 8, marginBottom: '1rem', alignItems: 'center', flexWrap: 'wrap' }}>
+            {(['pending', 'active', 'matured', 'rejected'] as const).map(s => (
+              <button key={s} onClick={() => setInvestFilter(s)} style={{
+                padding: '6px 14px', borderRadius: 6, cursor: 'pointer', fontWeight: investFilter === s ? 700 : 400,
+                background: investFilter === s ? '#16a34a' : 'transparent', color: investFilter === s ? '#fff' : 'inherit',
+                border: '1px solid #16a34a', textTransform: 'capitalize',
+              }}>{s}</button>
+            ))}
+            <button onClick={() => loadKitaGrow(investFilter, kgFilter)} style={{ marginLeft: 'auto', padding: '6px 14px', borderRadius: 6, border: '1px solid var(--border)', background: 'transparent', cursor: 'pointer' }}>
+              {kgLoading ? 'Loading…' : '↻ Refresh'}
+            </button>
+          </div>
+
+          {investments.length === 0 ? (
+            <p style={{ color: 'var(--text-muted)', padding: '1.5rem', textAlign: 'center' }}>No {investFilter} investments.</p>
+          ) : (
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, marginBottom: '2rem' }}>
+              <thead>
+                <tr style={{ borderBottom: '2px solid var(--border)' }}>
+                  {['Submitted', 'User', 'Term', 'Amount', 'Payout', 'Reference #', 'Receipt', 'Matures', 'Status', 'Actions'].map(h => (
+                    <th key={h} style={{ textAlign: 'left', padding: '8px 10px', whiteSpace: 'nowrap' }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {investments.map(inv => (
+                  <tr key={inv.id} style={{ borderBottom: '1px solid var(--border)' }}>
+                    <td style={{ padding: '8px 10px', whiteSpace: 'nowrap' }}>{new Date(inv.created_at).toLocaleDateString('en-PH', { timeZone: 'Asia/Manila' })}</td>
+                    <td style={{ padding: '8px 10px' }}>
+                      <div style={{ fontWeight: 600 }}>{inv.user_name}</div>
+                      <div style={{ fontSize: 11, color: '#9ca3af' }}>{inv.user_email}</div>
+                    </td>
+                    <td style={{ padding: '8px 10px', fontWeight: 700 }}>{inv.term_days}d</td>
+                    <td style={{ padding: '8px 10px', fontWeight: 700 }}>₱{inv.amount}</td>
+                    <td style={{ padding: '8px 10px', fontWeight: 700, color: '#16a34a' }}>₱{inv.payout_amount}</td>
+                    <td style={{ padding: '8px 10px', fontFamily: 'monospace', fontSize: 12 }}>{inv.reference}</td>
+                    <td style={{ padding: '8px 10px' }}>
+                      {inv.screenshot_url
+                        ? <img src={inv.screenshot_url} alt="receipt" onClick={() => setGcashPreview(inv.screenshot_url)} style={{ width: 48, height: 48, objectFit: 'cover', borderRadius: 6, cursor: 'zoom-in', border: '1px solid var(--border)' }} />
+                        : <span style={{ color: '#6b7280', fontSize: 11 }}>None</span>}
+                    </td>
+                    <td style={{ padding: '8px 10px', fontSize: 12, whiteSpace: 'nowrap' }}>{inv.matures_at ? new Date(inv.matures_at).toLocaleDateString('en-PH', { timeZone: 'Asia/Manila' }) : '—'}</td>
+                    <td style={{ padding: '8px 10px' }}>
+                      <span style={{ fontSize: 11, fontWeight: 700, padding: '3px 8px', borderRadius: 20, textTransform: 'capitalize',
+                        background: inv.status === 'active' ? 'rgba(34,197,94,0.15)' : inv.status === 'matured' ? 'rgba(14,165,233,0.15)' : inv.status === 'rejected' ? 'rgba(239,68,68,0.15)' : 'rgba(234,179,8,0.15)',
+                        color: inv.status === 'active' ? '#22c55e' : inv.status === 'matured' ? '#0ea5e9' : inv.status === 'rejected' ? '#ef4444' : '#eab308',
+                      }}>{inv.status}</span>
+                      {inv.admin_note && <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 2 }}>{inv.admin_note}</div>}
+                    </td>
+                    <td style={{ padding: '8px 10px' }}>
+                      {inv.status === 'pending' && (
+                        <div style={{ display: 'flex', gap: 6 }}>
+                          <button
+                            onClick={async () => {
+                              if (!window.confirm(`Approve ${inv.term_days}-day investment of ₱${inv.amount} for ${inv.user_name}? It will mature in ${inv.term_days} days and pay ₱${inv.payout_amount}.`)) return;
+                              await api.patch(`/admin/investments/${inv.id}/approve`, {});
+                              showToast('Investment activated.');
+                              loadKitaGrow(investFilter, kgFilter);
+                            }}
+                            style={{ padding: '4px 10px', background: '#16a34a', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 12, fontWeight: 700 }}
+                          >Approve</button>
+                          <button
+                            onClick={async () => {
+                              const note = window.prompt('Rejection reason (optional):') ?? undefined;
+                              await api.patch(`/admin/investments/${inv.id}/reject`, { note });
+                              showToast('Investment rejected.');
+                              loadKitaGrow(investFilter, kgFilter);
+                            }}
+                            style={{ padding: '4px 10px', background: 'transparent', color: '#ef4444', border: '1px solid #ef4444', borderRadius: 6, cursor: 'pointer', fontSize: 12 }}
+                          >Reject</button>
+                        </div>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+
+          {/* Wallet withdrawals */}
+          <h2 style={{ margin: '0 0 0.75rem', fontSize: '1.05rem', fontWeight: 700, color: '#16a34a' }}>Wallet Withdrawals</h2>
+          <div style={{ display: 'flex', gap: 8, marginBottom: '1rem', alignItems: 'center', flexWrap: 'wrap' }}>
+            {(['pending', 'completed', 'rejected'] as const).map(s => (
+              <button key={s} onClick={() => setKgFilter(s)} style={{
+                padding: '6px 14px', borderRadius: 6, cursor: 'pointer', fontWeight: kgFilter === s ? 700 : 400,
+                background: kgFilter === s ? '#16a34a' : 'transparent', color: kgFilter === s ? '#fff' : 'inherit',
+                border: '1px solid #16a34a', textTransform: 'capitalize',
+              }}>{s}</button>
+            ))}
+          </div>
+
+          {kgWithdrawals.length === 0 ? (
+            <p style={{ color: 'var(--text-muted)', padding: '1.5rem', textAlign: 'center' }}>No {kgFilter} withdrawals.</p>
+          ) : (
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+              <thead>
+                <tr style={{ borderBottom: '2px solid var(--border)' }}>
+                  {['Requested', 'User', 'Amount', 'GCash #', 'Account Name', 'Status', 'Actions'].map(h => (
+                    <th key={h} style={{ textAlign: 'left', padding: '8px 10px', whiteSpace: 'nowrap' }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {kgWithdrawals.map(w => (
+                  <tr key={w.id} style={{ borderBottom: '1px solid var(--border)' }}>
+                    <td style={{ padding: '8px 10px', whiteSpace: 'nowrap' }}>{new Date(w.created_at).toLocaleDateString('en-PH', { timeZone: 'Asia/Manila' })}</td>
+                    <td style={{ padding: '8px 10px' }}>
+                      <div style={{ fontWeight: 600 }}>{w.user_name}</div>
+                      <div style={{ fontSize: 11, color: '#9ca3af' }}>{w.user_email}</div>
+                    </td>
+                    <td style={{ padding: '8px 10px', fontWeight: 700, color: '#16a34a' }}>₱{w.amount}</td>
+                    <td style={{ padding: '8px 10px', fontFamily: 'monospace', fontSize: 12 }}>{w.account_number}</td>
+                    <td style={{ padding: '8px 10px' }}>{w.account_name}</td>
+                    <td style={{ padding: '8px 10px' }}>
+                      <span style={{ fontSize: 11, fontWeight: 700, padding: '3px 8px', borderRadius: 20, textTransform: 'capitalize',
+                        background: w.status === 'completed' ? 'rgba(34,197,94,0.15)' : w.status === 'rejected' ? 'rgba(239,68,68,0.15)' : 'rgba(234,179,8,0.15)',
+                        color: w.status === 'completed' ? '#22c55e' : w.status === 'rejected' ? '#ef4444' : '#eab308',
+                      }}>{w.status}</span>
+                      {w.admin_note && <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 2 }}>{w.admin_note}</div>}
+                    </td>
+                    <td style={{ padding: '8px 10px' }}>
+                      {(w.status === 'pending' || w.status === 'processing') && (
+                        <div style={{ display: 'flex', gap: 6 }}>
+                          <button
+                            onClick={async () => {
+                              if (!window.confirm(`Mark ₱${w.amount} payout to ${w.account_number} (${w.account_name}) as PAID?`)) return;
+                              await api.patch(`/admin/kitagrow-withdrawals/${w.id}/complete`, {});
+                              showToast('Withdrawal marked as paid.');
+                              loadKitaGrow(investFilter, kgFilter);
+                            }}
+                            style={{ padding: '4px 10px', background: '#16a34a', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 12, fontWeight: 700 }}
+                          >Mark Paid</button>
+                          <button
+                            onClick={async () => {
+                              const note = window.prompt('Rejection reason (amount will be refunded to wallet):') ?? undefined;
+                              await api.patch(`/admin/kitagrow-withdrawals/${w.id}/reject`, { note });
+                              showToast('Withdrawal rejected and refunded.');
+                              loadKitaGrow(investFilter, kgFilter);
+                            }}
+                            style={{ padding: '4px 10px', background: 'transparent', color: '#ef4444', border: '1px solid #ef4444', borderRadius: 6, cursor: 'pointer', fontSize: 12 }}
+                          >Reject</button>
+                        </div>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+      )}
+
       {/* ── Fraud Detection ── */}
       {tab === 'fraud' && (
         <div style={{ maxWidth: 980 }}>
@@ -2836,6 +3059,41 @@ export default function Admin() {
                     { key: 'maya_qr_silver',  label: 'Silver Plan QR URL',  placeholder: 'https://...', full: true },
                     { key: 'maya_qr_gold',    label: 'Gold Plan QR URL',    placeholder: 'https://...', full: true },
                     { key: 'maya_qr_diamond', label: 'Diamond Plan QR URL', placeholder: 'https://...', full: true },
+                  ].map(({ key, label, placeholder, full }) => (
+                    <div key={key} style={{ gridColumn: full ? '1 / -1' : 'auto' }}>
+                      <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{label}</label>
+                      <input type="text" value={siteSettings[key] ?? ''} onChange={e => setSetting(key, e.target.value)} placeholder={placeholder}
+                        style={{ width: '100%', padding: '9px 12px', borderRadius: 10, border: '1.5px solid var(--dark-border)', background: 'var(--dark-bg)', color: 'var(--text)', fontSize: '0.85rem', outline: 'none', boxSizing: 'border-box' }} />
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* ── KitaGrow ── */}
+              <div style={{ background: 'var(--dark-card)', border: '1px solid var(--dark-border)', borderRadius: 16, overflow: 'hidden' }}>
+                <div style={{ padding: '1rem 1.25rem', borderBottom: '1px solid var(--dark-border)', display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <div style={{ width: 32, height: 32, borderRadius: 8, background: 'rgba(22,163,74,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#16a34a' }}>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
+                  </div>
+                  <div>
+                    <p style={{ fontWeight: 700, fontSize: '0.9rem', margin: 0 }}>KitaGrow Investments</p>
+                    <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', margin: 0 }}>Investment limits & GCash deposit account</p>
+                  </div>
+                  <label style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+                    <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>Enabled</span>
+                    <input type="checkbox" checked={siteSettings['kitagrow_enabled'] !== 'false'} onChange={e => setSetting('kitagrow_enabled', e.target.checked ? 'true' : 'false')} style={{ display: 'none' }} />
+                    <div style={{ width: 44, height: 24, borderRadius: 12, transition: 'background 0.2s', background: siteSettings['kitagrow_enabled'] !== 'false' ? '#16a34a' : 'var(--dark-border)', position: 'relative' }}>
+                      <div style={{ position: 'absolute', top: 3, left: siteSettings['kitagrow_enabled'] !== 'false' ? 23 : 3, width: 18, height: 18, borderRadius: '50%', background: '#fff', transition: 'left 0.2s' }} />
+                    </div>
+                  </label>
+                </div>
+                <div style={{ padding: '1.25rem', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                  {[
+                    { key: 'kitagrow_min',          label: 'Minimum Investment (₱)', placeholder: '500',  full: false },
+                    { key: 'kitagrow_max',          label: 'Maximum Investment (₱)', placeholder: '50000', full: false },
+                    { key: 'kitagrow_gcash_number', label: 'GCash Number',           placeholder: '09XXXXXXXXX', full: false },
+                    { key: 'kitagrow_gcash_name',   label: 'GCash Account Name',     placeholder: 'Kitazon', full: false },
+                    { key: 'kitagrow_gcash_qr',     label: 'GCash QR Image URL',     placeholder: 'https://...', full: true },
                   ].map(({ key, label, placeholder, full }) => (
                     <div key={key} style={{ gridColumn: full ? '1 / -1' : 'auto' }}>
                       <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{label}</label>

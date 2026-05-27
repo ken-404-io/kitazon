@@ -40,6 +40,43 @@ export interface DbUser {
   kyc_reviewed_at: Date | null;
   kyc_rejection_reason: string | null;
   welcome_bonus_claimed_at: Date | null;
+  kitagrow_balance: number;
+  created_at: Date;
+  updated_at: Date;
+}
+
+export type InvestmentStatus = 'pending' | 'active' | 'matured' | 'rejected';
+
+export interface DbInvestment {
+  id: number;
+  user_id: number;
+  term_days: number;
+  amount: number;
+  payout_amount: number;
+  reference: string;
+  screenshot_url: string | null;
+  status: InvestmentStatus;
+  admin_note: string | null;
+  reviewed_by: number | null;
+  activated_at: Date | null;
+  matures_at: Date | null;
+  paid_out_at: Date | null;
+  created_at: Date;
+  updated_at: Date;
+}
+
+export type KitagrowWithdrawalStatus = 'pending' | 'processing' | 'completed' | 'rejected';
+
+export interface DbKitagrowWithdrawal {
+  id: number;
+  user_id: number;
+  amount: number;
+  channel: string;
+  account_number: string;
+  account_name: string;
+  status: KitagrowWithdrawalStatus;
+  admin_note: string | null;
+  reviewed_by: number | null;
   created_at: Date;
   updated_at: Date;
 }

@@ -24,6 +24,7 @@ const LogoutIcon  = () => <svg {...sz}><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012
 const UsersIcon   = () => <svg {...sz}><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>;
 const SettingsIcon= () => <svg {...sz}><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>;
 const CrownIcon   = () => <svg {...sz}><path d="M2 20h20"/><path d="M5 20V9l7-5 7 5v11"/><path d="M12 4v16"/><path d="M5 12h14"/></svg>;
+const GrowIcon    = () => <svg {...sz}><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>;
 
 // ─── Component ────────────────────────────────────────────────────────────────
 interface AppNotification {
@@ -94,6 +95,7 @@ export default function Navbar() {
           <nav className={styles.desktopLinks}>
             <Link to="/dashboard" className={isActive('/dashboard') ? styles.activeLink : ''}>Dashboard</Link>
             <Link to="/quiz"      className={isActive('/quiz')      ? styles.activeLink : ''}>Quiz</Link>
+            <Link to="/kitagrow"  className={isActive('/kitagrow')  ? styles.activeLink : ''}>KitaGrow</Link>
             <Link to="/referral"  className={isActive('/referral')  ? styles.activeLink : ''}>Referral</Link>
             {user.is_admin && <Link to="/admin" className={isActive('/admin') ? styles.activeLink : ''}>Admin</Link>}
           </nav>
@@ -186,6 +188,7 @@ export default function Navbar() {
           <>
             <NavTab to="/dashboard" label="Home"    icon={<HomeIcon />}   active={isActive('/dashboard')} />
             <NavTab to="/quiz"      label="Quiz"    icon={<QuizIcon />}   active={isActive('/quiz')} />
+            <NavTab to="/kitagrow"  label="Grow"    icon={<GrowIcon />}   active={isActive('/kitagrow')} />
             <NavTab to="/withdraw"  label="Wallet"  icon={<WalletIcon />} active={isActive('/withdraw')} />
             <NavTab to="/plans"     label="Upgrade" icon={<CrownIcon />}  active={isActive('/plans')} />
             <NavTab to="/account"   label="Profile" icon={<UserIcon />}   active={isActive('/account')}
