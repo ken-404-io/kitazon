@@ -1867,11 +1867,15 @@ export default function Admin() {
               )}
 
               <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', margin: '14px 0 0' }}>
-                ▾ Individual requests (detailed table) below — for fine-grained control.
+                Need per-request control? Open the <strong>Withdrawals</strong> tab and filter by <strong>Pending</strong>.
               </p>
             </div>
           )}
 
+          {/* Individual per-request table + bulk actions — only on the "Withdrawals" (all) tab.
+              The Pending tab shows the grouped-per-user cards above instead, to avoid
+              showing each user's requests twice. */}
+          {tab === 'withdrawals' && (<>
           {/* Bulk approve action bar */}
           <div style={{
             display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap',
@@ -1932,13 +1936,6 @@ export default function Admin() {
             const PAID_PLANS = ['bronze', 'silver', 'gold', 'diamond'];
             const PLAN_COLOR: Record<string, string> = { bronze: '#cd7f32', silver: '#9ca3af', gold: '#f59e0b', diamond: '#60a5fa' };
             const PLAN_BADGE: Record<string, string> = { bronze: '🥉', silver: '🥈', gold: '🥇', diamond: '💎' };
-
-            const paidWithdrawals = tab === 'pending-withdrawals'
-              ? withdrawals.filter(w => w.user_plan && PAID_PLANS.includes(w.user_plan))
-              : withdrawals;
-            const freeWithdrawals = tab === 'pending-withdrawals'
-              ? withdrawals.filter(w => !w.user_plan || !PAID_PLANS.includes(w.user_plan))
-              : [];
 
             const renderTable = (rows: AdminWithdrawal[], headerBg?: string) => (
             <div className="admin-table-wrap" style={{ overflowX: 'auto' }}>
@@ -2040,30 +2037,6 @@ export default function Admin() {
             </div>
             );
 
-            if (tab === 'pending-withdrawals') {
-              return (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-                  {/* Paid plan users — priority */}
-                  <div style={{ border: '1.5px solid rgba(245,158,11,0.4)', borderRadius: 12, overflow: 'hidden' }}>
-                    <div style={{ padding: '10px 14px', background: 'rgba(245,158,11,0.08)', display: 'flex', alignItems: 'center', gap: 10 }}>
-                      <span style={{ fontSize: '1rem' }}>⭐</span>
-                      <span style={{ fontWeight: 700, fontSize: 13, color: '#f59e0b' }}>Priority — Paid Plan Users</span>
-                      <span style={{ marginLeft: 'auto', background: '#f59e0b', color: '#fff', borderRadius: 20, padding: '1px 10px', fontSize: 12, fontWeight: 700 }}>{paidWithdrawals.length}</span>
-                    </div>
-                    {renderTable(paidWithdrawals, 'rgba(245,158,11,0.05)')}
-                  </div>
-                  {/* Free plan users */}
-                  <div style={{ border: '1px solid var(--dark-border)', borderRadius: 12, overflow: 'hidden' }}>
-                    <div style={{ padding: '10px 14px', background: 'rgba(107,114,128,0.08)', display: 'flex', alignItems: 'center', gap: 10 }}>
-                      <span style={{ fontSize: '1rem' }}>🆓</span>
-                      <span style={{ fontWeight: 700, fontSize: 13, color: '#9ca3af' }}>Free Plan Users</span>
-                      <span style={{ marginLeft: 'auto', background: '#6b7280', color: '#fff', borderRadius: 20, padding: '1px 10px', fontSize: 12, fontWeight: 700 }}>{freeWithdrawals.length}</span>
-                    </div>
-                    {renderTable(freeWithdrawals)}
-                  </div>
-                </div>
-              );
-            }
             return renderTable(withdrawals);
           })()}
           <div style={{ display: 'flex', gap: 8, marginTop: '1rem', alignItems: 'center' }}>
@@ -2071,6 +2044,7 @@ export default function Admin() {
             <span style={{ fontSize: 13 }}>Page {wPage} of {wPages}</span>
             <button className="btn-outline" disabled={wPage >= wPages} onClick={() => setWPage(p => p + 1)}>Next</button>
           </div>
+          </>)}
         </div>
       )}
 

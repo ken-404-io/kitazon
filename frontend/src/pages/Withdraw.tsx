@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import KycGate from '../components/KycGate';
 import { useAuth } from '../context/AuthContext';
+import { useSettings } from '../context/SettingsContext';
 import { useToast } from '../context/ToastContext';
 import EarningsChart from '../components/dashboard/EarningsChart';
 import { Skeleton } from '../components/ui/Skeleton';
@@ -21,13 +22,33 @@ const ClockIcon  = () => <svg {...sz} width={20} height={20}><circle cx="12" cy=
 const LockIcon2  = () => <svg {...sz} width={20} height={20}><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>;
 
 /* ─── plan config ────────────────────────────────────────────────────────────── */
-const PLAN_CONFIG: Record<UserPlan, { name: string; color: string; dailyLimit: number; badge: string; presets: number[] | null }> = {
-  free:    { name: 'Free',    color: 'var(--text-muted)', badge: '🆓', dailyLimit: 5,   presets: null },
-  bronze:  { name: 'Bronze',  color: '#cd7f32',           badge: '🥉', dailyLimit: 5,   presets: null },
-  silver:  { name: 'Silver',  color: '#9ca3af',           badge: '🥈', dailyLimit: 20,  presets: [5, 10, 15, 20] },
-  gold:    { name: 'Gold',    color: 'var(--gold)',        badge: '🥇', dailyLimit: 50,  presets: [10, 20, 30, 50] },
-  diamond: { name: 'Diamond', color: '#60a5fa',            badge: '💎', dailyLimit: 100, presets: [20, 50, 75, 100] },
+// `dailyLimit` here is only a fallback — the live ceiling comes from the
+// admin-editable `plan_limit_<plan>` site setting. `hasPresets` marks the VIP
+// plans whose amount buttons are generated from the live limit.
+const PLAN_CONFIG: Record<UserPlan, { name: string; color: string; dailyLimit: number; badge: string; hasPresets: boolean }> = {
+  free:    { name: 'Free',    color: 'var(--text-muted)', badge: '🆓', dailyLimit: 5,   hasPresets: false },
+  bronze:  { name: 'Bronze',  color: '#cd7f32',           badge: '🥉', dailyLimit: 5,   hasPresets: false },
+  silver:  { name: 'Silver',  color: '#9ca3af',           badge: '🥈', dailyLimit: 20,  hasPresets: true },
+  gold:    { name: 'Gold',    color: 'var(--gold)',        badge: '🥇', dailyLimit: 50,  hasPresets: true },
+  diamond: { name: 'Diamond', color: '#60a5fa',            badge: '💎', dailyLimit: 100, hasPresets: true },
 };
+
+// Build up to four ascending amount buttons that always end exactly at `limit`,
+// with the lower steps rounded to the nearest ₱5. Generating from the live limit
+// means changing plan_limit_<plan> in the admin panel immediately changes the
+// options the user sees (e.g. Silver 20 → 30 adds a ₱30 button).
+function buildPresets(limit: number): number[] {
+  const max = Math.round(limit);
+  if (!Number.isFinite(max) || max < 5) return [5];
+  const round5 = (n: number) => Math.max(5, Math.round(n / 5) * 5);
+  const candidates = [round5(max * 0.25), round5(max * 0.5), round5(max * 0.75), max];
+  const out: number[] = [];
+  for (const v of candidates) {
+    if (v > 0 && v <= max && !out.includes(v)) out.push(v);
+  }
+  if (!out.includes(max)) out.push(max);
+  return out.sort((a, b) => a - b);
+}
 
 const STATUS_COLOR: Record<WithdrawalStatus, string> = {
   pending:    'var(--primary-amber)',
@@ -80,6 +101,7 @@ function useCooldownTimer(endsAt: string | null | undefined): string {
 export default function Withdraw() {
   const { user }      = useAuth();
   const { showToast } = useToast();
+  const { getSetting } = useSettings();
   const navigate      = useNavigate();
   const [searchParams] = useSearchParams();
   const [view,      setView]      = useState<View>((searchParams.get('view') as View) ?? 'overview');
@@ -120,6 +142,10 @@ export default function Withdraw() {
 
   const plan        = user?.plan ?? 'free';
   const planCfg     = PLAN_CONFIG[plan];
+  // Live per-request limit from the admin-editable site setting (falls back to
+  // the plan's built-in default if the setting is missing).
+  const dailyLimit  = Math.max(1, Number(getSetting(`plan_limit_${plan}`, String(planCfg.dailyLimit))) || planCfg.dailyLimit);
+  const presets     = planCfg.hasPresets ? buildPresets(dailyLimit) : null;
   const balance     = Number(stats?.balance ?? 0);
   const todayAmt    = Number(stats?.today   ?? 0);
   const weekAmt     = Number(stats?.week    ?? 0);
@@ -128,7 +154,7 @@ export default function Withdraw() {
   const cooldownLabel = useCooldownTimer(elig?.cooldown_ends_at);
 
   // Free/Bronze plan: fixed ₱5. VIP plans: chosen preset (default to dailyLimit).
-  const amount = (plan === 'free' || plan === 'bronze') ? 5 : (preset ?? planCfg.dailyLimit);
+  const amount = (plan === 'free' || plan === 'bronze') ? 5 : (preset ?? dailyLimit);
 
   // Philippine mobile: 11 digits starting with 09 (e.g. 09171234567)
   // Also accept +63 prefix.
@@ -227,7 +253,7 @@ export default function Withdraw() {
         <div className={styles.planBadge} style={{ borderColor: planCfg.color }}>
           <span>{planCfg.badge}</span>
           <span style={{ fontWeight: 700, color: planCfg.color }}>{planCfg.name} Plan</span>
-          <span style={{ color: 'var(--text-muted)', fontSize: '0.78rem' }}>· ₱{planCfg.dailyLimit}/day limit</span>
+          <span style={{ color: 'var(--text-muted)', fontSize: '0.78rem' }}>· ₱{dailyLimit} max per withdrawal</span>
           {(plan === 'free' || plan === 'bronze') && <Link to="/plans" className={styles.upgradeLink}>Upgrade →</Link>}
         </div>
 
@@ -715,7 +741,7 @@ export default function Withdraw() {
               ) : (
                 /* Silver/Gold/Diamond — choose from presets */
                 <div className={styles.presetGrid}>
-                  {planCfg.presets!.map(p => (
+                  {presets!.map(p => (
                     <button
                       key={p}
                       type="button"
@@ -729,7 +755,7 @@ export default function Withdraw() {
               )}
 
               <p style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: 10 }}>
-                Daily limit: ₱{planCfg.dailyLimit} · Zero fee on first ₱500/month · ₱5 flat fee after
+                Max ₱{dailyLimit} per withdrawal · Zero fee on first ₱500/month · ₱5 flat fee after
               </p>
             </div>
 
