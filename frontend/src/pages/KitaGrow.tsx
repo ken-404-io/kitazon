@@ -19,6 +19,7 @@ interface Investment {
   reference: string; status: 'pending' | 'active' | 'matured' | 'rejected';
   admin_note: string | null; activated_at: string | null; matures_at: string | null;
   paid_out_at: string | null; created_at: string;
+  progress_pct?: number; accrued_value?: number | string;
 }
 interface KgWithdrawal {
   id: number; amount: number | string; channel: string; account_number: string;
@@ -32,7 +33,7 @@ interface Overview {
   withdraw_min: number;
   investments: Investment[];
   withdrawals: KgWithdrawal[];
-  summary: { active_principal: number; expected_payout: number; total_earned: number };
+  summary: { active_principal: number; expected_payout: number; total_earned: number; in_progress_value: number; accrued_earnings: number };
 }
 
 const peso = (n: number | string, dec = 2) =>
@@ -111,7 +112,11 @@ export default function KitaGrow() {
           <div className={styles.walletMain}>
             <div className={styles.walletLabel}>KitaGrow Wallet</div>
             <div className={styles.walletBalance}>{peso(data.wallet_balance)}</div>
-            <div className={styles.walletSub}>Matured payouts land here — withdraw anytime via GCash.</div>
+            <div className={styles.walletSub}>
+              {summary.in_progress_value > 0
+                ? <><b style={{ color: '#22c55e' }}>{peso(summary.in_progress_value, 2)}</b> growing across your active investments. Matured payouts land here to withdraw via GCash.</>
+                : <>Matured payouts land here — withdraw anytime via GCash.</>}
+            </div>
           </div>
           <div className={styles.statRow}>
             <div className={styles.stat}>
@@ -180,6 +185,17 @@ export default function KitaGrow() {
                       {inv.status === 'active' && inv.matures_at && <> · <span className={styles.countdown}>{maturityLabel(inv)}</span></>}
                       {inv.status === 'pending' && <> · awaiting admin approval</>}
                     </div>
+                    {inv.status === 'active' && (
+                      <div style={{ marginTop: 8 }}>
+                        <div style={{ height: 6, borderRadius: 999, background: 'rgba(255,255,255,0.08)', overflow: 'hidden' }}>
+                          <div style={{ height: '100%', width: `${inv.progress_pct ?? 0}%`, background: 'linear-gradient(90deg,#22c55e,#16a34a)', borderRadius: 999, transition: 'width .4s ease' }} />
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 4, fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                          <span>Now worth <b style={{ color: '#22c55e' }}>{peso(inv.accrued_value ?? inv.amount, 2)}</b></span>
+                          <span>{inv.progress_pct ?? 0}% grown</span>
+                        </div>
+                      </div>
+                    )}
                   </div>
                   <div className={styles.rowAmt}>
                     <div className={styles.rowAmtVal}>{peso(inv.payout_amount, 0)}</div>

@@ -368,3 +368,88 @@ export async function sendGcashPaymentRejectedEmail(to: string, name: string, pl
   `));
 }
 
+/* ─── KitaGrow (investment) emails ─────────────────────────────────────────────── */
+const peso2 = (n: number) => `₱${Number(n).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+// Admin: a new investment is awaiting verification.
+export async function sendKitaGrowInvestmentNotificationEmail(
+  adminEmail: string, userName: string, userEmail: string, userId: number,
+  termDays: number, amount: number, payout: number, reference: string,
+): Promise<void> {
+  const adminLink = `${BASE}/admin`;
+  await send(adminEmail, `KitaGrow Investment Submitted – ${userName} (${peso2(amount)})`, layout('KitaGrow Investment Received', `
+    ${h2('New KitaGrow Investment 🌱')}
+    ${p('A user has submitted a KitaGrow investment and is waiting for their GCash payment to be verified.')}
+    ${table(
+      row('User', escapeHtml(userName)) +
+      row('Email', escapeHtml(userEmail)) +
+      row('User ID', `#${userId}`) +
+      row('Term', `<strong style="color:#22c55e;">${termDays} days</strong>`) +
+      row('Amount', `<strong style="color:#22c55e;">${peso2(amount)}</strong>`) +
+      row('Payout at maturity', `<strong style="color:#e8e8e8;">${peso2(payout)}</strong>`) +
+      row('GCash Reference #', `<strong style="color:#e8e8e8;">${escapeHtml(reference)}</strong>`)
+    )}
+    ${p('Please verify the GCash payment, then activate or reject the investment in the admin panel.')}
+    <div style="text-align:center;margin:24px 0;">${btn(adminLink, 'Go to Admin Panel')}</div>
+  `));
+}
+
+// User: confirmation that their investment was received and is under review.
+export async function sendKitaGrowInvestmentReceivedEmail(
+  to: string, name: string, termDays: number, amount: number, payout: number, reference: string,
+): Promise<void> {
+  await send(to, 'We received your KitaGrow investment 🌱', layout('Investment Received', `
+    ${h2(`Investment received, ${name.split(' ')[0]}!`)}
+    ${p(`We've received your <strong style="color:#22c55e;">${termDays}-day</strong> KitaGrow investment. Our team will verify your GCash payment and activate it within <strong style="color:#e8e8e8;">24 hours</strong>.`)}
+    ${table(
+      row('Term', `<span style="color:#22c55e;font-weight:800;">${termDays} days</span>`) +
+      row('Amount', peso2(amount)) +
+      row('Payout at maturity', `<span style="color:#22c55e;font-weight:800;">${peso2(payout)}</span>`) +
+      row('Reference #', `<span style="font-family:monospace;">${escapeHtml(reference)}</span>`) +
+      row('Status', `<span style="color:#eab308;font-weight:800;">Under Review</span>`)
+    )}
+    ${p('You will receive another email once your investment has been activated. No further action is needed from you.')}
+    ${p('If you did <strong style="color:#e8e8e8;">not</strong> make this investment, please contact support immediately.')}
+  `));
+}
+
+// User: investment approved and now actively growing.
+export async function sendKitaGrowInvestmentActivatedEmail(
+  to: string, name: string, termDays: number, amount: number, payout: number, maturesAt: Date,
+): Promise<void> {
+  const link = `${BASE}/kitagrow`;
+  const maturityStr = maturesAt.toLocaleDateString('en-PH', { year: 'numeric', month: 'long', day: 'numeric' });
+  await send(to, 'Your KitaGrow investment is now active! 🌱', layout('Investment Activated', `
+    ${h2(`You're growing, ${name.split(' ')[0]}! 🚀`)}
+    ${p(`Your <strong style="color:#22c55e;">${termDays}-day</strong> KitaGrow investment has been verified and is now <strong style="color:#22c55e;">active</strong>. Sit back and watch it grow.`)}
+    ${table(
+      row('Term', `<span style="color:#22c55e;font-weight:800;">${termDays} days</span>`) +
+      row('Invested', peso2(amount)) +
+      row('Payout at maturity', `<span style="color:#22c55e;font-weight:800;">${peso2(payout)}</span>`) +
+      row('Matures on', maturityStr)
+    )}
+    ${p('When your investment matures, the payout lands in your KitaGrow wallet and you can withdraw it via GCash.')}
+    <div style="text-align:center;margin:24px 0;">${btn(link, 'View My Investment')}</div>
+    ${p('Thank you for investing with KitaGrow!')}
+  `));
+}
+
+// User: investment rejected (payment could not be verified).
+export async function sendKitaGrowInvestmentRejectedEmail(
+  to: string, name: string, termDays: number, amount: number, note: string | null,
+): Promise<void> {
+  const link = `${BASE}/kitagrow`;
+  await send(to, 'Your KitaGrow investment was not approved', layout('Investment Not Approved', `
+    ${h2(`Hi ${name.split(' ')[0]}, your investment was not approved`)}
+    ${p(`Unfortunately your <strong style="color:#22c55e;">${termDays}-day</strong> KitaGrow investment could not be verified and has been rejected.`)}
+    ${table(
+      row('Term', `<span style="color:#e8e8e8;font-weight:700;">${termDays} days</span>`) +
+      row('Amount', peso2(amount)) +
+      (note ? row('Reason', `<span style="color:#fca5a5;">${escapeHtml(note)}</span>`) : '')
+    )}
+    ${p('Please double-check your GCash reference number and payment screenshot, then resubmit. If you believe this is a mistake, contact our support team.')}
+    <div style="text-align:center;margin:24px 0;">${btn(link, 'Try Again')}</div>
+    ${p('Need help? Reply to this email or message us on Facebook.')}
+  `));
+}
+
