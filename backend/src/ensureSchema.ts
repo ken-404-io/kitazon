@@ -6,7 +6,7 @@ import db from '../config/database';
 // safe to run on every boot and is isolated so one failure can't block another.
 
 const REQUIRED_EARNING_TYPES = [
-  'task', 'referral_signup', 'referral_commission', 'spin', 'checkin', 'referral', 'quiz', 'welcome_bonus',
+  'task', 'referral_signup', 'referral_commission', 'spin', 'checkin', 'referral', 'quiz', 'welcome_bonus', 'admin_adjustment',
 ];
 
 async function ensureNotificationsTable(): Promise<void> {
@@ -88,8 +88,35 @@ async function ensureKitaGrowSchema(): Promise<void> {
   await db.raw('CREATE INDEX IF NOT EXISTS kitagrow_withdrawals_user_status ON kitagrow_withdrawals (user_id, status)');
 }
 
+async function ensurePaymentMethodSchema(): Promise<void> {
+  // Admin-set authoritative GCash account (locks the user's withdrawals to it).
+  await db.raw('ALTER TABLE users ADD COLUMN IF NOT EXISTS gcash_number varchar(20)');
+  await db.raw('ALTER TABLE users ADD COLUMN IF NOT EXISTS gcash_name varchar(100)');
+
+  // User-submitted requests to change their GCash account (with proof), reviewed
+  // by an admin.
+  await db.raw(`
+    CREATE TABLE IF NOT EXISTS payment_change_requests (
+      id serial PRIMARY KEY,
+      user_id integer NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      current_number varchar(20) NULL,
+      requested_number varchar(20) NOT NULL,
+      requested_name varchar(100) NOT NULL,
+      reason text NOT NULL,
+      screenshot_url text NULL,
+      status varchar(20) NOT NULL DEFAULT 'pending',
+      admin_note text NULL,
+      reviewed_by integer NULL REFERENCES users(id) ON DELETE SET NULL,
+      created_at timestamptz NOT NULL DEFAULT now(),
+      updated_at timestamptz NOT NULL DEFAULT now()
+    )
+  `);
+  await db.raw('CREATE INDEX IF NOT EXISTS pcr_status_idx ON payment_change_requests (status, created_at)');
+  await db.raw('CREATE INDEX IF NOT EXISTS pcr_user_idx ON payment_change_requests (user_id, created_at)');
+}
+
 export async function ensureSchema(): Promise<void> {
-  for (const step of [ensureNotificationsTable, ensureWelcomeBonusSchema, ensureKitaGrowSchema]) {
+  for (const step of [ensureNotificationsTable, ensureWelcomeBonusSchema, ensureKitaGrowSchema, ensurePaymentMethodSchema]) {
     try {
       await step();
     } catch (err) {
