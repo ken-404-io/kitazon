@@ -248,14 +248,21 @@ export default function Withdraw() {
           <span className={styles.pageTitle}>Withdraw Money</span>
           <button className={styles.iconBtn} onClick={() => setView('history')}><HistIcon /></button>
         </div>
+        <p style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.78rem', margin: '-4px 0 0.9rem' }}>Safe · Fast · Simple</p>
 
-        {/* Plan badge */}
-        <div className={styles.planBadge} style={{ borderColor: planCfg.color }}>
-          <span>{planCfg.badge}</span>
-          <span style={{ fontWeight: 700, color: planCfg.color }}>{planCfg.name} Plan</span>
-          <span style={{ color: 'var(--text-muted)', fontSize: '0.78rem' }}>· ₱{dailyLimit} max per withdrawal</span>
-          {(plan === 'free' || plan === 'bronze') && <Link to="/plans" className={styles.upgradeLink}>Upgrade →</Link>}
-        </div>
+        {/* Plan card (tap to view/upgrade plan) */}
+        <button
+          type="button"
+          onClick={() => navigate('/plans')}
+          style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 12, background: 'var(--dark-card)', border: `1px solid ${planCfg.color}55`, borderRadius: 14, padding: '0.9rem 1.1rem', marginBottom: '0.9rem', cursor: 'pointer', textAlign: 'left' }}
+        >
+          <span style={{ fontSize: '1.4rem', lineHeight: 1 }}>{planCfg.badge}</span>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontWeight: 800, color: planCfg.color, fontSize: '0.95rem' }}>{planCfg.name} Plan</div>
+            <div style={{ color: 'var(--text-muted)', fontSize: '0.78rem' }}>₱{dailyLimit} max per withdrawal</div>
+          </div>
+          <span style={{ color: 'var(--text-muted)', fontSize: '1.3rem', lineHeight: 1 }}>›</span>
+        </button>
 
         {/* ── 24h cooldown banner ── */}
         {elig?.cooldown_active && elig.cooldown_ends_at && (
@@ -429,23 +436,28 @@ export default function Withdraw() {
           )}
         </button>
 
+        {/* ── Withdrawal Method ── */}
+        <div className={styles.sectionHeader} style={{ marginTop: '1rem' }}>
+          <span className={styles.sectionTitle}>Withdrawal Method</span>
+          <button className={styles.sectionLink} onClick={() => navigate('/change-withdrawal-method')} style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>⇄ Change Method</button>
+        </div>
         <button
           type="button"
           onClick={() => navigate('/change-withdrawal-method')}
-          style={{
-            width: '100%',
-            marginTop: 10,
-            background: 'transparent',
-            border: '1.5px solid var(--border)',
-            color: 'var(--text)',
-            borderRadius: 10,
-            padding: '0.7rem 1rem',
-            fontSize: '0.85rem',
-            fontWeight: 600,
-            cursor: 'pointer',
-          }}
+          style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 12, background: 'var(--dark-card)', border: '1px solid var(--dark-border)', borderRadius: 14, padding: '0.85rem 1rem', cursor: 'pointer', textAlign: 'left' }}
         >
-          Change Withdrawal Method →
+          <span style={{ width: 34, height: 34, borderRadius: '50%', background: '#0070e0', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900, flexShrink: 0 }}>G</span>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span style={{ fontWeight: 700 }}>GCash</span>
+              {savedAcct && <span style={{ fontSize: '0.62rem', fontWeight: 800, color: '#22c55e', background: 'rgba(34,197,94,0.12)', padding: '1px 7px', borderRadius: 20, textTransform: 'uppercase' }}>Default</span>}
+            </div>
+            <div style={{ color: 'var(--text-muted)', fontSize: '0.8rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              {savedAcct ? savedAcct.replace(/.(?=.{4})/g, '*') : 'No account saved yet'}
+              {savedAcctName ? ` · ${savedAcctName}` : ''}
+            </div>
+          </div>
+          <span style={{ color: 'var(--text-muted)', fontSize: '1.3rem', lineHeight: 1 }}>›</span>
         </button>
 
         <div className={styles.totalStrip}>
