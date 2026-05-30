@@ -13,6 +13,7 @@ migrations/.env
 # Build
 frontend/build/
 frontend/.cache/
+backend/dist/
 coverage/
 
 # Logs
