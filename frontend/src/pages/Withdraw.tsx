@@ -663,7 +663,17 @@ export default function Withdraw() {
                     <span style={{ fontSize: '0.7rem', fontWeight: 700, color: '#22c55e', background: 'rgba(34,197,94,0.1)', padding: '2px 8px', borderRadius: 20 }}>Saved</span>
                   </div>
                   <div style={{ marginTop: 8, background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.25)', borderRadius: 10, padding: '0.65rem 0.9rem', fontSize: '0.78rem', color: 'var(--text-muted)', lineHeight: 1.5 }}>
-                    To change or remove your GCash account, please contact support. This is required to prevent duplicate accounts.
+                    Need to change or remove your GCash account?{' '}
+                    <span
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => navigate('/change-withdrawal-method')}
+                      onKeyDown={e => { if (e.key === 'Enter') navigate('/change-withdrawal-method'); }}
+                      style={{ color: 'var(--primary, #f97316)', fontWeight: 700, cursor: 'pointer', textDecoration: 'underline' }}
+                    >
+                      Request a change
+                    </span>{' '}
+                    — submit a reason and a screenshot of your GCash account for review (prevents duplicate accounts).
                   </div>
                 </div>
               ) : (

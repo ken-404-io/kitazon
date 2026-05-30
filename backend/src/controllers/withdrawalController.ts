@@ -229,12 +229,19 @@ export async function eligibility(req: Request, res: Response, next: NextFunctio
 
 export async function savedAccount(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    // Ignore withdrawals from before the user cleared their saved payment method
+    // An admin-set GCash account (users.gcash_number) is authoritative — return it
+    // directly when present, regardless of withdrawal history.
     let clearedAt: Date | null = null;
     try {
-      const u = await db<DbUser>('users').where({ id: req.user!.id }).select('payment_method_cleared_at').first();
+      const u = await db<DbUser>('users').where({ id: req.user!.id })
+        .select('payment_method_cleared_at', 'gcash_number', 'gcash_name').first();
+      const uu = u as (DbUser & { gcash_number?: string | null; gcash_name?: string | null }) | undefined;
+      if (uu?.gcash_number) {
+        res.json({ account_number: uu.gcash_number, channel: 'gcash', account_name: uu.gcash_name ?? null });
+        return;
+      }
       clearedAt = (u?.payment_method_cleared_at as Date | null | undefined) ?? null;
-    } catch { /* column not migrated yet */ }
+    } catch { /* columns not migrated yet */ }
 
     let q = db('withdrawals').where({ user_id: req.user!.id });
     if (clearedAt) q = q.where('created_at', '>', clearedAt);
@@ -449,6 +456,18 @@ export async function create(req: Request, res: Response, next: NextFunction): P
     if (!user) { res.status(404).json({ message: 'User not found.' }); return; }
     if (!user.email_verified) {
       res.status(403).json({ message: 'Please verify your email before making withdrawals.' });
+      return;
+    }
+
+    // If an admin-set GCash account is locked on the user, the withdrawal must use
+    // that exact number. To change it the user must file a payment-method request.
+    const lockedNumber = (user as DbUser & { gcash_number?: string | null }).gcash_number ?? null;
+    if (lockedNumber && normalizedAccount !== lockedNumber) {
+      res.status(409).json({
+        message: `Your withdrawals are locked to GCash ${maskAccount(lockedNumber)}. To change it, request a payment-method change.`,
+        reason: 'gcash_locked',
+        saved_account: lockedNumber,
+      });
       return;
     }
 

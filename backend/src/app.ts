@@ -21,6 +21,7 @@ import creditsRoutes from './routes/credits';
 import investmentRoutes from './routes/investments';
 import kycRoutes from './routes/kyc';
 import notificationsRoutes from './routes/notifications';
+import paymentMethodRoutes from './routes/paymentMethod';
 import { getPublicSettings } from './controllers/settingsController';
 import { ensureSchema } from './ensureSchema';
 
@@ -126,6 +127,7 @@ app.use(cookieParser());
 app.use('/api/kyc/submit', express.json({ limit: '20mb' }));
 app.use('/api/subscriptions/gcash-submit', express.json({ limit: '8mb' }));
 app.use('/api/investments', express.json({ limit: '8mb' }));
+app.use('/api/payment-method/change-requests', express.json({ limit: '8mb' }));
 app.use('/api/admin/upload-image', express.json({ limit: '8mb' }));
 app.use(express.json({ limit: '10kb' }));
 app.use(express.urlencoded({ extended: false, limit: '10kb' }));
@@ -163,6 +165,7 @@ app.use('/api/credits', creditsRoutes);
 app.use('/api/investments', investmentRoutes);
 app.use('/api/kyc', kycRoutes);
 app.use('/api/notifications', notificationsRoutes);
+app.use('/api/payment-method', paymentMethodRoutes);
 
 // ─── security.txt (RFC 9116) ──────────────────────────────────────────────────
 app.get('/.well-known/security.txt', (_req, res) => {
