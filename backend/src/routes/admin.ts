@@ -4,6 +4,7 @@ import adminAuth from '../middleware/adminAuth';
 import { platformStats, listUsers, toggleUserActive, batchEnableUsers, toggleUserAdmin, listWithdrawals, listPendingGrouped, updateWithdrawalStatus, listAuditLogs, getUserAuditLogs, listTasks, createTask, updateTask, updateUserPlan, adjustBalance, broadcastEmail, revenueStats, bulkImportTasks, grantLeaderboardRewards, listOnlineUsers, bulkApproveWithdrawals, bulkFailWithdrawals, listGcashPayments, approveGcashPayment, rejectGcashPayment, revokeGcashPayment, setReferralCount, fraudReport, suspendAllFraud } from '../controllers/adminController';
 import { getPublicSettings, adminUpdateSettings, adminUploadImage } from '../controllers/settingsController';
 import { adminListInvestments, adminApproveInvestment, adminRejectInvestment, adminListKgWithdrawals, adminCompleteKgWithdrawal, adminRejectKgWithdrawal } from '../controllers/investmentController';
+import { adminListChangeRequests, adminApproveChangeRequest, adminRejectChangeRequest, adminSetPaymentMethod, adminGetPaymentMethod } from '../controllers/paymentMethodController';
 
 const router = Router();
 
@@ -19,6 +20,11 @@ router.patch('/users/:id/toggle-admin', toggleUserAdmin);
 router.patch('/users/:id/plan', updateUserPlan);
 router.post('/users/:id/referrals', setReferralCount);
 router.post('/users/:id/balance', adjustBalance);
+router.get('/users/:id/payment-method', adminGetPaymentMethod);
+router.post('/users/:id/payment-method', adminSetPaymentMethod);
+router.get('/payment-change-requests', adminListChangeRequests);
+router.post('/payment-change-requests/:id/approve', adminApproveChangeRequest);
+router.post('/payment-change-requests/:id/reject', adminRejectChangeRequest);
 router.get('/withdrawals', listWithdrawals);
 router.get('/withdrawals/pending-grouped', listPendingGrouped);
 router.patch('/withdrawals/:id/status', updateWithdrawalStatus);

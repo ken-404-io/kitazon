@@ -5,12 +5,11 @@ import KycGate from '../components/KycGate';
 import api from '../services/api';
 import styles from './MathQuiz.module.css';
 
+// Silver, Gold and Diamond have no daily quiz earning cap.
+const UNLIMITED_QUIZ_PLANS = ['silver', 'gold', 'diamond'];
 const PLAN_LIMITS: Record<string, string> = {
   free:    '₱150/day',
   bronze:  '₱150/day',
-  silver:  '₱500/day',
-  gold:    '₱2,000/day',
-  diamond: '₱4,000/day',
 };
 
 const QUESTIONS_PER_ROUND = 10;
@@ -163,6 +162,19 @@ function QuizInner() {
   const [phase,         setPhase]         = useState<'question' | 'ad' | 'result'>('question');
   const [pendingReward, setPendingReward] = useState(false);
   const [showLeaveModal, setShowLeaveModal] = useState(false);
+  const [ready,         setReady]         = useState(false);
+
+  // On load, check whether the user still has earning room today. If they've
+  // already hit their daily cap we show the limit screen instead of letting them
+  // keep playing for ₱0. (Unlimited plans always report capped: false.)
+  useEffect(() => {
+    let cancelled = false;
+    api.get<{ capped: boolean }>('/tasks/quiz/status')
+      .then(r => { if (!cancelled && r.data.capped) setCapped(true); })
+      .catch(() => { /* fall through — allow play if the check fails */ })
+      .finally(() => { if (!cancelled) setReady(true); });
+    return () => { cancelled = true; };
+  }, []);
 
   const isAdPhase = phase === 'ad';
   const pendingRewardRef = useRef(pendingReward);
@@ -271,11 +283,33 @@ function QuizInner() {
         <div className={styles.navIntercept} onClick={() => setShowLeaveModal(true)} />
       )}
 
-      {phase === 'ad' && (
+      {!ready && (
+        <div className={styles.quiz}>
+          <p className={styles.progressLabel} style={{ textAlign: 'center', padding: '2rem 0' }}>Loading…</p>
+        </div>
+      )}
+
+      {/* Daily earnings limit reached — stop play and tell the user. */}
+      {ready && capped && (
+        <div className={styles.result}>
+          <div className={styles.resultIcon}>
+            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#22c55e" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+          </div>
+          <h2 className={styles.resultTitle}>You hit your daily earnings! 🎉</h2>
+          <p className={styles.resultScore}>You've earned the maximum from the quiz for today.</p>
+          {earned > 0 && <p className={styles.resultEarned}>+₱{earned.toFixed(2)} earned this session</p>}
+          <p className={styles.cappedNote}>Come back tomorrow to earn more — your limit resets daily.</p>
+          <div className={styles.resultBtns}>
+            <button className={styles.dashBtn} onClick={() => navigate('/dashboard')}>Back to Dashboard</button>
+          </div>
+        </div>
+      )}
+
+      {ready && !capped && phase === 'ad' && (
         <AdBreak onDone={nextQuestion} onAbandoned={handleAbandoned} />
       )}
 
-      {phase === 'result' && (
+      {ready && !capped && phase === 'result' && (
         <div className={styles.result}>
           <div className={styles.resultIcon}>
             {correct >= 7
@@ -294,7 +328,7 @@ function QuizInner() {
         </div>
       )}
 
-      {phase === 'question' && (
+      {ready && !capped && phase === 'question' && (
         <div className={styles.quiz}>
           <div className={styles.progress}>
             <div className={styles.progressBar}>
@@ -337,7 +371,8 @@ function QuizInner() {
 export default function MathQuiz() {
   const { user } = useAuth();
   const plan = (user as { plan?: string })?.plan ?? 'free';
-  const limitLabel = PLAN_LIMITS[plan] ?? PLAN_LIMITS.free;
+  const unlimited = UNLIMITED_QUIZ_PLANS.includes(plan);
+  const limitLabel = unlimited ? 'Unlimited daily earnings' : `Max ${PLAN_LIMITS[plan] ?? PLAN_LIMITS.free}`;
 
   return (
     <KycGate feature="tasks">
@@ -351,7 +386,7 @@ export default function MathQuiz() {
             </div>
             <div>
               <h1 className={styles.title}>Math Quiz</h1>
-              <p className={styles.subtitle}>₱3.00 per correct answer · Max {limitLabel}</p>
+              <p className={styles.subtitle}>₱3.00 per correct answer · {limitLabel}</p>
             </div>
           </div>
           <QuizInner />

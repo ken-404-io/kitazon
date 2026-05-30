@@ -453,3 +453,76 @@ export async function sendKitaGrowInvestmentRejectedEmail(
   `));
 }
 
+/* ─── Payment-method change request emails ─────────────────────────────────────── */
+
+// Admin: a user has requested to change their GCash withdrawal account.
+export async function sendPaymentChangeRequestAdminEmail(
+  adminEmail: string, userName: string, userEmail: string, userId: number,
+  currentNumber: string | null, requestedNumber: string, requestedName: string, reason: string,
+): Promise<void> {
+  const adminLink = `${BASE}/admin`;
+  await send(adminEmail, `Payment-method change request – ${userName}`, layout('Payment Method Change Request', `
+    ${h2('Payment-method change requested 🔁')}
+    ${p('A user wants to change the GCash account used for their withdrawals. Please verify the attached proof before approving.')}
+    ${table(
+      row('User', escapeHtml(userName)) +
+      row('Email', escapeHtml(userEmail)) +
+      row('User ID', `#${userId}`) +
+      row('Current GCash', currentNumber ? escapeHtml(currentNumber) : '—') +
+      row('Requested GCash', `<strong style="color:#22c55e;">${escapeHtml(requestedNumber)}</strong>`) +
+      row('Requested Name', escapeHtml(requestedName)) +
+      row('Reason', `<span style="color:#e8e8e8;">${escapeHtml(reason)}</span>`)
+    )}
+    ${p('Review the request and proof screenshot in the admin panel, then approve or reject it.')}
+    <div style="text-align:center;margin:24px 0;">${btn(adminLink, 'Review in Admin Panel')}</div>
+  `));
+}
+
+// User: confirmation that their change request was received.
+export async function sendPaymentChangeReceivedEmail(
+  to: string, name: string, requestedNumber: string, requestedName: string,
+): Promise<void> {
+  await send(to, 'We received your payment-method change request 📥', layout('Change Request Received', `
+    ${h2(`Request received, ${name.split(' ')[0]}!`)}
+    ${p('We\'ve received your request to change your GCash withdrawal account. Our team will review your proof and update it within <strong style="color:#e8e8e8;">24 hours</strong>.')}
+    ${table(
+      row('New GCash number', `<strong style="color:#f97316;">${escapeHtml(requestedNumber)}</strong>`) +
+      row('New account name', escapeHtml(requestedName)) +
+      row('Status', `<span style="color:#eab308;font-weight:800;">Under Review</span>`)
+    )}
+    ${p('You\'ll get another email once it\'s been reviewed. No further action is needed.')}
+  `));
+}
+
+// User: their withdrawal account was updated (request approved or admin-set).
+export async function sendPaymentMethodUpdatedEmail(
+  to: string, name: string, newNumber: string, newName: string,
+): Promise<void> {
+  const link = `${BASE}/withdraw`;
+  await send(to, 'Your withdrawal account has been updated ✅', layout('Payment Method Updated', `
+    ${h2(`All set, ${name.split(' ')[0]}!`)}
+    ${p('Your GCash withdrawal account has been updated. Future withdrawals will go to the account below.')}
+    ${table(
+      row('GCash number', `<strong style="color:#22c55e;">${escapeHtml(newNumber)}</strong>`) +
+      row('Account name', escapeHtml(newName)) +
+      row('Status', `<span style="color:#22c55e;font-weight:800;">Active</span>`)
+    )}
+    ${p('If you did <strong style="color:#e8e8e8;">not</strong> request this change, contact support immediately.')}
+    <div style="text-align:center;margin:24px 0;">${btn(link, 'Go to Withdraw')}</div>
+  `));
+}
+
+// User: their change request was rejected.
+export async function sendPaymentChangeRejectedEmail(
+  to: string, name: string, requestedNumber: string, note: string | null,
+): Promise<void> {
+  const link = `${BASE}/change-withdrawal-method`;
+  await send(to, 'Your payment-method change request was not approved', layout('Change Request Not Approved', `
+    ${h2(`Hi ${name.split(' ')[0]}, your request was not approved`)}
+    ${p(`Unfortunately your request to change your GCash account to <strong style="color:#f97316;">${escapeHtml(requestedNumber)}</strong> could not be approved.`)}
+    ${table(note ? row('Reason', `<span style="color:#fca5a5;">${escapeHtml(note)}</span>`) : row('Reason', 'The proof could not be verified.'))}
+    ${p('Please make sure the screenshot clearly shows the GCash account name and number, then submit a new request. If you believe this is a mistake, contact support.')}
+    <div style="text-align:center;margin:24px 0;">${btn(link, 'Submit a New Request')}</div>
+  `));
+}
+

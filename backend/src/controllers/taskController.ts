@@ -284,6 +284,39 @@ export async function quizCorrect(req: Request, res: Response, next: NextFunctio
   } catch (err) { next(err); }
 }
 
+// GET /api/tasks/quiz/status — how much quiz earning room the user has left today.
+// Lets the quiz UI show a "daily limit reached" screen up front (and skip it for
+// unlimited plans) instead of letting the user keep playing for ₱0.
+export async function quizStatus(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const userRow = await db('users').where({ id: req.user!.id }).select('plan').first();
+    const plan = (userRow?.plan ?? 'free') as string;
+
+    if (UNLIMITED_QUIZ_PLANS.has(plan)) {
+      res.json({ unlimited: true, capped: false, reward: QUIZ_REWARD });
+      return;
+    }
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const countToday = await db('earnings')
+      .where({ user_id: req.user!.id, type: 'quiz' })
+      .where('created_at', '>=', today)
+      .count('id as n')
+      .first();
+    const answered = Number((countToday as any)?.n ?? 0);
+    const dailyMax = QUIZ_DAILY_LIMITS[plan] ?? QUIZ_DAILY_LIMITS.free;
+
+    res.json({
+      unlimited: false,
+      capped: answered >= dailyMax,
+      answered_today: answered,
+      daily_limit: dailyMax,
+      reward: QUIZ_REWARD,
+    });
+  } catch (err) { next(err); }
+}
+
 export async function claimWelcomeBonus(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     let alreadyClaimed = false;

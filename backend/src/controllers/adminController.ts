@@ -55,7 +55,7 @@ export async function listUsers(req: Request, res: Response, next: NextFunction)
     };
 
     let query = db<DbUser>('users')
-      .select('id', 'name', 'email', 'balance', 'is_active', 'is_admin', 'email_verified', 'created_at', 'last_login_at', 'plan', 'plan_expires_at', 'withdrawal_credits')
+      .select('id', 'name', 'email', 'balance', 'is_active', 'is_admin', 'email_verified', 'created_at', 'last_login_at', 'plan', 'plan_expires_at', 'withdrawal_credits', 'gcash_number', 'gcash_name')
       .orderBy('created_at', 'desc')
       .limit(limit)
       .offset(offset);

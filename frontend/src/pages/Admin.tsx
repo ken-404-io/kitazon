@@ -4,7 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import api from '../services/api';
 import { WithdrawalStatus, WithdrawalChannel } from '../types';
 
-type Tab = 'stats' | 'users' | 'suspended' | 'withdrawals' | 'pending-withdrawals' | 'tasks' | 'logs' | 'revenue' | 'broadcast' | 'kyc' | 'online' | 'gcash-payments' | 'kitagrow' | 'fraud' | 'settings';
+type Tab = 'stats' | 'users' | 'suspended' | 'withdrawals' | 'pending-withdrawals' | 'tasks' | 'logs' | 'revenue' | 'broadcast' | 'kyc' | 'online' | 'gcash-payments' | 'kitagrow' | 'payment-changes' | 'fraud' | 'settings';
 
 const TAB_LABELS: Record<Tab, string> = {
   stats: 'Stats',
@@ -18,6 +18,7 @@ const TAB_LABELS: Record<Tab, string> = {
   fraud: 'Fraud Detection',
   'gcash-payments': 'GCash Payments',
   kitagrow: 'KitaGrow',
+  'payment-changes': 'Payment Changes',
   online: 'Online',
   logs: 'Audit Logs',
   broadcast: 'Broadcast',
@@ -133,6 +134,8 @@ interface AdminUser {
   plan?: string;
   plan_expires_at?: string | null;
   withdrawal_credits?: number | null;
+  gcash_number?: string | null;
+  gcash_name?: string | null;
 }
 
 interface AdminWithdrawal {
@@ -167,6 +170,21 @@ interface PendingGroup {
   account_name: string | null;
   withdrawal_ids: number[];
   daily_completed_count: number;
+}
+
+interface PaymentChangeRequest {
+  id: number;
+  user_id: number;
+  current_number: string | null;
+  requested_number: string;
+  requested_name: string;
+  reason: string;
+  screenshot_url: string | null;
+  status: 'pending' | 'approved' | 'rejected';
+  admin_note: string | null;
+  created_at: string;
+  user_name: string;
+  user_email: string;
 }
 
 interface AdminTask {
@@ -275,6 +293,18 @@ export default function Admin() {
   const [adjustAmount, setAdjustAmount] = useState('');
   const [adjustNote, setAdjustNote] = useState('');
   const [adjustLoading, setAdjustLoading] = useState(false);
+
+  // Manage payment method (per user)
+  const [managingUser, setManagingUser] = useState<number | null>(null);
+  const [pmNumber, setPmNumber] = useState('');
+  const [pmName, setPmName] = useState('');
+  const [pmLoading, setPmLoading] = useState(false);
+
+  // Payment-method change requests tab
+  const [pendingChanges, setPendingChanges] = useState<PaymentChangeRequest[]>([]);
+  const [pcFilter, setPcFilter] = useState('pending');
+  const [pcLoading, setPcLoading] = useState(false);
+  const [pcBusy, setPcBusy] = useState<number | null>(null);
 
   // Broadcast
   const [broadcastTarget, setBroadcastTarget] = useState<'all' | 'verified' | 'paid'>('all');
@@ -544,6 +574,14 @@ export default function Admin() {
     } finally { setGroupedLoading(false); }
   }, []);
 
+  const loadPaymentChanges = useCallback(async (status: string) => {
+    setPcLoading(true);
+    try {
+      const res = await api.get<PaymentChangeRequest[]>(`/admin/payment-change-requests?status=${status}`);
+      setPendingChanges(res.data);
+    } finally { setPcLoading(false); }
+  }, []);
+
   const loadTasks = useCallback(async () => {
     setTaskLoading(true);
     try {
@@ -677,10 +715,11 @@ export default function Admin() {
     if (tab === 'kyc') loadKyc(kycFilter);
     if (tab === 'gcash-payments') loadGcashPayments(gcashFilter);
     if (tab === 'kitagrow') loadKitaGrow(investFilter, kgFilter);
+    if (tab === 'payment-changes') loadPaymentChanges(pcFilter);
     if (tab === 'online') loadOnline();
     if (tab === 'fraud' && !fraudData) loadFraud();
     if (tab === 'settings') loadSiteSettings();
-  }, [tab, userPage, wPage, wPerPage, wFilter, wSearch, logPage, kycFilter, gcashFilter, investFilter, kgFilter, stats, revenueStats, fraudData, loadStats, loadUsers, loadWithdrawals, loadPendingGrouped, loadTasks, loadLogs, loadRevenue, loadKyc, loadGcashPayments, loadKitaGrow, loadOnline, loadFraud, loadSiteSettings]);
+  }, [tab, userPage, wPage, wPerPage, wFilter, wSearch, logPage, kycFilter, gcashFilter, investFilter, kgFilter, pcFilter, stats, revenueStats, fraudData, loadStats, loadUsers, loadWithdrawals, loadPendingGrouped, loadTasks, loadLogs, loadRevenue, loadKyc, loadGcashPayments, loadKitaGrow, loadPaymentChanges, loadOnline, loadFraud, loadSiteSettings]);
 
   // Tick once a minute so the per-user waiting-time counters stay live while the
   // admin sits on the Pending Withdrawals tab.
@@ -831,6 +870,59 @@ export default function Admin() {
     } catch (err: unknown) {
       showToast((err as { response?: { data?: { message?: string } } }).response?.data?.message ?? 'Failed to adjust balance.');
     } finally { setAdjustLoading(false); }
+  };
+
+  // ── Manage payment method (per user) ──
+  const openManagePM = async (u: AdminUser) => {
+    if (managingUser === u.id) { setManagingUser(null); return; }
+    setManagingUser(u.id);
+    setPmNumber(u.gcash_number ?? '');
+    setPmName(u.gcash_name ?? '');
+    // Pull the latest derived/admin-set method in case the row is stale.
+    try {
+      const r = await api.get<{ gcash_number: string | null; gcash_name: string | null; derived_number: string | null }>(`/admin/users/${u.id}/payment-method`);
+      setPmNumber(r.data.gcash_number ?? r.data.derived_number ?? '');
+      setPmName(r.data.gcash_name ?? '');
+    } catch { /* keep row values */ }
+  };
+
+  const savePaymentMethod = async (userId: number) => {
+    if (!pmNumber.trim() || !pmName.trim()) { showToast('GCash number and account name are required.'); return; }
+    setPmLoading(true);
+    try {
+      await api.post(`/admin/users/${userId}/payment-method`, { number: pmNumber.trim(), name: pmName.trim() });
+      showToast('Payment method updated. User notified.');
+      setManagingUser(null);
+      loadUsers(userPage, userSearch);
+    } catch (err: unknown) {
+      showToast((err as { response?: { data?: { message?: string } } }).response?.data?.message ?? 'Failed to update payment method.');
+    } finally { setPmLoading(false); }
+  };
+
+  // ── Payment-method change requests ──
+  const approvePaymentChange = async (r: PaymentChangeRequest) => {
+    if (!window.confirm(`Approve and set ${r.user_name}'s GCash to ${r.requested_number} (${r.requested_name})?`)) return;
+    setPcBusy(r.id);
+    try {
+      await api.post(`/admin/payment-change-requests/${r.id}/approve`, { number: r.requested_number, name: r.requested_name });
+      showToast('Approved — payment method updated and user notified.');
+      loadPaymentChanges(pcFilter);
+    } catch (err: unknown) {
+      showToast((err as { response?: { data?: { message?: string } } }).response?.data?.message ?? 'Failed to approve.');
+    } finally { setPcBusy(null); }
+  };
+
+  const rejectPaymentChange = async (r: PaymentChangeRequest) => {
+    const note = window.prompt('Reason for rejecting (shown to the user):', '');
+    if (note === null) return;
+    setPcBusy(r.id);
+    try {
+      await api.post(`/admin/payment-change-requests/${r.id}/reject`, { note: note.trim() || undefined });
+      showToast('Request rejected — user notified.');
+      loadPaymentChanges(pcFilter);
+    } catch (err: unknown) {
+      showToast((err as { response?: { data?: { message?: string } } }).response?.data?.message ?? 'Failed to reject.');
+    } finally { setPcBusy(null); }
   };
 
   const sendBroadcast = async (e: React.FormEvent) => {
@@ -1039,6 +1131,7 @@ export default function Admin() {
     { id: 'kyc',                 label: 'KYC',                 icon: <svg {...si}><rect x="3" y="4" width="18" height="16" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><path d="M9 12h6M9 16h4"/></svg> },
     { id: 'gcash-payments',      label: 'GCash Payments',      icon: <svg {...si}><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg> },
     { id: 'kitagrow',            label: 'KitaGrow',            icon: <svg {...si}><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg> },
+    { id: 'payment-changes',     label: 'Payment Changes',     icon: <svg {...si}><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>, badge: pendingChanges.filter(r => r.status === 'pending').length || undefined },
     { id: 'online',              label: 'Online',              icon: <svg {...si}><circle cx="12" cy="12" r="3"/><path d="M2 12C2 6.48 6.48 2 12 2s10 4.48 10 10-4.48 10-10 10"/></svg> },
     { id: 'logs',                label: 'Audit Logs',          icon: <svg {...si}><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg> },
     { id: 'broadcast',           label: 'Broadcast',           icon: <svg {...si}><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12 19.79 19.79 0 0 1 1.63 3.38 2 2 0 0 1 3.6 1.18h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 8.96a16 16 0 0 0 6.13 6.13l.96-.96a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg> },
@@ -1410,7 +1503,42 @@ export default function Admin() {
                           >
                             📋 Activity
                           </button>
+                          <button
+                            className="btn-outline"
+                            style={{ fontSize: 12, padding: '4px 10px', borderColor: '#22c55e', color: '#22c55e', background: managingUser === u.id ? 'rgba(34,197,94,0.1)' : undefined }}
+                            onClick={() => openManagePM(u)}
+                          >
+                            💳 Payment
+                          </button>
                         </div>
+                        {managingUser === u.id && (
+                          <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 6, minWidth: 220, background: 'rgba(34,197,94,0.06)', border: '1px solid rgba(34,197,94,0.3)', borderRadius: 8, padding: '10px' }}>
+                            <div style={{ fontSize: 12, fontWeight: 700, color: '#22c55e' }}>Manage GCash withdrawal account</div>
+                            <input
+                              type="tel"
+                              placeholder="GCash number (09xxxxxxxxx)"
+                              value={pmNumber}
+                              maxLength={13}
+                              onChange={e => setPmNumber(e.target.value)}
+                              style={{ padding: '5px 8px', borderRadius: 6, border: '1px solid #22c55e', fontSize: 12, width: '100%' }}
+                            />
+                            <input
+                              type="text"
+                              placeholder="Account name"
+                              value={pmName}
+                              maxLength={100}
+                              onChange={e => setPmName(e.target.value)}
+                              style={{ padding: '5px 8px', borderRadius: 6, border: '1px solid #22c55e', fontSize: 12, width: '100%' }}
+                            />
+                            <div style={{ display: 'flex', gap: 6 }}>
+                              <button className="btn-primary" disabled={pmLoading} style={{ fontSize: 12, padding: '4px 10px', flex: 1, background: '#16a34a', borderColor: '#16a34a' }} onClick={() => savePaymentMethod(u.id)}>
+                                {pmLoading ? 'Saving…' : 'Save & notify'}
+                              </button>
+                              <button className="btn-outline" style={{ fontSize: 12, padding: '4px 10px' }} onClick={() => setManagingUser(null)}>Cancel</button>
+                            </div>
+                            <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>Locks the user's withdrawals to this account. The user is emailed + notified.</div>
+                          </div>
+                        )}
                         {editingReferrals === u.id && (
                           <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 6, minWidth: 200 }}>
                             <input
@@ -2841,6 +2969,71 @@ export default function Admin() {
                 ))}
               </tbody>
             </table>
+          )}
+        </div>
+      )}
+
+      {/* ── Payment-method change requests ── */}
+      {tab === 'payment-changes' && (
+        <div>
+          <div style={{ display: 'flex', gap: 8, marginBottom: '1rem', alignItems: 'center', flexWrap: 'wrap' }}>
+            <label style={{ fontSize: 13 }}>Status:</label>
+            <select
+              value={pcFilter}
+              onChange={e => setPcFilter(e.target.value)}
+              style={{ padding: '6px 10px', borderRadius: 6, border: '1px solid var(--dark-border)', background: 'var(--dark-bg)', color: 'var(--text)' }}
+            >
+              <option value="pending">Pending</option>
+              <option value="approved">Approved</option>
+              <option value="rejected">Rejected</option>
+            </select>
+            <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+              Users request to change their GCash withdrawal account here. Verify the proof, then approve (sets the new account) or reject.
+            </span>
+          </div>
+
+          {pcLoading ? (
+            <p style={{ fontSize: 13, color: 'var(--text-muted)' }}>Loading…</p>
+          ) : pendingChanges.length === 0 ? (
+            <p style={{ fontSize: 13, color: 'var(--text-muted)' }}>No {pcFilter} requests.</p>
+          ) : (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 12 }}>
+              {pendingChanges.map(r => (
+                <div key={r.id} style={{ border: '1.5px solid var(--dark-border)', borderRadius: 12, padding: '0.9rem', background: 'var(--dark-bg)', display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  <div>
+                    <div style={{ fontWeight: 700, fontSize: '0.9rem' }}>{r.user_name}</div>
+                    <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>{r.user_email}</div>
+                  </div>
+                  <div style={{ fontSize: '0.8rem' }}>
+                    <div style={{ color: 'var(--text-muted)' }}>Current: <span style={{ color: 'var(--text)' }}>{r.current_number ?? '—'}</span></div>
+                    <div style={{ color: 'var(--text-muted)' }}>Requested: <strong style={{ color: '#22c55e' }}>{r.requested_number}</strong> · {r.requested_name}</div>
+                  </div>
+                  <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', background: 'rgba(255,255,255,0.03)', borderRadius: 8, padding: '6px 8px' }}>
+                    <span style={{ fontWeight: 700, color: 'var(--text)' }}>Reason: </span>{r.reason}
+                  </div>
+                  {r.screenshot_url && (
+                    <a href={r.screenshot_url} target="_blank" rel="noreferrer">
+                      <img src={r.screenshot_url} alt="proof" style={{ width: '100%', maxHeight: 220, objectFit: 'contain', borderRadius: 8, border: '1px solid var(--dark-border)', background: '#000' }} />
+                    </a>
+                  )}
+                  <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>
+                    {new Date(r.created_at).toLocaleString('en-PH', { timeZone: 'Asia/Manila' })}
+                    {r.status !== 'pending' && <> · <span style={{ fontWeight: 700, color: r.status === 'approved' ? '#22c55e' : '#dc2626' }}>{r.status.toUpperCase()}</span></>}
+                    {r.admin_note && <> · {r.admin_note}</>}
+                  </div>
+                  {r.status === 'pending' && (
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <button disabled={pcBusy === r.id} onClick={() => approvePaymentChange(r)} style={{ flex: 1, padding: '7px 10px', borderRadius: 8, border: 'none', background: '#16a34a', color: '#fff', fontSize: '0.78rem', fontWeight: 700, cursor: pcBusy === r.id ? 'default' : 'pointer', opacity: pcBusy === r.id ? 0.6 : 1 }}>
+                        {pcBusy === r.id ? '…' : '✓ Approve & set'}
+                      </button>
+                      <button disabled={pcBusy === r.id} onClick={() => rejectPaymentChange(r)} style={{ padding: '7px 10px', borderRadius: 8, border: '1px solid #dc2626', background: 'transparent', color: '#dc2626', fontSize: '0.78rem', fontWeight: 700, cursor: pcBusy === r.id ? 'default' : 'pointer', opacity: pcBusy === r.id ? 0.6 : 1 }}>
+                        ✗ Reject
+                      </button>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
           )}
         </div>
       )}
