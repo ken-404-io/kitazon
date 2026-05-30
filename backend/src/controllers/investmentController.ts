@@ -4,6 +4,12 @@ import db from '../../config/database';
 import { DbUser } from '../types';
 import { logAudit } from '../services/audit';
 import { getAllSettings } from './settingsController';
+import {
+  sendKitaGrowInvestmentNotificationEmail,
+  sendKitaGrowInvestmentReceivedEmail,
+  sendKitaGrowInvestmentActivatedEmail,
+  sendKitaGrowInvestmentRejectedEmail,
+} from '../services/email';
 
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
@@ -95,30 +101,56 @@ export async function getOverview(req: Request, res: Response, next: NextFunctio
       .orderBy('created_at', 'desc')
       .select('id', 'amount', 'channel', 'account_number', 'status', 'admin_note', 'created_at');
 
+    const now = Date.now();
     let activePrincipal = 0;
     let expectedPayout = 0;
     let totalEarned = 0;
-    for (const inv of investments) {
-      if (inv.status === 'active') {
-        activePrincipal += Number(inv.amount);
-        expectedPayout += Number(inv.payout_amount);
+    let inProgressValue = 0; // current accrued value of all active investments
+
+    // Enrich each investment with how far it has grown so far. `progress_pct` is
+    // the share of the term elapsed; `accrued_value` is the principal plus the
+    // linearly-accrued portion of the gain — i.e. what the investment is "worth"
+    // right now, so the UI can show real progress instead of a flat ₱0.00.
+    const enrichedInvestments = investments.map((inv) => {
+      const amount = Number(inv.amount);
+      const payout = Number(inv.payout_amount);
+      let progress = 0;
+      let accruedValue = amount;
+
+      if (inv.status === 'active' && inv.activated_at && inv.matures_at) {
+        const start = new Date(inv.activated_at).getTime();
+        const end = new Date(inv.matures_at).getTime();
+        progress = end > start ? Math.min(1, Math.max(0, (now - start) / (end - start))) : 0;
+        accruedValue = amount + (payout - amount) * progress;
+        activePrincipal += amount;
+        expectedPayout += payout;
+        inProgressValue += accruedValue;
+      } else if (inv.status === 'matured') {
+        progress = 1;
+        accruedValue = payout;
+        totalEarned += payout - amount;
       }
-      if (inv.status === 'matured') {
-        totalEarned += Number(inv.payout_amount) - Number(inv.amount);
-      }
-    }
+
+      return {
+        ...inv,
+        progress_pct: Math.round(progress * 100),
+        accrued_value: Math.round(accruedValue * 100) / 100,
+      };
+    });
 
     res.json({
       wallet_balance: Number(user.kitagrow_balance ?? 0),
       config: await getConfig(),
       terms: termsResponse(),
       withdraw_min: KG_WITHDRAW_MIN,
-      investments,
+      investments: enrichedInvestments,
       withdrawals,
       summary: {
         active_principal: activePrincipal,
         expected_payout: expectedPayout,
         total_earned: totalEarned,
+        in_progress_value: Math.round(inProgressValue * 100) / 100,
+        accrued_earnings: Math.round((inProgressValue - activePrincipal) * 100) / 100,
       },
     });
   } catch (err) { next(err); }
@@ -179,6 +211,21 @@ export async function submitInvestment(req: Request, res: Response, next: NextFu
       amount: parsed,
       metadata: { term_days: term, payout_amount: payoutAmount, reference: ref },
     });
+
+    // Notify admin + confirm to the user (fire-and-forget)
+    const investor = await db<DbUser>('users').where({ id: req.user!.id }).first();
+    if (investor) {
+      const adminEmail = process.env.ADMIN_EMAIL;
+      if (adminEmail) {
+        sendKitaGrowInvestmentNotificationEmail(
+          adminEmail, investor.name, investor.email, investor.id, term, parsed, payoutAmount, ref,
+        ).catch((err) => console.error('[KitaGrow] Admin notification email failed:', err?.message ?? err));
+      } else {
+        console.warn('[KitaGrow] ADMIN_EMAIL env var is not set — skipping admin notification');
+      }
+      sendKitaGrowInvestmentReceivedEmail(investor.email, investor.name, term, parsed, payoutAmount, ref)
+        .catch((err) => console.error('[KitaGrow] User confirmation email failed:', err?.message ?? err));
+    }
 
     res.json({ message: 'Investment submitted! Admin will verify your GCash payment and activate it within 24 hours.' });
   } catch (err) { next(err); }
@@ -283,6 +330,14 @@ export async function adminApproveInvestment(req: Request, res: Response, next: 
       metadata: { investment_id: id, user_id: inv.user_id, term_days: inv.term_days, matures_at: maturesAt },
     });
 
+    // Notify the investor that their plan is now active (fire-and-forget)
+    const owner = await db<DbUser>('users').where({ id: inv.user_id }).select('email', 'name').first();
+    if (owner) {
+      sendKitaGrowInvestmentActivatedEmail(
+        owner.email, owner.name, inv.term_days, Number(inv.amount), Number(inv.payout_amount), maturesAt,
+      ).catch((err) => console.error('[KitaGrow] Activation email failed:', err?.message ?? err));
+    }
+
     res.json({ message: 'Investment activated.' });
   } catch (err) { next(err); }
 }
@@ -295,9 +350,10 @@ export async function adminRejectInvestment(req: Request, res: Response, next: N
     if (!inv) { res.status(404).json({ message: 'Investment not found.' }); return; }
     if (inv.status !== 'pending') { res.status(409).json({ message: 'Investment already reviewed.' }); return; }
 
+    const trimmedNote = note?.trim() ?? null;
     await db('investments').where({ id }).update({
       status: 'rejected',
-      admin_note: note?.trim() ?? null,
+      admin_note: trimmedNote,
       reviewed_by: req.user!.id,
       updated_at: new Date(),
     });
@@ -305,6 +361,14 @@ export async function adminRejectInvestment(req: Request, res: Response, next: N
     await logAudit(req.user!.id, 'investment_rejected', req, {
       metadata: { investment_id: id, user_id: inv.user_id, note },
     });
+
+    // Notify the investor that their investment was not approved (fire-and-forget)
+    const owner = await db<DbUser>('users').where({ id: inv.user_id }).select('email', 'name').first();
+    if (owner) {
+      sendKitaGrowInvestmentRejectedEmail(
+        owner.email, owner.name, inv.term_days, Number(inv.amount), trimmedNote,
+      ).catch((err) => console.error('[KitaGrow] Rejection email failed:', err?.message ?? err));
+    }
 
     res.json({ message: 'Investment rejected.' });
   } catch (err) { next(err); }
