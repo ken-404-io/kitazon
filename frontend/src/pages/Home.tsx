@@ -1,38 +1,49 @@
 import { Link, Navigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useSettings } from '../context/SettingsContext';
 import { SurveyIcon, PhoneIcon, PlayIcon, BriefcaseIcon, GamepadIcon, UsersIcon, ZapIcon, ClockIcon, ShieldIcon, MapPinIcon } from '../components/ui/Icons';
 import styles from './Home.module.css';
 
+// The max-withdrawal feature line is built at render time from the live
+// `plan_limit_<plan>` site settings so it always matches the admin panel.
 const PRICING_PLANS = [
   {
     name: 'Free',
+    plan: 'free',
     price: 'Free',
     color: 'var(--text-muted)',
-    features: ['₱5/day withdrawal limit', 'GCash withdrawals', 'Task earnings', 'Referral bonuses'],
+    limitDefault: 5,
+    features: ['GCash withdrawals', 'Task earnings', 'Referral bonuses'],
     cta: 'Get Started',
     highlight: false,
   },
   {
     name: 'Silver',
+    plan: 'silver',
     price: '₱499/mo',
     color: '#9ca3af',
-    features: ['₱20/day withdrawal limit', 'Choose withdrawal amount', 'Priority support', 'All Free features'],
+    limitDefault: 20,
+    features: ['Choose withdrawal amount', 'Priority support', 'All Free features'],
     cta: 'Upgrade',
     highlight: false,
   },
   {
     name: 'Gold',
+    plan: 'gold',
     price: '₱1,299/mo',
     color: '#f59e0b',
-    features: ['₱50/day withdrawal limit', 'Choose withdrawal amount', 'Priority support', 'All Silver features'],
+    limitDefault: 50,
+    features: ['Choose withdrawal amount', 'Priority support', 'All Silver features'],
     cta: 'Upgrade',
     highlight: true,
   },
   {
     name: 'Diamond',
+    plan: 'diamond',
     price: '₱1,999/mo',
     color: '#60a5fa',
-    features: ['₱100/day withdrawal limit', 'Choose withdrawal amount', 'VIP support', 'All Gold features'],
+    limitDefault: 100,
+    features: ['Choose withdrawal amount', 'VIP support', 'All Gold features'],
     cta: 'Upgrade',
     highlight: false,
   },
@@ -58,6 +69,7 @@ const WHY_ITEMS = [
 
 export default function Home() {
   const { user, loading } = useAuth();
+  const { getSetting } = useSettings();
 
   if (!loading && user) return <Navigate to="/dashboard" replace />;
 
@@ -143,7 +155,10 @@ export default function Home() {
               <p className={styles.pricingName} style={{ color: p.color }}>{p.name}</p>
               <p className={styles.pricingPrice}>{p.price}</p>
               <ul className={styles.pricingFeatures}>
-                {p.features.map(f => (
+                {[
+                  `₱${getSetting(`plan_limit_${p.plan}`, String(p.limitDefault))} max withdrawal per request`,
+                  ...p.features,
+                ].map(f => (
                   <li key={f}>
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className={styles.checkIcon}><polyline points="20 6 9 17 4 12"/></svg>
                     {f}

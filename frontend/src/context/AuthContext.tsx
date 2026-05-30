@@ -1,7 +1,6 @@
 import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
-import api from '../services/api';
+import api, { refreshSession } from '../services/api';
 import { getToken, setToken } from '../utils/tokenStore';
-import { useIdleLogout } from '../hooks/useIdleLogout';
 import { User } from '../types';
 
 interface AuthContextValue {
@@ -35,30 +34,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [authTransition, setAuthTransition] = useState<'idle' | 'signing-in' | 'signing-out'>('idle');
 
   useEffect(() => {
-    // On app load, try to restore session via httpOnly cookie (silent refresh)
-    api.post<{ token: string; user: User }>('/auth/refresh', {})
-      .then((res) => { setToken(res.data.token); setUser(res.data.user); })
-      .catch(() => setToken(null))
+    // On app load, try to restore the session via the httpOnly refresh cookie.
+    // Only a definitive failure (null result) clears the session — a network blip
+    // leaves the user logged in. Tokens live 60 days, so a returning visitor stays
+    // signed in for the whole window.
+    refreshSession()
+      .then((res) => { if (res) setUser(res.user); else setToken(null); })
       .finally(() => setLoading(false));
   }, []);
 
-  // Silently refresh the access token every 12 minutes (token expires at 15 min)
+  // Keep the session warm while the tab is open. The access token is long-lived,
+  // so this is just to rotate the rolling refresh window and pick up fresh user
+  // data — the shared single-flight refresh prevents any rotation race.
   useEffect(() => {
     const interval = setInterval(() => {
-      api.post<{ token: string; user: User }>('/auth/refresh', {})
-        .then((res) => { setToken(res.data.token); setUser(res.data.user); })
-        .catch(() => {}); // Silently ignore — the 401 interceptor handles actual failures
-    }, 12 * 60 * 1000);
+      refreshSession().then((res) => { if (res) setUser(res.user); });
+    }, 30 * 60 * 1000);
     return () => clearInterval(interval);
   }, []);
 
-  // Re-validate session when user returns to the tab
+  // Re-validate the session when the user returns to the tab. Never clear state on
+  // failure here — a network blip should not look like a logout.
   useEffect(() => {
     const handleVisibility = () => {
       if (document.visibilityState !== 'visible') return;
-      api.post<{ token: string; user: User }>('/auth/refresh', {})
-        .then((res) => { setToken(res.data.token); setUser(res.data.user); })
-        .catch(() => {}); // Don't clear state on failure — network blip should not log user out
+      refreshSession().then((res) => { if (res) setUser(res.user); });
     };
     document.addEventListener('visibilitychange', handleVisibility);
     return () => document.removeEventListener('visibilitychange', handleVisibility);
@@ -123,8 +123,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  // Auto-logout after 30 minutes of inactivity (only when logged in)
-  useIdleLogout(logout, !!user);
+  // Idle auto-logout is intentionally disabled: users have asked to stay signed in
+  // for the full 60-day session window even after long periods away from the tab.
 
   const refreshUser = async (): Promise<void> => {
     const res = await api.get<User>('/auth/me');

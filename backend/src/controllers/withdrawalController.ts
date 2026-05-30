@@ -17,29 +17,41 @@ const QUIZ_GATE_DEFAULTS: Record<string, number> = {
   free: 45, bronze: 40, silver: 20, gold: 0, diamond: 0,
 };
 
-// Count referrals made since the last COMPLETED withdrawal.
-// - Frozen (returns 0) while any withdrawal is pending/processing.
-// - Only a completed withdrawal moves the cutoff date; failed ones don't reset the count.
-// - If no completed withdrawal exists, counts all-time referrals.
+// Max withdrawal amount per request, per plan (₱). Used when the matching
+// `plan_limit_<plan>` site setting is missing. The admin Settings tab edits the
+// DB value, which always takes precedence over these fallbacks.
+const PLAN_LIMIT_DEFAULTS: Record<string, number> = {
+  free: 5, bronze: 5, silver: 20, gold: 50, diamond: 100,
+};
+
+// Resolve the per-request withdrawal ceiling for a plan from site settings,
+// falling back to the built-in defaults. Returns 0 when unset/invalid so callers
+// can skip enforcement rather than block every withdrawal.
+function planWithdrawalLimit(plan: string, settings: Record<string, string>): number {
+  const raw = settings[`plan_limit_${plan}`];
+  const fromSettings = raw !== undefined ? Number(raw) : NaN;
+  if (Number.isFinite(fromSettings) && fromSettings > 0) return fromSettings;
+  return PLAN_LIMIT_DEFAULTS[plan] ?? 0;
+}
+
+// Count referrals made since the user's most recent withdrawal request.
+// - Progress counts from the created_at of the latest withdrawal (any status), so
+//   each new withdrawal requires fresh referrals. A pending withdrawal no longer
+//   freezes the gate — once 24h passes and fresh progress exists, the user may
+//   withdraw again even while a previous request is still pending.
+// - If no withdrawal exists yet, counts all-time referrals.
 async function countReferralsForNextGate(userId: number): Promise<{ count: number; frozen: boolean }> {
-  const pending = await db('withdrawals')
+  const lastWithdrawal = await db('withdrawals')
     .where({ user_id: userId })
-    .whereIn('status', ['pending', 'processing'])
-    .first();
-
-  if (pending) return { count: 0, frozen: true };
-
-  const lastCompleted = await db('withdrawals')
-    .where({ user_id: userId, status: 'completed' })
-    .orderBy('updated_at', 'desc')
-    .select('updated_at')
+    .orderBy('created_at', 'desc')
+    .select('created_at')
     .first();
 
   let q = db('referrals')
     .join('users as referred', 'referrals.referred_id', 'referred.id')
     .where({ 'referrals.referrer_id': userId })
     .where('referred.email_verified', true);
-  if (lastCompleted) q = q.where('referrals.created_at', '>', lastCompleted.updated_at);
+  if (lastWithdrawal) q = q.where('referrals.created_at', '>', lastWithdrawal.created_at);
   const row = await q.count('referrals.id as n').first();
   return { count: Number((row as { n?: unknown } | undefined)?.n ?? 0), frozen: false };
 }
@@ -68,26 +80,20 @@ function normalizeGcashNumber(raw: string): string {
 }
 
 // Count correct quiz answers available toward the next withdrawal gate.
-// - Returns 0 if the user has any pending/processing withdrawal (gate is frozen).
-// - Otherwise counts from the updated_at of the last completed/failed withdrawal.
-// - If no settled withdrawal exists, counts all-time (first-ever withdrawal path).
+// - Progress counts from the created_at of the user's most recent withdrawal
+//   request (any status), so each new withdrawal requires fresh quiz answers. A
+//   pending withdrawal no longer freezes the gate — once 24h passes and fresh
+//   progress exists, the user may withdraw again even with a pending request.
+// - If no withdrawal exists yet, counts all-time (first-ever withdrawal path).
 async function countQuizzesForNextGate(userId: number): Promise<{ count: number; frozen: boolean }> {
-  const pending = await db('withdrawals')
+  const lastWithdrawal = await db('withdrawals')
     .where({ user_id: userId })
-    .whereIn('status', ['pending', 'processing'])
-    .first();
-
-  if (pending) return { count: 0, frozen: true };
-
-  const lastSettled = await db('withdrawals')
-    .where({ user_id: userId })
-    .whereIn('status', ['completed', 'failed'])
-    .orderBy('updated_at', 'desc')
-    .select('updated_at')
+    .orderBy('created_at', 'desc')
+    .select('created_at')
     .first();
 
   let q = db('earnings').where({ user_id: userId, type: 'quiz' });
-  if (lastSettled) q = q.where('created_at', '>', lastSettled.updated_at);
+  if (lastWithdrawal) q = q.where('created_at', '>', lastWithdrawal.created_at);
   const row = await q.count('id as n').first();
   return { count: Number((row as { n?: unknown } | undefined)?.n ?? 0), frozen: false };
 }
@@ -100,6 +106,7 @@ async function getWithdrawalEligibility(userId: number, user: DbUser) {
   const plan = (user.plan as string | undefined) ?? 'free';
   const settings = await getAllSettings().catch(() => ({} as Record<string, string>));
   const quizRequired = Number(settings[`quiz_gate_${plan}`] ?? QUIZ_GATE_DEFAULTS[plan] ?? QUIZ_GATE_DEFAULTS.free);
+  const planLimit = planWithdrawalLimit(plan, settings);
 
   const { count: quizzesCompleted, frozen: quizGateFrozen } = quizRequired > 0
     ? await countQuizzesForNextGate(userId)
@@ -112,7 +119,10 @@ async function getWithdrawalEligibility(userId: number, user: DbUser) {
     .first();
   const hasPendingWithdrawal = !!pendingWithdrawal;
 
-  // 24-hour cooldown: after any withdrawal request, user must wait 24h before submitting another
+  // 24-hour cooldown: after any withdrawal request the user must wait 24h before
+  // submitting another. This is the ONLY time gate — a still-pending withdrawal no
+  // longer blocks a new one, so once 24h has elapsed the user may withdraw again
+  // even while a previous request is still pending.
   const lastWithdrawal = await db('withdrawals')
     .where({ user_id: userId })
     .orderBy('created_at', 'desc')
@@ -120,7 +130,7 @@ async function getWithdrawalEligibility(userId: number, user: DbUser) {
     .first();
   let cooldownActive = false;
   let cooldownEndsAt: Date | null = null;
-  if (lastWithdrawal && !hasPendingWithdrawal) {
+  if (lastWithdrawal) {
     const cooldownEnd = new Date(new Date(lastWithdrawal.created_at).getTime() + 24 * 60 * 60 * 1000);
     if (cooldownEnd > new Date()) {
       cooldownActive = true;
@@ -144,7 +154,9 @@ async function getWithdrawalEligibility(userId: number, user: DbUser) {
 
   const reasons: string[] = [];
   if (!user.email_verified)                    reasons.push('email_not_verified');
-  if (hasPendingWithdrawal)                    reasons.push('has_pending_withdrawal');
+  // NOTE: a pending withdrawal is intentionally NOT a blocking reason anymore —
+  // only the 24h cooldown gates a new request. `has_pending_withdrawal` is still
+  // reported below for informational/UI purposes.
   if (cooldownActive)                           reasons.push('cooldown_active');
   if (freePlanCapReached)                       reasons.push('free_plan_cap_reached');
   if (quizRequired > 0) {
@@ -166,6 +178,7 @@ async function getWithdrawalEligibility(userId: number, user: DbUser) {
     referral_gate_frozen: false,
     cooldown_active: cooldownActive,
     cooldown_ends_at: cooldownEndsAt,
+    plan_withdrawal_limit: planLimit,
     free_plan_cap_reached: freePlanCapReached,
     free_plan_total_withdrawn: freePlanTotalWithdrawn,
     free_plan_cap: FREE_PLAN_CAP,
@@ -282,6 +295,15 @@ export async function requestOtp(req: Request, res: Response, next: NextFunction
     }
 
     const elig = await getWithdrawalEligibility(user.id, user);
+    if (elig.plan_withdrawal_limit > 0 && parsed > elig.plan_withdrawal_limit) {
+      res.status(400).json({
+        message: `The maximum withdrawal for the ${user.plan ?? 'free'} plan is ₱${elig.plan_withdrawal_limit} per request.`,
+        reason: 'plan_limit_exceeded',
+        plan_limit: elig.plan_withdrawal_limit,
+        plan: user.plan ?? 'free',
+      });
+      return;
+    }
     if (!elig.eligible) {
       if (elig.reasons.includes('cooldown_active') && elig.cooldown_ends_at) {
         res.status(429).json({
@@ -431,6 +453,15 @@ export async function create(req: Request, res: Response, next: NextFunction): P
     }
 
     const elig = await getWithdrawalEligibility(user.id, user);
+    if (elig.plan_withdrawal_limit > 0 && parsed > elig.plan_withdrawal_limit) {
+      res.status(400).json({
+        message: `The maximum withdrawal for the ${user.plan ?? 'free'} plan is ₱${elig.plan_withdrawal_limit} per request.`,
+        reason: 'plan_limit_exceeded',
+        plan_limit: elig.plan_withdrawal_limit,
+        plan: user.plan ?? 'free',
+      });
+      return;
+    }
     if (!elig.eligible) {
       if (elig.reasons.includes('cooldown_active') && elig.cooldown_ends_at) {
         res.status(429).json({
@@ -477,15 +508,8 @@ export async function create(req: Request, res: Response, next: NextFunction): P
       }
     }
 
-    // Block if user already has a pending or processing withdrawal
-    const hasPending = await db('withdrawals')
-      .where({ user_id: req.user!.id })
-      .whereIn('status', ['pending', 'processing'])
-      .first();
-    if (hasPending) {
-      res.status(400).json({ message: 'You have a withdrawal in progress. Wait for it to be processed before submitting another.' });
-      return;
-    }
+    // A still-pending withdrawal no longer blocks a new one — the 24h cooldown
+    // enforced via getWithdrawalEligibility() above is the only time gate.
 
     // Suspicious activity detection
     const { flags: baseFlags, isSuspicious: baseSuspicious } = await detectSuspicious(user.id, parsed, user);

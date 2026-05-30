@@ -10,8 +10,14 @@ import { createOtp, verifyOtp } from '../services/otp';
 import { logAudit, logLoginEvent } from '../services/audit';
 import { verifyTotpLogin } from './totpController';
 
-const ACCESS_TOKEN_TTL = '30d';
-const REFRESH_TOKEN_TTL_DAYS = 30;
+const ACCESS_TOKEN_TTL = '60d';
+const REFRESH_TOKEN_TTL_DAYS = 60;
+// Grace window for refresh-token rotation. When several tabs/devices refresh at
+// nearly the same time they all present the same cookie; the first request wins
+// the rotation and the rest arrive carrying a token that was *just* revoked.
+// Treat a token revoked within this window as a benign concurrent-rotation race
+// (re-issue a fresh session) instead of nuking every session as suspected theft.
+const REFRESH_GRACE_MS = 60_000;
 const MAX_PASSWORD_LENGTH = 128;
 
 // Access token: short-lived JWT (15 min), id + jti only — no PII
@@ -582,21 +588,33 @@ export async function refresh(req: Request, res: Response, next: NextFunction): 
       .where({ token_hash: tokenHash })
       .first();
 
-    if (anyRecord?.revoked_at) {
-      // Token was already revoked — possible theft. Revoke ALL sessions for this user.
-      await db('refresh_tokens').where({ user_id: anyRecord.user_id }).update({ revoked_at: new Date() });
-      clearRefreshCookie(res);
-      res.status(401).json({ message: 'Session invalidated due to suspicious activity. Please log in again.' });
-      return;
-    }
-
-    const record = anyRecord && !anyRecord.revoked_at && anyRecord.expires_at > new Date() ? anyRecord : null;
-
-    if (!record) {
+    if (!anyRecord) {
       clearRefreshCookie(res);
       res.status(401).json({ message: 'Invalid or expired refresh token.' });
       return;
     }
+
+    if (anyRecord.revoked_at) {
+      const revokedAgeMs = Date.now() - new Date(anyRecord.revoked_at).getTime();
+      if (revokedAgeMs > REFRESH_GRACE_MS) {
+        // Revoked well in the past and presented again — genuine reuse / possible
+        // theft. Revoke ALL sessions for this user.
+        await db('refresh_tokens').where({ user_id: anyRecord.user_id }).update({ revoked_at: new Date() });
+        clearRefreshCookie(res);
+        res.status(401).json({ message: 'Session invalidated due to suspicious activity. Please log in again.' });
+        return;
+      }
+      // Within the grace window: a concurrent refresh already rotated this token.
+      // Fall through and issue a fresh session so the racing tab stays logged in.
+    }
+
+    if (anyRecord.expires_at <= new Date()) {
+      clearRefreshCookie(res);
+      res.status(401).json({ message: 'Invalid or expired refresh token.' });
+      return;
+    }
+
+    const record = anyRecord;
 
     let user = await db<DbUser>('users').where({ id: record.user_id, is_active: true }).first();
     if (!user) {

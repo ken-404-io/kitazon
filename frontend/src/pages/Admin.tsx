@@ -152,6 +152,23 @@ interface AdminWithdrawal {
   daily_completed_count: number;
 }
 
+interface PendingGroup {
+  user_id: number;
+  user_name: string;
+  user_email: string;
+  user_plan: string;
+  total_amount: number;
+  total_net: number;
+  count: number;
+  oldest_created_at: string;
+  newest_created_at: string;
+  channel: WithdrawalChannel;
+  account_number: string;
+  account_name: string | null;
+  withdrawal_ids: number[];
+  daily_completed_count: number;
+}
+
 interface AdminTask {
   id: number;
   title: string;
@@ -191,6 +208,19 @@ const STATUS_COLORS: Record<string, string> = {
   pending: '#d97706', processing: '#2563eb', completed: '#16a34a', failed: '#dc2626',
 };
 
+const WITHDRAWAL_WAIT_MS = 24 * 60 * 60 * 1000; // users wait 24h between withdrawals
+
+// Human-readable "Xh Ym" / "Xm" from a millisecond duration.
+function formatDuration(ms: number): string {
+  const totalMin = Math.max(0, Math.floor(ms / 60_000));
+  const days = Math.floor(totalMin / 1440);
+  const hours = Math.floor((totalMin % 1440) / 60);
+  const mins = totalMin % 60;
+  if (days > 0) return `${days}d ${hours}h`;
+  if (hours > 0) return `${hours}h ${mins}m`;
+  return `${mins}m`;
+}
+
 export default function Admin() {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -217,6 +247,11 @@ export default function Admin() {
   const [selectedW, setSelectedW] = useState<Set<number>>(new Set());
   const [batchBusy, setBatchBusy] = useState(false);
   const [batchAction, setBatchAction] = useState<'approve' | 'fail' | null>(null);
+  // Pending withdrawals grouped per user (batch payout view)
+  const [pendingGroups, setPendingGroups] = useState<PendingGroup[]>([]);
+  const [groupedLoading, setGroupedLoading] = useState(false);
+  const [groupBusyUser, setGroupBusyUser] = useState<number | null>(null);
+  const [nowTick, setNowTick] = useState(() => Date.now());
 
   // Tasks
   const [tasks, setTasks] = useState<AdminTask[]>([]);
@@ -496,6 +531,19 @@ export default function Admin() {
     } finally { setWLoading(false); }
   }, []);
 
+  const loadPendingGrouped = useCallback(async (search = '') => {
+    setGroupedLoading(true);
+    try {
+      const params = new URLSearchParams();
+      if (search.trim()) params.set('search', search.trim());
+      const qs = params.toString();
+      const res = await api.get<{ groups: PendingGroup[] }>(
+        `/admin/withdrawals/pending-grouped${qs ? `?${qs}` : ''}`
+      );
+      setPendingGroups(res.data.groups);
+    } finally { setGroupedLoading(false); }
+  }, []);
+
   const loadTasks = useCallback(async () => {
     setTaskLoading(true);
     try {
@@ -622,7 +670,7 @@ export default function Admin() {
     if (tab === 'users') loadUsers(userPage, userSearch);
     if (tab === 'suspended') loadUsers(userPage, userSearch, 'suspended');
     if (tab === 'withdrawals') loadWithdrawals(wPage, wFilter, wSearch, wPerPage);
-    if (tab === 'pending-withdrawals') loadWithdrawals(wPage, 'pending', wSearch, wPerPage);
+    if (tab === 'pending-withdrawals') { loadWithdrawals(wPage, 'pending', wSearch, wPerPage); loadPendingGrouped(wSearch); }
     if (tab === 'tasks') loadTasks();
     if (tab === 'logs') loadLogs(logPage);
     if (tab === 'revenue' && !revenueStats) loadRevenue();
@@ -632,7 +680,15 @@ export default function Admin() {
     if (tab === 'online') loadOnline();
     if (tab === 'fraud' && !fraudData) loadFraud();
     if (tab === 'settings') loadSiteSettings();
-  }, [tab, userPage, wPage, wPerPage, wFilter, wSearch, logPage, kycFilter, gcashFilter, investFilter, kgFilter, stats, revenueStats, fraudData, loadStats, loadUsers, loadWithdrawals, loadTasks, loadLogs, loadRevenue, loadKyc, loadGcashPayments, loadKitaGrow, loadOnline, loadFraud, loadSiteSettings]);
+  }, [tab, userPage, wPage, wPerPage, wFilter, wSearch, logPage, kycFilter, gcashFilter, investFilter, kgFilter, stats, revenueStats, fraudData, loadStats, loadUsers, loadWithdrawals, loadPendingGrouped, loadTasks, loadLogs, loadRevenue, loadKyc, loadGcashPayments, loadKitaGrow, loadOnline, loadFraud, loadSiteSettings]);
+
+  // Tick once a minute so the per-user waiting-time counters stay live while the
+  // admin sits on the Pending Withdrawals tab.
+  useEffect(() => {
+    if (tab !== 'pending-withdrawals') return;
+    const id = setInterval(() => setNowTick(Date.now()), 60_000);
+    return () => clearInterval(id);
+  }, [tab]);
 
   // Auto-refresh online tab every 1 minute
   useEffect(() => {
@@ -907,6 +963,38 @@ export default function Admin() {
     } finally {
       setBatchBusy(false);
       setBatchAction(null);
+    }
+  };
+
+  // Approve (or fail) every pending withdrawal for one user in a single batch.
+  const processGroup = async (group: PendingGroup, action: 'approve' | 'fail') => {
+    const verb = action === 'approve' ? 'Approve' : 'Mark as FAILED';
+    const extra = action === 'approve'
+      ? `\n\nThe user will be paid ₱${group.total_net.toFixed(2)} (net) across ${group.count} request${group.count === 1 ? '' : 's'}.`
+      : `\n\nEach request will be refunded to the user's balance.`;
+    if (!window.confirm(
+      `${verb} all ${group.count} pending withdrawal${group.count === 1 ? '' : 's'} for ${group.user_name} (₱${group.total_amount.toFixed(2)} total)?${extra}`
+    )) return;
+    setGroupBusyUser(group.user_id);
+    try {
+      const endpoint = action === 'approve' ? '/admin/withdrawals/bulk-approve' : '/admin/withdrawals/bulk-failed';
+      const res = await api.post<{ approved_count?: number; failed_count?: number; skipped_ids?: number[] }>(
+        endpoint,
+        { withdrawal_ids: group.withdrawal_ids },
+      );
+      const done = res.data.approved_count ?? res.data.failed_count ?? 0;
+      const skipped = res.data.skipped_ids?.length ? ` · ${res.data.skipped_ids.length} skipped` : '';
+      setToast(`${action === 'approve' ? 'Approved' : 'Marked failed'} ${done} for ${group.user_name}${skipped}.`);
+      setTimeout(() => setToast(''), 6000);
+      loadPendingGrouped(wSearch);
+      loadWithdrawals(wPage, 'pending', wSearch, wPerPage);
+      loadStats();
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { message?: string } } }).response?.data?.message ?? 'Batch action failed.';
+      setToast(msg);
+      setTimeout(() => setToast(''), 5000);
+    } finally {
+      setGroupBusyUser(null);
     }
   };
 
@@ -1683,6 +1771,104 @@ export default function Admin() {
                   <button onClick={() => { setWSearch(''); setWPage(1); }} style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', fontSize: 14, padding: 0, lineHeight: 1 }}>✕</button>
                 )}
               </div>
+            </div>
+          )}
+
+          {/* ── Pending grouped per user (batch payout) ── */}
+          {tab === 'pending-withdrawals' && (
+            <div style={{ marginBottom: '1.25rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8, marginBottom: 10 }}>
+                <h3 style={{ fontSize: '0.95rem', fontWeight: 800, margin: 0 }}>
+                  💸 Pending by user
+                  <span style={{ fontWeight: 500, color: 'var(--text-muted)', marginLeft: 8, fontSize: '0.8rem' }}>
+                    Pay each user out in one batch
+                  </span>
+                </h3>
+                {pendingGroups.length > 0 && (
+                  <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                    {pendingGroups.length} user{pendingGroups.length === 1 ? '' : 's'} ·
+                    ₱{pendingGroups.reduce((s, g) => s + g.total_amount, 0).toFixed(2)} total
+                  </span>
+                )}
+              </div>
+
+              {groupedLoading && pendingGroups.length === 0 ? (
+                <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Loading…</p>
+              ) : pendingGroups.length === 0 ? (
+                <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>No pending withdrawals. 🎉</p>
+              ) : (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 12 }}>
+                  {pendingGroups.map((g) => {
+                    const waitedMs = nowTick - new Date(g.oldest_created_at).getTime();
+                    const ready = waitedMs >= WITHDRAWAL_WAIT_MS;
+                    const remainMs = WITHDRAWAL_WAIT_MS - waitedMs;
+                    const planColor = PLAN_COLORS[(g.user_plan as PlanValue)] ?? '#6b7280';
+                    const busy = groupBusyUser === g.user_id;
+                    const acct = /^\d{10}$/.test(g.account_number) ? '0' + g.account_number : g.account_number;
+                    return (
+                      <div key={g.user_id} style={{
+                        border: `1.5px solid ${ready ? '#16a34a' : 'var(--dark-border)'}`,
+                        borderRadius: 12, padding: '0.9rem', background: 'var(--dark-bg)',
+                        display: 'flex', flexDirection: 'column', gap: 8,
+                      }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
+                          <div style={{ minWidth: 0 }}>
+                            <div style={{ fontWeight: 700, fontSize: '0.9rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{g.user_name}</div>
+                            <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{g.user_email}</div>
+                          </div>
+                          <span style={{ fontSize: '0.65rem', fontWeight: 800, textTransform: 'uppercase', color: planColor, border: `1px solid ${planColor}55`, borderRadius: 6, padding: '2px 6px', whiteSpace: 'nowrap' }}>{g.user_plan}</span>
+                        </div>
+
+                        <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
+                          <span style={{ fontSize: '1.35rem', fontWeight: 800 }}>₱{g.total_amount.toFixed(2)}</span>
+                          <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                            {g.count} request{g.count === 1 ? '' : 's'} · net ₱{g.total_net.toFixed(2)}
+                          </span>
+                        </div>
+
+                        {/* 24h waiting-time counter */}
+                        <div style={{
+                          fontSize: '0.74rem', fontWeight: 700, padding: '5px 8px', borderRadius: 6,
+                          background: ready ? 'rgba(22,163,74,0.12)' : 'rgba(245,158,11,0.12)',
+                          color: ready ? '#16a34a' : '#d97706',
+                        }}>
+                          {ready
+                            ? `✓ Ready to pay · oldest waited ${formatDuration(waitedMs)}`
+                            : `⏳ Wait ${formatDuration(remainMs)} more · waited ${formatDuration(waitedMs)} of 24h`}
+                        </div>
+
+                        <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                          {g.channel.toUpperCase()} · {acct}{g.account_name ? ` · ${g.account_name}` : ''}
+                          {g.daily_completed_count > 0 && (
+                            <span style={{ marginLeft: 6, color: '#16a34a' }}>· {g.daily_completed_count} paid today</span>
+                          )}
+                        </div>
+
+                        <div style={{ display: 'flex', gap: 8, marginTop: 2 }}>
+                          <button
+                            onClick={() => processGroup(g, 'approve')}
+                            disabled={busy}
+                            style={{ flex: 1, padding: '7px 10px', borderRadius: 8, border: 'none', background: '#16a34a', color: '#fff', fontSize: '0.78rem', fontWeight: 700, cursor: busy ? 'default' : 'pointer', opacity: busy ? 0.6 : 1 }}
+                          >
+                            {busy ? '…' : `✓ Approve all (₱${g.total_net.toFixed(2)})`}
+                          </button>
+                          <button
+                            onClick={() => processGroup(g, 'fail')}
+                            disabled={busy}
+                            style={{ padding: '7px 10px', borderRadius: 8, border: '1px solid #dc2626', background: 'transparent', color: '#dc2626', fontSize: '0.78rem', fontWeight: 700, cursor: busy ? 'default' : 'pointer', opacity: busy ? 0.6 : 1 }}
+                          >
+                            ✗ Fail
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', margin: '14px 0 0' }}>
+                ▾ Individual requests (detailed table) below — for fine-grained control.
+              </p>
             </div>
           )}
 

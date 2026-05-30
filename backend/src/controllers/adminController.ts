@@ -240,6 +240,116 @@ export async function listWithdrawals(req: Request, res: Response, next: NextFun
   } catch (err) { next(err); }
 }
 
+// ─── Pending withdrawals grouped per user ─────────────────────────────────────
+// Aggregates every pending/processing withdrawal into one row per user so the
+// admin can pay each user out in a single batch. Each group carries the total
+// amount, the list of withdrawal IDs (for bulk-approve / bulk-failed), and the
+// age of the oldest pending request so the UI can show a 24h waiting-time
+// counter. Paid plans are sorted first, then by oldest-waiting.
+export async function listPendingGrouped(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const search = (req.query.search as string | undefined)?.trim() ?? '';
+
+    let query = db('withdrawals as w')
+      .join('users as u', 'w.user_id', 'u.id')
+      .whereIn('w.status', ['pending', 'processing'])
+      .select(
+        'w.id', 'w.amount', 'w.net_amount', 'w.fee', 'w.channel',
+        'w.account_number', 'w.account_name', 'w.status', 'w.created_at',
+        'u.id as user_id', 'u.name as user_name', 'u.email as user_email', 'u.plan as user_plan'
+      )
+      .orderBy('w.created_at', 'asc');
+
+    if (search) {
+      query = query.where(function () {
+        this.whereILike('u.name', `%${search}%`)
+            .orWhereILike('u.email', `%${search}%`)
+            .orWhereILike('w.account_number', `%${search}%`)
+            .orWhereILike('w.account_name', `%${search}%`);
+      });
+    }
+
+    const rows = await query as Array<{
+      id: number; amount: string | number; net_amount: string | number; channel: string;
+      account_number: string; account_name: string | null; status: string; created_at: string | Date;
+      user_id: number; user_name: string; user_email: string; user_plan: string;
+    }>;
+
+    interface Group {
+      user_id: number; user_name: string; user_email: string; user_plan: string;
+      total_amount: number; total_net: number; count: number;
+      oldest_created_at: string | Date; newest_created_at: string | Date;
+      channel: string; account_number: string; account_name: string | null;
+      withdrawal_ids: number[]; daily_completed_count: number;
+    }
+
+    const groupsMap = new Map<number, Group>();
+    for (const r of rows) {
+      let g = groupsMap.get(r.user_id);
+      if (!g) {
+        g = {
+          user_id: r.user_id, user_name: r.user_name, user_email: r.user_email, user_plan: r.user_plan,
+          total_amount: 0, total_net: 0, count: 0,
+          oldest_created_at: r.created_at, newest_created_at: r.created_at,
+          channel: r.channel, account_number: r.account_number, account_name: r.account_name,
+          withdrawal_ids: [], daily_completed_count: 0,
+        };
+        groupsMap.set(r.user_id, g);
+      }
+      g.total_amount += Number(r.amount);
+      g.total_net += Number(r.net_amount);
+      g.count += 1;
+      g.withdrawal_ids.push(r.id);
+      if (new Date(r.created_at) < new Date(g.oldest_created_at)) g.oldest_created_at = r.created_at;
+      if (new Date(r.created_at) >= new Date(g.newest_created_at)) {
+        // Keep the most recent payout details (account may have changed)
+        g.newest_created_at = r.created_at;
+        g.channel = r.channel;
+        g.account_number = r.account_number;
+        g.account_name = r.account_name;
+      }
+    }
+
+    const groups = [...groupsMap.values()];
+
+    // Daily completed withdrawal count per user (resets midnight PH time, UTC+8)
+    const userIds = groups.map((g) => g.user_id);
+    if (userIds.length > 0) {
+      const nowUtc = new Date();
+      const nowPh = new Date(nowUtc.getTime() + 8 * 60 * 60 * 1000);
+      const todayPhDateStr = nowPh.toISOString().slice(0, 10);
+      const todayPhStartUtc = new Date(`${todayPhDateStr}T00:00:00+08:00`);
+      const dailyCounts = await db('withdrawals')
+        .whereIn('user_id', userIds)
+        .where('status', 'completed')
+        .where('created_at', '>=', todayPhStartUtc)
+        .groupBy('user_id')
+        .select('user_id', db.raw('count(*) as daily_completed_count'));
+      const dailyMap = new Map(
+        (dailyCounts as Array<{ user_id: number; daily_completed_count: string | number }>)
+          .map((r) => [r.user_id, Number(r.daily_completed_count)])
+      );
+      for (const g of groups) g.daily_completed_count = dailyMap.get(g.user_id) ?? 0;
+    }
+
+    // Paid plans first, then oldest-waiting first
+    const isPaid = (p: string) => ['bronze', 'silver', 'gold', 'diamond'].includes(p);
+    groups.sort((a, b) => {
+      const pa = isPaid(a.user_plan) ? 0 : 1;
+      const pb = isPaid(b.user_plan) ? 0 : 1;
+      if (pa !== pb) return pa - pb;
+      return new Date(a.oldest_created_at).getTime() - new Date(b.oldest_created_at).getTime();
+    });
+
+    res.json({
+      groups,
+      total_users: groups.length,
+      total_requests: rows.length,
+      total_amount: groups.reduce((s, g) => s + g.total_amount, 0),
+    });
+  } catch (err) { next(err); }
+}
+
 export async function updateWithdrawalStatus(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     const withdrawalId = Number(req.params.id);
