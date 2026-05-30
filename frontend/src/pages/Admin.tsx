@@ -270,6 +270,7 @@ export default function Admin() {
   const [groupedLoading, setGroupedLoading] = useState(false);
   const [groupBusyUser, setGroupBusyUser] = useState<number | null>(null);
   const [nowTick, setNowTick] = useState(() => Date.now());
+  const [pendingPlanFilter, setPendingPlanFilter] = useState<string>('all');
 
   // Tasks
   const [tasks, setTasks] = useState<AdminTask[]>([]);
@@ -1920,13 +1921,66 @@ export default function Admin() {
                 )}
               </div>
 
-              {groupedLoading && pendingGroups.length === 0 ? (
-                <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Loading…</p>
-              ) : pendingGroups.length === 0 ? (
-                <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>No pending withdrawals. 🎉</p>
-              ) : (
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 12 }}>
-                  {pendingGroups.map((g) => {
+              {/* Plan filter buttons with per-plan request counts */}
+              {pendingGroups.length > 0 && (() => {
+                const PLAN_TABS: Array<{ key: string; label: string }> = [
+                  { key: 'all', label: 'All' },
+                  { key: 'free', label: 'Free' },
+                  { key: 'bronze', label: 'Bronze' },
+                  { key: 'silver', label: 'Silver' },
+                  { key: 'gold', label: 'Gold' },
+                  { key: 'diamond', label: 'Diamond' },
+                ];
+                // Count pending requests per plan (sum of each user's request count)
+                const reqCount = (planKey: string) => pendingGroups
+                  .filter(g => planKey === 'all' || (g.user_plan ?? 'free') === planKey)
+                  .reduce((s, g) => s + g.count, 0);
+                return (
+                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
+                    {PLAN_TABS.map(({ key, label }) => {
+                      const n = reqCount(key);
+                      const active = pendingPlanFilter === key;
+                      const color = key === 'all' ? '#f59e0b' : (PLAN_COLORS[key as PlanValue] ?? '#6b7280');
+                      return (
+                        <button
+                          key={key}
+                          onClick={() => setPendingPlanFilter(key)}
+                          style={{
+                            display: 'inline-flex', alignItems: 'center', gap: 6,
+                            padding: '6px 12px', borderRadius: 999, cursor: 'pointer',
+                            fontSize: '0.8rem', fontWeight: 700,
+                            border: `1.5px solid ${active ? color : 'var(--dark-border)'}`,
+                            background: active ? `${color}22` : 'transparent',
+                            color: active ? color : 'var(--text)',
+                          }}
+                        >
+                          {label}
+                          <span style={{
+                            minWidth: 18, textAlign: 'center', padding: '1px 6px', borderRadius: 999,
+                            fontSize: '0.7rem', fontWeight: 800,
+                            background: active ? color : 'var(--dark-border)',
+                            color: active ? '#fff' : 'var(--text-muted)',
+                          }}>{n}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                );
+              })()}
+
+              {(() => {
+                const visibleGroups = pendingGroups.filter(
+                  g => pendingPlanFilter === 'all' || (g.user_plan ?? 'free') === pendingPlanFilter
+                );
+                return groupedLoading && pendingGroups.length === 0 ? (
+                  <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Loading…</p>
+                ) : visibleGroups.length === 0 ? (
+                  <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+                    {pendingGroups.length === 0 ? 'No pending withdrawals. 🎉' : 'No pending withdrawals for this plan.'}
+                  </p>
+                ) : (
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 12 }}>
+                    {visibleGroups.map((g) => {
                     const waitedMs = nowTick - new Date(g.oldest_created_at).getTime();
                     const ready = waitedMs >= WITHDRAWAL_WAIT_MS;
                     const remainMs = WITHDRAWAL_WAIT_MS - waitedMs;
@@ -1992,7 +2046,8 @@ export default function Admin() {
                     );
                   })}
                 </div>
-              )}
+              );
+              })()}
 
               <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', margin: '14px 0 0' }}>
                 Need per-request control? Open the <strong>Withdrawals</strong> tab and filter by <strong>Pending</strong>.
