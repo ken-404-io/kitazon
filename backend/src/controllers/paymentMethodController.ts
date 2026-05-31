@@ -197,8 +197,24 @@ export async function adminListChangeRequests(req: Request, res: Response, next:
         'r.id', 'r.user_id', 'r.current_number', 'r.requested_number', 'r.requested_name',
         'r.reason', 'r.screenshot_url', 'r.status', 'r.admin_note', 'r.created_at',
         'u.name as user_name', 'u.email as user_email',
+        'u.gcash_name as current_name',
       );
-    res.json(rows);
+
+    // Enrich each row with the user's *live* current number (admin-set, or
+    // derived from their latest withdrawal). Older requests — and any submitted
+    // before a current number could be captured — may have a null snapshot, so
+    // we fall back to the live value to ensure the admin always sees the user's
+    // active GCash account.
+    const enriched = await Promise.all(rows.map(async (r) => {
+      const liveCurrent = await currentNumberFor(r.user_id);
+      return {
+        ...r,
+        current_number: r.current_number ?? liveCurrent,
+        current_number_live: liveCurrent,
+      };
+    }));
+
+    res.json(enriched);
   } catch (err) { next(err); }
 }
 

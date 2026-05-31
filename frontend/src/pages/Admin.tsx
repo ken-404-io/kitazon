@@ -176,6 +176,8 @@ interface PaymentChangeRequest {
   id: number;
   user_id: number;
   current_number: string | null;
+  current_number_live: string | null;
+  current_name: string | null;
   requested_number: string;
   requested_name: string;
   reason: string;
@@ -3060,7 +3062,13 @@ export default function Admin() {
                     <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>{r.user_email}</div>
                   </div>
                   <div style={{ fontSize: '0.8rem' }}>
-                    <div style={{ color: 'var(--text-muted)' }}>Current: <span style={{ color: 'var(--text)' }}>{r.current_number ?? '—'}</span></div>
+                    <div style={{ color: 'var(--text-muted)' }}>
+                      Current: <span style={{ color: 'var(--text)', fontWeight: 600 }}>{r.current_number ?? 'No account on file'}</span>
+                      {r.current_name && <span style={{ color: 'var(--text-muted)' }}> · {r.current_name}</span>}
+                    </div>
+                    {r.current_number_live && r.current_number && r.current_number_live !== r.current_number && (
+                      <div style={{ color: '#f59e0b', fontSize: '0.72rem' }}>Now on file: {r.current_number_live}</div>
+                    )}
                     <div style={{ color: 'var(--text-muted)' }}>Requested: <strong style={{ color: '#22c55e' }}>{r.requested_number}</strong> · {r.requested_name}</div>
                   </div>
                   <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', background: 'rgba(255,255,255,0.03)', borderRadius: 8, padding: '6px 8px' }}>
