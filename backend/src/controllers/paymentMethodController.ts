@@ -3,9 +3,8 @@ import { v2 as cloudinary } from 'cloudinary';
 import db from '../../config/database';
 import { DbUser } from '../types';
 import { logAudit } from '../services/audit';
-import { createNotification, notifyAdmins } from '../services/notify';
+import { createNotification } from '../services/notify';
 import {
-  sendPaymentChangeRequestAdminEmail,
   sendPaymentChangeReceivedEmail,
   sendPaymentMethodUpdatedEmail,
   sendPaymentChangeRejectedEmail,
@@ -152,21 +151,14 @@ export async function submitChangeRequest(req: Request, res: Response, next: Nex
       metadata: { request_id: requestId, requested_number: number },
     });
 
-    // Notify the user (in-app) and admins (email + in-app), fire-and-forget.
+    // Notify the user only (in-app + email), fire-and-forget. Admins are not
+    // emailed or notified — pending requests surface via the Payment Changes
+    // tab badge in the admin panel.
     const user = await db<DbUser>('users').where({ id: req.user!.id }).first();
     if (user) {
       createNotification(user.id, 'payment_change', 'Change request submitted',
         `We received your request to change your GCash account to ${number}. We'll review it within 24 hours.`);
       sendPaymentChangeReceivedEmail(user.email, user.name, number, (requested_name ?? '').trim()).catch(() => {});
-
-      notifyAdmins('payment_change', 'New payment-method change request',
-        `${user.name} requested to change their GCash account to ${number}.`);
-      const adminEmail = process.env.ADMIN_EMAIL;
-      if (adminEmail) {
-        sendPaymentChangeRequestAdminEmail(
-          adminEmail, user.name, user.email, user.id, currentNumber, number, (requested_name ?? '').trim(), reasonTrim,
-        ).catch((err) => console.error('[PaymentChange] Admin email failed:', err?.message ?? err));
-      }
     }
 
     res.status(201).json({ message: 'Change request submitted! Our team will review your proof and update your account within 24 hours.' });

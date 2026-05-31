@@ -302,6 +302,7 @@ export default function Admin() {
   const [pmNumber, setPmNumber] = useState('');
   const [pmName, setPmName] = useState('');
   const [pmLoading, setPmLoading] = useState(false);
+  const [pmCurrent, setPmCurrent] = useState<{ number: string | null; name: string | null; source: 'admin' | 'derived' | null }>({ number: null, name: null, source: null });
 
   // Payment-method change requests tab
   const [pendingChanges, setPendingChanges] = useState<PaymentChangeRequest[]>([]);
@@ -881,11 +882,18 @@ export default function Admin() {
     setManagingUser(u.id);
     setPmNumber(u.gcash_number ?? '');
     setPmName(u.gcash_name ?? '');
+    setPmCurrent({ number: u.gcash_number ?? null, name: u.gcash_name ?? null, source: u.gcash_number ? 'admin' : null });
     // Pull the latest derived/admin-set method in case the row is stale.
     try {
       const r = await api.get<{ gcash_number: string | null; gcash_name: string | null; derived_number: string | null }>(`/admin/users/${u.id}/payment-method`);
-      setPmNumber(r.data.gcash_number ?? r.data.derived_number ?? '');
+      const current = r.data.gcash_number ?? r.data.derived_number ?? '';
+      setPmNumber(current);
       setPmName(r.data.gcash_name ?? '');
+      setPmCurrent({
+        number: r.data.gcash_number ?? r.data.derived_number ?? null,
+        name: r.data.gcash_name ?? null,
+        source: r.data.gcash_number ? 'admin' : (r.data.derived_number ? 'derived' : null),
+      });
     } catch { /* keep row values */ }
   };
 
@@ -1517,6 +1525,18 @@ export default function Admin() {
                         {managingUser === u.id && (
                           <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 6, minWidth: 220, background: 'rgba(34,197,94,0.06)', border: '1px solid rgba(34,197,94,0.3)', borderRadius: 8, padding: '10px' }}>
                             <div style={{ fontSize: 12, fontWeight: 700, color: '#22c55e' }}>Manage GCash withdrawal account</div>
+                            <div style={{ fontSize: 11, color: 'var(--text-muted)', background: 'rgba(255,255,255,0.04)', borderRadius: 6, padding: '5px 8px' }}>
+                              Current account on file:{' '}
+                              {pmCurrent.number ? (
+                                <>
+                                  <strong style={{ color: 'var(--text)' }}>{pmCurrent.number}</strong>
+                                  {pmCurrent.name ? ` · ${pmCurrent.name}` : ''}
+                                  <span style={{ marginLeft: 4 }}>({pmCurrent.source === 'admin' ? 'admin-set' : 'from last withdrawal'})</span>
+                                </>
+                              ) : (
+                                <strong style={{ color: 'var(--text)' }}>No account on file yet</strong>
+                              )}
+                            </div>
                             <input
                               type="tel"
                               placeholder="GCash number (09xxxxxxxxx)"
