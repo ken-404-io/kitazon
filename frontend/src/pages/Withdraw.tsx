@@ -423,9 +423,7 @@ export default function Withdraw() {
           disabled={elig !== null && !elig.eligible}
           style={elig !== null && !elig.eligible ? { opacity: 0.55, cursor: 'not-allowed', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 } : { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}
         >
-          {elig?.has_pending_withdrawal ? (
-            <><ClockIcon />Withdrawal Pending…</>
-          ) : elig?.cooldown_active ? (
+          {elig?.cooldown_active ? (
             <><ClockIcon />Come back tomorrow · {cooldownLabel}</>
           ) : elig?.free_plan_cap_reached ? (
             <><LockIcon2 />Upgrade to Withdraw</>
@@ -435,6 +433,14 @@ export default function Withdraw() {
             'Fast Cash →'
           )}
         </button>
+
+        {/* Informational only — a pending withdrawal no longer blocks a new one */}
+        {elig?.has_pending_withdrawal && !elig.cooldown_active && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8, fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+            <ClockIcon />
+            <span>You have a withdrawal being processed. You can still request another.</span>
+          </div>
+        )}
 
         {/* ── Withdrawal Method ── */}
         <div className={styles.sectionHeader} style={{ marginTop: '1rem' }}>
@@ -579,8 +585,10 @@ export default function Withdraw() {
   );
 
   /* ══════════════════════════ FORM ════════════════════════════════════════════ */
-  // Redirect back to overview if cooldown, cap, or pending withdrawal is blocking
-  if (elig && (elig.has_pending_withdrawal || elig.cooldown_active || elig.free_plan_cap_reached)) {
+  // Redirect back to overview if cooldown or cap is blocking. A still-pending
+  // withdrawal no longer blocks a new request — only the 24h cooldown gates it,
+  // so once the timer is done the user can withdraw again even with one pending.
+  if (elig && (elig.cooldown_active || elig.free_plan_cap_reached)) {
     return (
       <div className="page-container">
         <div className={styles.page}>
@@ -589,15 +597,6 @@ export default function Withdraw() {
             <span className={styles.pageTitle}>Request Withdrawal</span>
             <span style={{ width: 38 }} />
           </div>
-          {elig.has_pending_withdrawal && (
-            <div style={{ background: 'var(--dark-card)', border: '1px solid var(--dark-border)', borderRadius: 14, padding: '1.5rem', textAlign: 'center', marginTop: '1rem' }}>
-              <span style={{ display: 'inline-flex', color: 'var(--primary-amber)', marginBottom: '0.75rem' }}><ClockIcon /></span>
-              <p style={{ fontWeight: 700, fontSize: '0.95rem', color: 'var(--text)', margin: '0 0 6px' }}>Withdrawal in Progress</p>
-              <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', margin: 0, lineHeight: 1.5 }}>
-                You already have a pending withdrawal being processed. You can submit a new request once it has been completed or rejected.
-              </p>
-            </div>
-          )}
           {elig.cooldown_active && elig.cooldown_ends_at && (
             <div style={{ background: 'var(--dark-card)', border: '1px solid var(--dark-border)', borderRadius: 14, padding: '1.5rem', textAlign: 'center', marginTop: '1rem', opacity: 0.85 }}>
               <span style={{ display: 'inline-flex', color: 'var(--text-muted)', marginBottom: '0.75rem' }}><ClockIcon /></span>
