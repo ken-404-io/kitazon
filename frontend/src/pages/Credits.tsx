@@ -10,7 +10,7 @@ interface StatsData   { balance: number; }
 export default function Credits() {
   const { showToast } = useToast();
   const { getSetting } = useSettings();
-  const PHP_PER_CREDIT = Number(getSetting('credit_php_per_credit', '25'));
+  const PHP_PER_CREDIT = Number(getSetting('credit_php_per_credit', '10'));
   const [credits,    setCredits]    = useState<number | null>(null);
   const [balance,    setBalance]    = useState<number | null>(null);
   const [convertAmt, setConvertAmt] = useState('');
@@ -75,7 +75,7 @@ export default function Credits() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
           {[
             { icon: '📅', label: 'Daily Check-in',  desc: '+1 credit per check-in',        color: '#f59e0b' },
-            { icon: '💱', label: 'Convert Balance',  desc: '₱25 = 1 credit',                color: '#60a5fa' },
+            { icon: '💱', label: 'Convert Balance',  desc: '₱10 = 1 credit',                color: '#60a5fa' },
           ].map(item => (
             <div key={item.label} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '0.65rem 0.75rem', background: 'var(--surface)', borderRadius: 12 }}>
               <span style={{ fontSize: 20 }}>{item.icon}</span>
