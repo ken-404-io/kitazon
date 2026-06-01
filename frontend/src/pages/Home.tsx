@@ -106,7 +106,7 @@ export default function Home() {
           <span key={i} className={styles.avatar} style={{ background: g }} />
         ))}
       </div>
-      <p><strong>50,000+</strong> users earning every day</p>
+      <p><strong>5,000,000+</strong> users earning every day</p>
     </div>
   );
 
