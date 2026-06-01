@@ -184,7 +184,7 @@ export default function Withdraw() {
   const acctNameErr = acctNameTouched ? validateAccountName(accountName) : null;
 
   const creditInput  = Math.max(0, Math.floor(Number(convertAmt) || 0));
-  const phpToSpend   = creditInput * 25;
+  const phpToSpend   = creditInput * 10;
 
   const convertCredits = async () => {
     if (creditInput < 1) return;
@@ -316,7 +316,7 @@ export default function Withdraw() {
                 <span className={styles.reqIcon}>{elig.withdrawal_credits >= 5 ? <CheckIcon /> : <span className={styles.reqNum}>2</span>}</span>
                 <div className={styles.reqText}>
                   <span>Have withdrawal credits</span>
-                  <span className={styles.reqSub}>You have {elig.withdrawal_credits} credit{elig.withdrawal_credits !== 1 ? 's' : ''} · earn via daily check-in or convert ₱25 → 1 credit</span>
+                  <span className={styles.reqSub}>You have {elig.withdrawal_credits} credit{elig.withdrawal_credits !== 1 ? 's' : ''} · earn via daily check-in or convert ₱10 → 1 credit</span>
                 </div>
                 {elig.withdrawal_credits >= 5
                   ? <span className={styles.reqBadge}>Done</span>
@@ -484,7 +484,7 @@ export default function Withdraw() {
               </span>
               <div>
                 <p className={styles.creditsTitle}>Get Withdrawal Credits</p>
-                <p className={styles.creditsSub}>Enter how many credits you want · 1 credit costs ₱25 · +1 credit per daily check-in</p>
+                <p className={styles.creditsSub}>Enter how many credits you want · 1 credit costs ₱10 · +1 credit per daily check-in</p>
               </div>
             </div>
           </div>

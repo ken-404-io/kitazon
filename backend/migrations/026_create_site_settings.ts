@@ -13,7 +13,7 @@ export async function up(knex: Knex): Promise<void> {
     { key: 'gcash_qr_silver',       value: 'https://res.cloudinary.com/dtm4n2uk3/image/upload/v1778935459/4432f02f-79d9-4bf7-bd8f-39f0b63487ad_qbjxzx.jpg' },
     { key: 'gcash_qr_gold',         value: 'https://res.cloudinary.com/dtm4n2uk3/image/upload/v1778935610/1593c9bc-c490-4854-826d-72ad2a5a79a1_cwdk3l.jpg' },
     { key: 'gcash_qr_diamond',      value: 'https://res.cloudinary.com/dtm4n2uk3/image/upload/v1778935570/69504c45-6f87-43b1-aebe-83d55a30e5be_p6tncl.jpg' },
-    { key: 'credit_php_per_credit', value: '25' },
+    { key: 'credit_php_per_credit', value: '10' },
     { key: 'withdrawal_min',        value: '5' },
     { key: 'announcement_text',     value: '' },
     { key: 'announcement_color',    value: '#f59e0b' },

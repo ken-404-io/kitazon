@@ -3,7 +3,7 @@ import db from '../../config/database';
 import { DbUser } from '../types';
 import { logAudit } from '../services/audit';
 
-const PHP_PER_CREDIT = 25; // ₱25 = 1 withdrawal credit
+const PHP_PER_CREDIT = 10; // ₱10 = 1 withdrawal credit
 
 /* ── GET /api/credits ──────────────────────────────────────────────────────── */
 export async function getCredits(req: Request, res: Response, next: NextFunction): Promise<void> {
@@ -15,7 +15,7 @@ export async function getCredits(req: Request, res: Response, next: NextFunction
 }
 
 /* ── POST /api/credits/convert ─────────────────────────────────────────────── */
-// Convert PHP balance → withdrawal credits at ₱25 per credit
+// Convert PHP balance → withdrawal credits at ₱10 per credit
 export async function convertToCredits(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     const { amount } = req.body as { amount: string | number };
