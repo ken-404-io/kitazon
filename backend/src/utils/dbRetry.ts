@@ -17,6 +17,16 @@ const TRANSIENT_PATTERNS = [
   'etimedout',
   'enotfound',
   'too many connections',
+  // Neon proxy throttling concurrent connection establishment during a spike or
+  // cold start. These are short-lived and clear once the compute finishes
+  // scaling, so they're safe to retry with backoff rather than 500.
+  'too many database connection attempts',
+  'failed to acquire permit',
+  // Postgres server-side connection-slot exhaustion (FATAL 53300 / 53400).
+  'too many clients already',
+  'remaining connection slots are reserved',
+  // Knex/tarn pool ran out of room to hand out a connection in time.
+  'timeout acquiring a connection',
   'the database system is starting up',
   'terminating connection due to administrator command',
 ];
@@ -26,9 +36,15 @@ function isTransientDbError(err: unknown): boolean {
   const message = `${(err as { message?: string }).message ?? ''} ${String(err)}`.toLowerCase();
   if (TRANSIENT_PATTERNS.some((p) => message.includes(p))) return true;
 
-  // pg connection-class SQLSTATE codes (08xxx) and admin shutdown (57P0x).
+  // pg SQLSTATE codes: connection class (08xxx), insufficient resources such as
+  // too_many_connections (53xxx), and admin shutdown (57P0x).
   const code = (err as { code?: string }).code;
-  if (typeof code === 'string' && (code.startsWith('08') || code.startsWith('57P'))) return true;
+  if (
+    typeof code === 'string' &&
+    (code.startsWith('08') || code.startsWith('53') || code.startsWith('57P'))
+  ) {
+    return true;
+  }
 
   return false;
 }
