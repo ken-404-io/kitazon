@@ -31,7 +31,7 @@ const PRICING_PLANS = [
     name: 'Gold',
     plan: 'gold',
     price: '₱1,299/mo',
-    color: '#f59e0b',
+    color: 'var(--primary-amber)',
     limitDefault: 50,
     features: ['Choose withdrawal amount', 'Priority support', 'All Silver features'],
     cta: 'Upgrade',
@@ -67,52 +67,113 @@ const WHY_ITEMS = [
   { icon: <MapPinIcon />,  label: 'Built for Filipinos', desc: 'Tagalog UI, local payment rails, local support.' },
 ];
 
+// The mini "Recent Earnings" feed shown inside the hero phone mockup.
+const PHONE_FEED = [
+  { icon: <SurveyIcon />,    label: 'Surveys & Polls', amount: '+₱50.00' },
+  { icon: <PhoneIcon />,     label: 'App Installs',    amount: '+₱30.00' },
+  { icon: <BriefcaseIcon />, label: 'Micro-Jobs',      amount: '+₱120.00' },
+  { icon: <GamepadIcon />,   label: 'Game Earnings',   amount: '+₱250.00' },
+];
+
+function GoogleGlyph() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true">
+      <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
+      <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
+      <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>
+      <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
+    </svg>
+  );
+}
+
+const AVATAR_GRADIENTS = [
+  'linear-gradient(135deg,#f97316,#fbbf24)',
+  'linear-gradient(135deg,#fb923c,#f59e0b)',
+  'linear-gradient(135deg,#ea580c,#f97316)',
+  'linear-gradient(135deg,#f59e0b,#fcd34d)',
+];
+
 export default function Home() {
   const { user, loading } = useAuth();
   const { getSetting } = useSettings();
 
   if (!loading && user) return <Navigate to="/dashboard" replace />;
 
+  const socialProof = (
+    <div className={styles.socialProof}>
+      <div className={styles.avatarStack}>
+        {AVATAR_GRADIENTS.map((g, i) => (
+          <span key={i} className={styles.avatar} style={{ background: g }} />
+        ))}
+      </div>
+      <p><strong>50,000+</strong> users earning every day</p>
+    </div>
+  );
+
   return (
     <main>
       <section className={styles.hero}>
-        <h1>Earn Real Money Online</h1>
-        <p className={styles.tagline}>Complete simple tasks and get paid — directly to your GCash account.</p>
-        <div className={styles.heroBadges}>
-          <span className="badge badge-gold">Min ₱5 Withdrawal</span>
-          <span className="badge badge-green">Cashout via GCash</span>
-          <span className="badge badge-gold">₱15 – ₱500 per Task</span>
-        </div>
-
-        {!user && (
-          <div className={styles.heroGoogle}>
-            <a href={GOOGLE_REDIRECT} className={styles.heroGoogleBtn}>
-              <svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true">
-                <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
-                <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
-                <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>
-                <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
+        <div className={styles.heroInner}>
+          {/* ── Copy column ─────────────────────────────────────────────── */}
+          <div className={styles.heroCopy}>
+            <span className={styles.trustPill}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
               </svg>
-              Continue with Google
-            </a>
-            <p className={styles.orDivider}>— or —</p>
-          </div>
-        )}
+              Trusted by thousands of Filipinos
+            </span>
 
-        <div className={styles.heroCta}>
-          {user ? (
-            <Link to="/dashboard">
-              <button className="btn-primary" style={{ fontSize: '1.05rem', padding: '0.8rem 2rem' }}>
-                Go to Dashboard →
-              </button>
-            </Link>
-          ) : (
-            <Link to="/register">
-              <button className="btn-primary" style={{ fontSize: '1.05rem', padding: '0.8rem 2rem' }}>
+            <h1 className={styles.heroTitle}>
+              Earn Real Money<br />
+              <span className={styles.heroAccent}>Online</span>
+            </h1>
+
+            <p className={styles.tagline}>
+              Complete simple tasks and get paid — directly to your GCash account.
+            </p>
+
+            <div className={styles.heroBadges}>
+              <span className="badge badge-gold">Min ₱5 Withdrawal</span>
+              <span className="badge badge-green">Cashout via GCash</span>
+              <span className="badge badge-gold">₱15 – ₱500 per Task</span>
+            </div>
+
+            <div className={styles.heroCta}>
+              <Link to="/register" className={styles.ctaPrimary}>
                 Join Free — Start Earning
-              </button>
-            </Link>
-          )}
+              </Link>
+              {!user && (
+                <a href={GOOGLE_REDIRECT} className={styles.ctaGoogle}>
+                  <GoogleGlyph />
+                  Continue with Google
+                </a>
+              )}
+            </div>
+
+            {socialProof}
+          </div>
+
+          {/* ── Phone mockup column ─────────────────────────────────────── */}
+          <div className={styles.heroVisual} aria-hidden="true">
+            <div className={styles.phone}>
+              <div className={styles.phoneBalance}>
+                <span className={styles.phoneBalanceLabel}>Your Balance</span>
+                <span className={styles.phoneBalanceAmount}>₱ 12,450.00</span>
+                <span className={styles.phoneGcash}>GCash</span>
+              </div>
+              <div className={styles.phoneFeed}>
+                <span className={styles.phoneFeedTitle}>Recent Earnings</span>
+                {PHONE_FEED.map((f) => (
+                  <div key={f.label} className={styles.phoneRow}>
+                    <span className={styles.phoneRowIcon}>{f.icon}</span>
+                    <span className={styles.phoneRowLabel}>{f.label}</span>
+                    <span className={styles.phoneRowAmount}>{f.amount}</span>
+                  </div>
+                ))}
+                <span className={styles.phoneViewAll}>View All</span>
+              </div>
+            </div>
+          </div>
         </div>
       </section>
 
