@@ -9,6 +9,7 @@ import { sendVerificationEmail, sendPasswordResetEmail, sendLoginAlertEmail, sen
 import { createOtp, verifyOtp } from '../services/otp';
 import { logAudit, logLoginEvent } from '../services/audit';
 import { verifyTotpLogin } from './totpController';
+import { withDbRetry } from '../utils/dbRetry';
 
 const ACCESS_TOKEN_TTL = '60d';
 const REFRESH_TOKEN_TTL_DAYS = 60;
@@ -34,7 +35,10 @@ async function createRefreshToken(userId: number): Promise<string> {
   const raw = crypto.randomBytes(48).toString('hex');
   const tokenHash = crypto.createHash('sha256').update(raw).digest('hex');
   const expiresAt = new Date(Date.now() + REFRESH_TOKEN_TTL_DAYS * 24 * 60 * 60 * 1000);
-  await db('refresh_tokens').insert({ user_id: userId, token_hash: tokenHash, expires_at: expiresAt });
+  await withDbRetry(
+    () => db('refresh_tokens').insert({ user_id: userId, token_hash: tokenHash, expires_at: expiresAt }),
+    { label: 'insert refresh_token (password)' },
+  );
   return raw;
 }
 
