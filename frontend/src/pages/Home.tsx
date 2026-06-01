@@ -1,7 +1,11 @@
 import { Link, Navigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useSettings } from '../context/SettingsContext';
-import { SurveyIcon, PhoneIcon, PlayIcon, BriefcaseIcon, GamepadIcon, UsersIcon, ZapIcon, ClockIcon, ShieldIcon, MapPinIcon } from '../components/ui/Icons';
+import {
+  SurveyIcon, PhoneIcon, PlayIcon, BriefcaseIcon, GamepadIcon, UsersIcon,
+  ZapIcon, ClockIcon, ShieldIcon, MapPinIcon,
+  ShieldCheckIcon, CreditCardIcon, TrophyIcon,
+} from '../components/ui/Icons';
 import styles from './Home.module.css';
 
 // The max-withdrawal feature line is built at render time from the live
@@ -51,6 +55,12 @@ const PRICING_PLANS = [
 
 const GOOGLE_REDIRECT = `${process.env.REACT_APP_API_URL ?? 'https://api.kitazon.com'}/api/auth/google/redirect`;
 
+const HERO_BADGES = [
+  { icon: <ShieldCheckIcon />, label: 'Min ₱5 Withdrawal' },
+  { icon: <CreditCardIcon />,  label: 'Cashout via GCash' },
+  { icon: <TrophyIcon />,      label: '₱15 – ₱500 per Task' },
+];
+
 const EARNING_CATEGORIES = [
   { icon: <SurveyIcon />,    name: 'Surveys & Polls',   range: '₱20 – ₱150',       desc: 'Answer surveys from global market research firms.' },
   { icon: <PhoneIcon />,     name: 'App Installs',      range: '₱30 – ₱500',       desc: 'Install and try apps, earn per qualified install.' },
@@ -99,17 +109,6 @@ export default function Home() {
 
   if (!loading && user) return <Navigate to="/dashboard" replace />;
 
-  const socialProof = (
-    <div className={styles.socialProof}>
-      <div className={styles.avatarStack}>
-        {AVATAR_GRADIENTS.map((g, i) => (
-          <span key={i} className={styles.avatar} style={{ background: g }} />
-        ))}
-      </div>
-      <p><strong>5,000,000+</strong> users earning every day</p>
-    </div>
-  );
-
   return (
     <main>
       <section className={styles.hero}>
@@ -133,9 +132,12 @@ export default function Home() {
             </p>
 
             <div className={styles.heroBadges}>
-              <span className="badge badge-gold">Min ₱5 Withdrawal</span>
-              <span className="badge badge-green">Cashout via GCash</span>
-              <span className="badge badge-gold">₱15 – ₱500 per Task</span>
+              {HERO_BADGES.map((b) => (
+                <span key={b.label} className={styles.heroBadge}>
+                  <span className={styles.heroBadgeIcon}>{b.icon}</span>
+                  {b.label}
+                </span>
+              ))}
             </div>
 
             <div className={styles.heroCta}>
@@ -150,27 +152,61 @@ export default function Home() {
               )}
             </div>
 
-            {socialProof}
+            <div className={styles.socialProof}>
+              <div className={styles.avatarStack}>
+                {AVATAR_GRADIENTS.map((g, i) => (
+                  <span key={i} className={styles.avatar} style={{ background: g }} />
+                ))}
+              </div>
+              <p><strong>5,000,000+</strong> users earning every day</p>
+            </div>
           </div>
 
           {/* ── Phone mockup column ─────────────────────────────────────── */}
           <div className={styles.heroVisual} aria-hidden="true">
-            <div className={styles.phone}>
-              <div className={styles.phoneBalance}>
-                <span className={styles.phoneBalanceLabel}>Your Balance</span>
-                <span className={styles.phoneBalanceAmount}>₱ 12,450.00</span>
-                <span className={styles.phoneGcash}>GCash</span>
+            <div className={styles.scene}>
+              <span className={styles.blob} />
+
+              {/* Floating decorations */}
+              <span className={`${styles.coin} ${styles.coinA}`}>₱</span>
+              <span className={`${styles.coin} ${styles.coinB}`}>₱</span>
+              <span className={`${styles.coin} ${styles.coinC}`}>₱</span>
+
+              <div className={styles.trophyBadge}><TrophyIcon /></div>
+
+              <div className={styles.checkCard}>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
               </div>
-              <div className={styles.phoneFeed}>
-                <span className={styles.phoneFeedTitle}>Recent Earnings</span>
-                {PHONE_FEED.map((f) => (
-                  <div key={f.label} className={styles.phoneRow}>
-                    <span className={styles.phoneRowIcon}>{f.icon}</span>
-                    <span className={styles.phoneRowLabel}>{f.label}</span>
-                    <span className={styles.phoneRowAmount}>{f.amount}</span>
+
+              <div className={styles.gcashWallet}>
+                <span>G</span>
+                GCash
+              </div>
+
+              {/* Phone */}
+              <div className={styles.phone}>
+                <div className={styles.phoneScreen}>
+                  <div className={styles.phoneStatus}>
+                    <span>9:41</span>
+                    <span className={styles.phoneSignal} />
                   </div>
-                ))}
-                <span className={styles.phoneViewAll}>View All</span>
+                  <div className={styles.phoneBalance}>
+                    <span className={styles.phoneBalanceLabel}>Your Balance</span>
+                    <span className={styles.phoneBalanceAmount}>₱ 12,450.00</span>
+                    <span className={styles.phoneGcash}>GCash</span>
+                  </div>
+                  <div className={styles.phoneFeed}>
+                    <span className={styles.phoneFeedTitle}>Recent Earnings</span>
+                    {PHONE_FEED.map((f) => (
+                      <div key={f.label} className={styles.phoneRow}>
+                        <span className={styles.phoneRowIcon}>{f.icon}</span>
+                        <span className={styles.phoneRowLabel}>{f.label}</span>
+                        <span className={styles.phoneRowAmount}>{f.amount}</span>
+                      </div>
+                    ))}
+                    <span className={styles.phoneViewAll}>View All</span>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -182,9 +218,13 @@ export default function Home() {
         <div className="grid-3">
           {EARNING_CATEGORIES.map((c) => (
             <div key={c.name} className={`card ${styles.catCard}`}>
-              <span className={styles.catIcon}>{c.icon}</span>
-              <h3>{c.name}</h3>
-              <p className={styles.range}>{c.range}</p>
+              <div className={styles.catHead}>
+                <span className={styles.catIcon}>{c.icon}</span>
+                <div className={styles.catHeadText}>
+                  <h3>{c.name}</h3>
+                  <p className={styles.range}>{c.range}</p>
+                </div>
+              </div>
               <p className={styles.catDesc}>{c.desc}</p>
             </div>
           ))}
@@ -193,10 +233,10 @@ export default function Home() {
 
       <section className={styles.whySection}>
         <div className="page-container">
-          <h2 className={styles.sectionTitle}>Why Kitazon?</h2>
+          <h2 className={`${styles.sectionTitle} ${styles.whyTitle}`}>Why Kitazon?</h2>
           <div className="grid-4">
             {WHY_ITEMS.map((w) => (
-              <div key={w.label} className={`card ${styles.whyCard}`}>
+              <div key={w.label} className={styles.whyCard}>
                 <span className={styles.whyIcon}>{w.icon}</span>
                 <strong>{w.label}</strong>
                 <p>{w.desc}</p>
