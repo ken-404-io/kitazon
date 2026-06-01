@@ -7,6 +7,7 @@ import db from '../../config/database';
 import { DbUser } from '../types';
 import { logAudit, logLoginEvent } from '../services/audit';
 import { sendReferralEarnedEmail } from '../services/email';
+import { withDbRetry } from '../utils/dbRetry';
 
 const REFERRAL_SIGNUP_BONUS = 50;
 
@@ -33,7 +34,10 @@ async function createRefreshToken(userId: number): Promise<string> {
   const raw       = crypto.randomBytes(48).toString('hex');
   const tokenHash = crypto.createHash('sha256').update(raw).digest('hex');
   const expiresAt = new Date(Date.now() + REFRESH_TOKEN_TTL_DAYS * 24 * 60 * 60 * 1000);
-  await db('refresh_tokens').insert({ user_id: userId, token_hash: tokenHash, expires_at: expiresAt });
+  await withDbRetry(
+    () => db('refresh_tokens').insert({ user_id: userId, token_hash: tokenHash, expires_at: expiresAt }),
+    { label: 'insert refresh_token (google)' },
+  );
   return raw;
 }
 
