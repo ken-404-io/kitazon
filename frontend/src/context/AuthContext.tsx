@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback, useRef, ReactNode } from 'react';
 import api, { refreshSession } from '../services/api';
 import { getToken, setToken } from '../utils/tokenStore';
 import { User } from '../types';
@@ -32,37 +32,67 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [authTransition, setAuthTransition] = useState<'idle' | 'signing-in' | 'signing-out'>('idle');
+  // Timestamp of the last "warm" refresh, used to throttle the focus-driven
+  // re-validation. Rotating the refresh token on every single tab focus churns
+  // the cookie and makes lost-Set-Cookie races (which trigger a hard logout) far
+  // more likely, so we only warm at most once every few minutes.
+  const lastWarmRef = useRef(0);
 
   useEffect(() => {
     // On app load, try to restore the session via the httpOnly refresh cookie.
-    // Only a definitive failure (null result) clears the session — a network blip
-    // leaves the user logged in. Tokens live 60 days, so a returning visitor stays
-    // signed in for the whole window.
-    refreshSession()
-      .then((res) => { if (res) setUser(res.user); else setToken(null); })
-      .finally(() => setLoading(false));
+    // Only a definitive failure (null result) clears the session. A transient
+    // failure (thrown) is retried once before we give up — a network blip on load
+    // must not drop a returning visitor at /login. Tokens live 60 days, so a
+    // returning visitor stays signed in for the whole window.
+    let cancelled = false;
+    const restore = async () => {
+      try {
+        const res = await refreshSession();
+        if (cancelled) return;
+        if (res) setUser(res.user);
+        else setToken(null); // definitive: no valid session
+      } catch {
+        // Transient — wait briefly and try once more before giving up.
+        try {
+          await new Promise((r) => setTimeout(r, 1500));
+          const res = await refreshSession();
+          if (!cancelled && res) setUser(res.user);
+        } catch { /* still transient — leave the session untouched */ }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
+    restore();
+    return () => { cancelled = true; };
+  }, []);
+
+  // Refresh the session without ever logging the user out on failure. A transient
+  // error is swallowed; only an explicit login/logout changes auth state here.
+  const warmSession = useCallback((force = false) => {
+    const now = Date.now();
+    if (!force && now - lastWarmRef.current < 5 * 60 * 1000) return;
+    lastWarmRef.current = now;
+    refreshSession().then((res) => { if (res) setUser(res.user); }).catch(() => {});
   }, []);
 
   // Keep the session warm while the tab is open. The access token is long-lived,
   // so this is just to rotate the rolling refresh window and pick up fresh user
   // data — the shared single-flight refresh prevents any rotation race.
   useEffect(() => {
-    const interval = setInterval(() => {
-      refreshSession().then((res) => { if (res) setUser(res.user); });
-    }, 30 * 60 * 1000);
+    const interval = setInterval(() => warmSession(true), 30 * 60 * 1000);
     return () => clearInterval(interval);
-  }, []);
+  }, [warmSession]);
 
-  // Re-validate the session when the user returns to the tab. Never clear state on
-  // failure here — a network blip should not look like a logout.
+  // Re-validate the session when the user returns to the tab (throttled). Never
+  // clear state on failure here — a network blip should not look like a logout.
   useEffect(() => {
     const handleVisibility = () => {
       if (document.visibilityState !== 'visible') return;
-      refreshSession().then((res) => { if (res) setUser(res.user); });
+      warmSession();
     };
     document.addEventListener('visibilitychange', handleVisibility);
     return () => document.removeEventListener('visibilitychange', handleVisibility);
-  }, []);
+  }, [warmSession]);
 
   const login = async (email: string, password: string, captchaToken?: string, totpCode?: string): Promise<void> => {
     setAuthTransition('signing-in');
