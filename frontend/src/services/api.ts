@@ -27,6 +27,14 @@ export interface RefreshResult { token: string; user: User; }
 // user out everywhere. One shared promise eliminates that race within a tab.
 let refreshPromise: Promise<RefreshResult | null> | null = null;
 
+// Refresh outcome contract:
+//   • RefreshResult → success (new access token + user).
+//   • null          → DEFINITIVE failure: the server rejected the refresh cookie
+//                     (401/403), so the session is genuinely gone. Callers should
+//                     clear local state and send the user to /login.
+//   • throws        → TRANSIENT failure (network blip, 5xx, CORS hiccup). The
+//                     session may still be perfectly valid, so callers MUST NOT log
+//                     the user out — that's what made brief blips look like a logout.
 export function refreshSession(): Promise<RefreshResult | null> {
   if (refreshPromise) return refreshPromise;
   refreshPromise = axios
@@ -35,9 +43,11 @@ export function refreshSession(): Promise<RefreshResult | null> {
       headers: { 'Content-Type': 'application/json' },
     })
     .then((r) => { setToken(r.data.token); return r.data as RefreshResult; })
-    // Do NOT clear the token on a transient/network failure here — let the caller
-    // decide. Clearing eagerly is what made brief blips look like a logout.
-    .catch(() => null)
+    .catch((e) => {
+      const status = (e as { response?: { status?: number } })?.response?.status;
+      if (status === 401 || status === 403) return null; // session truly invalid
+      throw e;                                            // transient — keep session
+    })
     .finally(() => { refreshPromise = null; });
   return refreshPromise;
 }
@@ -48,13 +58,19 @@ api.interceptors.response.use(
     const original = err.config;
     if (err.response?.status === 401 && !original._retry && !original.url?.includes('/auth/refresh')) {
       original._retry = true;
-      const result = await refreshSession();
-      if (result?.token) {
-        original.headers.Authorization = `Bearer ${result.token}`;
-        return api(original);
+      try {
+        const result = await refreshSession();
+        if (result?.token) {
+          original.headers.Authorization = `Bearer ${result.token}`;
+          return api(original);
+        }
+        // null = the refresh was definitively rejected — the session is gone.
+        setToken(null);
+        window.location.href = '/login';
+      } catch {
+        // Transient refresh failure (network/5xx). Do NOT log the user out — just
+        // surface the original error so the caller can retry. The session stands.
       }
-      setToken(null);
-      window.location.href = '/login';
     }
     return Promise.reject(err);
   }

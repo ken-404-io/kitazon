@@ -153,6 +153,14 @@ export default function Withdraw() {
   const emailOk     = user?.email_verified ?? false;
   const cooldownLabel = useCooldownTimer(elig?.cooldown_ends_at);
 
+  // Not eligible because of outstanding tasks (quiz / credits / referrals) rather
+  // than a real time/upgrade gate. This is an actionable state — the user can
+  // finish the tasks now — so we treat it as a CTA, not a "come back later" dead-end.
+  const taskGated  = elig !== null && !elig.eligible && !elig.cooldown_active && !elig.free_plan_cap_reached;
+  // The button is only truly disabled for the dead-end gates (24h cooldown, free
+  // plan cap). A task-gated user keeps an active button that routes to /tasks.
+  const hardBlocked = elig !== null && !elig.eligible && !taskGated;
+
   // Free/Bronze plan: fixed ₱5. VIP plans: chosen preset (default to dailyLimit).
   const amount = (plan === 'free' || plan === 'bronze') ? 5 : (preset ?? dailyLimit);
 
@@ -419,16 +427,21 @@ export default function Withdraw() {
 
         <button
           className={styles.withdrawBtn}
-          onClick={() => setView('form')}
-          disabled={elig !== null && !elig.eligible}
-          style={elig !== null && !elig.eligible ? { opacity: 0.55, cursor: 'not-allowed', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 } : { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}
+          onClick={() => {
+            if (elig?.eligible) setView('form');
+            // Blocked only by outstanding tasks (quiz/credits) — send them to the
+            // tasks page to finish unlocking instead of leaving a dead-end button.
+            else if (taskGated) navigate('/tasks');
+          }}
+          disabled={hardBlocked}
+          style={hardBlocked ? { opacity: 0.55, cursor: 'not-allowed', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 } : { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}
         >
           {elig?.cooldown_active ? (
             <><ClockIcon />Come back tomorrow · {cooldownLabel}</>
           ) : elig?.free_plan_cap_reached ? (
             <><LockIcon2 />Upgrade to Withdraw</>
-          ) : (elig !== null && !elig.eligible) ? (
-            <><ClockIcon />Come back tomorrow</>
+          ) : taskGated ? (
+            <><LockIcon2 />Finish tasks to withdraw</>
           ) : (
             'Fast Cash →'
           )}
