@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import KycGate from '../components/KycGate';
 import { useAuth } from '../context/AuthContext';
@@ -79,13 +79,24 @@ interface Eligibility {
   reasons: string[];
 }
 
-function useCooldownTimer(endsAt: string | null | undefined): string {
+// Live countdown to `endsAt`. When the timer crosses zero it fires `onExpire`
+// once — the caller uses this to re-fetch eligibility so the UI flips out of the
+// "Come back tomorrow" cooldown state on its own (no manual reload needed).
+function useCooldownTimer(endsAt: string | null | undefined, onExpire?: () => void): string {
   const [label, setLabel] = useState('');
+  // Keep the latest callback in a ref so it doesn't re-trigger the effect.
+  const onExpireRef = useRef(onExpire);
+  onExpireRef.current = onExpire;
   useEffect(() => {
     if (!endsAt) { setLabel(''); return; }
+    let fired = false;
     const tick = () => {
       const diff = new Date(endsAt).getTime() - Date.now();
-      if (diff <= 0) { setLabel('Ready'); return; }
+      if (diff <= 0) {
+        setLabel('Ready');
+        if (!fired) { fired = true; onExpireRef.current?.(); }
+        return;
+      }
       const h = Math.floor(diff / 3600000);
       const m = Math.floor((diff % 3600000) / 60000);
       const s = Math.floor((diff % 60000) / 1000);
@@ -151,7 +162,10 @@ export default function Withdraw() {
   const weekAmt     = Number(stats?.week    ?? 0);
   const totalAmt    = Number(stats?.total   ?? 0);
   const emailOk     = user?.email_verified ?? false;
-  const cooldownLabel = useCooldownTimer(elig?.cooldown_ends_at);
+  // Re-fetch eligibility the instant the cooldown elapses so the button flips
+  // from "Come back tomorrow" to "Finish tasks to withdraw" (or "Fast Cash")
+  // without a manual page reload.
+  const cooldownLabel = useCooldownTimer(elig?.cooldown_ends_at, loadData);
 
   // Not eligible because of outstanding tasks (quiz / credits / referrals) rather
   // than a real time/upgrade gate. This is an actionable state — the user can
